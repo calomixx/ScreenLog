@@ -1,0 +1,871 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  X, 
+  Star, 
+  Play, 
+  Calendar, 
+  User, 
+  Tv, 
+  Clock, 
+  Bookmark, 
+  Check, 
+  MessageSquare, 
+  ThumbsUp, 
+  Send, 
+  Sliders, 
+  Share2, 
+  Edit3, 
+  Sparkles,
+  RotateCcw,
+  Film,
+  Award,
+  Layers,
+  Heart
+} from 'lucide-react';
+import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
+import { useMedia } from '../context/MediaContext';
+import { RatingStars } from './RatingStars';
+
+const PLATFORM_OPTIONS = [
+  'Netflix',
+  'Max (HBO)',
+  'Prime Video',
+  'Disney+',
+  'Apple TV+',
+  'Star+',
+  'Paramount+',
+  'Crunchyroll',
+  'Cine / Sala de Cine',
+  'Blu-ray / Físico',
+  'YouTube / Alquiler',
+  'Otra'
+];
+
+const EVALUATION_PRESETS: EvaluationTag[] = [
+  'Obra Maestra (10/10)',
+  'Excelente (9/10)',
+  'Muy Buena (8/10)',
+  'Buena (7/10)',
+  'Entretenida (6/10)',
+  'Pasable / Regular (5/10)',
+  'Mediocre (4/10)',
+  'Mala (2-3/10)',
+  'Pérdida de tiempo (1/10)'
+];
+
+const REWATCH_OPTIONS: { value: RewatchChoice; label: string; icon: string }[] = [
+  { value: 'si_totalmente', label: '¡Sí, totalmente!', icon: '🤩' },
+  { value: 'quizas', label: 'Quizás en el futuro', icon: '🤔' },
+  { value: 'no_suficiente', label: 'No, una vez fue suficiente', icon: '👌' },
+  { value: 'jamas', label: 'Jamás', icon: '🙅‍♂️' }
+];
+
+export const DetailModal: React.FC = () => {
+  const { 
+    selectedMedia, 
+    setSelectedMediaId, 
+    userReviews, 
+    updateUserReview, 
+    updateMediaStatus, 
+    removeFromMyList,
+    addCommunityComment, 
+    toggleCommentLike, 
+    submitDetailedVote,
+    openTrailer 
+  } = useMedia();
+
+  const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios'>('info');
+  const [commentText, setCommentText] = useState('');
+  const [commentRating, setCommentRating] = useState(5);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Community detailed vote state
+  const [userDetailedVote, setUserDetailedVote] = useState({
+    script: 9,
+    acting: 9,
+    soundtrack: 9,
+    visuals: 9,
+    direction: 9
+  });
+  const [hasVotedDetailed, setHasVotedDetailed] = useState(false);
+
+  // Personal Review Form State
+  const currentReview = selectedMedia ? userReviews[selectedMedia.id] : undefined;
+
+  const [reviewForm, setReviewForm] = useState<UserReview>({
+    mediaId: '',
+    status: 'pendiente',
+    stars: 4.5,
+    year: new Date().getFullYear(),
+    genres: [],
+    evaluation: 'Excelente (9/10)',
+    critique: '',
+    director: '',
+    watchedDate: new Date().toISOString().split('T')[0],
+    platform: 'Netflix',
+    wouldRewatch: 'si_totalmente',
+    favoriteMoment: '',
+    updatedAt: new Date().toISOString()
+  });
+
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+
+  useEffect(() => {
+    if (selectedMedia) {
+      const existing = userReviews[selectedMedia.id];
+      if (existing) {
+        setReviewForm({
+          ...existing,
+          genres: existing.genres || selectedMedia.genres,
+          year: existing.year || selectedMedia.year,
+          director: existing.director || selectedMedia.director,
+          platform: existing.platform || selectedMedia.defaultPlatform
+        });
+      } else {
+        setReviewForm({
+          mediaId: selectedMedia.id,
+          status: 'pendiente',
+          stars: 4.5,
+          year: selectedMedia.year,
+          genres: selectedMedia.genres,
+          evaluation: 'Excelente (9/10)',
+          critique: '',
+          director: selectedMedia.director,
+          watchedDate: new Date().toISOString().split('T')[0],
+          platform: selectedMedia.defaultPlatform,
+          wouldRewatch: 'si_totalmente',
+          favoriteMoment: '',
+          updatedAt: new Date().toISOString()
+        });
+      }
+      setActiveTab('info');
+      setHasVotedDetailed(false);
+    }
+  }, [selectedMedia, userReviews]);
+
+  if (!selectedMedia) return null;
+
+  const handleStatusClick = (status: WatchStatus) => {
+    updateMediaStatus(selectedMedia.id, status);
+    setReviewForm((prev) => ({ ...prev, status }));
+    if (status === 'terminada') {
+      setActiveTab('resena');
+    }
+  };
+
+  const handleSaveReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateUserReview({
+      ...reviewForm,
+      mediaId: selectedMedia.id
+    });
+    setSaveSuccessMsg(true);
+    setTimeout(() => setSaveSuccessMsg(false), 3000);
+  };
+
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (commentText.trim()) {
+      addCommunityComment(selectedMedia.id, commentText, commentRating);
+      setCommentText('');
+      setCommentRating(5);
+    }
+  };
+
+  const handleSendDetailedVote = () => {
+    submitDetailedVote(selectedMedia.id, userDetailedVote);
+    setHasVotedDetailed(true);
+  };
+
+  const handleShare = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+      <div 
+        id="detail-modal-container"
+        className="relative w-full max-w-4xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
+      >
+        {/* Modal Header with Backdrop Image */}
+        <div className="relative h-64 sm:h-80 w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B]">
+          <img
+            src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
+            alt={selectedMedia.title}
+            className="w-full h-full object-cover filter brightness-65"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#161618] via-[#161618]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/90 via-[#161618]/40 to-transparent" />
+
+          {/* Close & Share Buttons */}
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+            <button
+              onClick={handleShare}
+              className="p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              title="Copiar enlace"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+            {copiedLink && (
+              <span className="absolute top-12 right-0 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded shadow">
+                ¡Copiado!
+              </span>
+            )}
+            <button
+              id="detail-modal-close-btn"
+              onClick={() => setSelectedMediaId(null)}
+              className="p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Banner Details (Poster + Title + Basic Info) */}
+          <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-4 sm:gap-6 z-10">
+            <img
+              src={selectedMedia.posterUrl}
+              alt={selectedMedia.title}
+              className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50"
+              referrerPolicy="no-referrer"
+            />
+            <div className="flex-1 min-w-0 pb-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
+                  {selectedMedia.type}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 text-xs font-medium border border-white/10">
+                  {selectedMedia.defaultPlatform}
+                </span>
+                <span className="text-xs text-slate-300 font-semibold">{selectedMedia.year}</span>
+                {selectedMedia.duration && (
+                  <span className="text-xs text-slate-400">• {selectedMedia.duration}</span>
+                )}
+              </div>
+
+              <h2 className="text-xl sm:text-3xl font-display font-extrabold text-white truncate leading-tight">
+                {selectedMedia.title}
+              </h2>
+
+              <div className="flex items-center gap-3 mt-1 text-xs text-slate-300">
+                <span>Dir: <strong className="text-white">{selectedMedia.director}</strong></span>
+                <div className="flex items-center gap-1 text-amber-400 font-bold">
+                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                  <span>{selectedMedia.communityRating.toFixed(1)}</span>
+                  <span className="text-slate-400 text-[11px]">({selectedMedia.communityVotesCount.toLocaleString()} votos)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Action Strip & Modal Navigation Tabs */}
+        <div className="border-b border-white/10 bg-[#0A0A0B] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+          
+          {/* Quick List Status Buttons */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Tu estado:</span>
+            
+            <button
+              onClick={() => handleStatusClick('pendiente')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                currentReview?.status === 'pendiente'
+                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Por ver
+            </button>
+
+            <button
+              onClick={() => handleStatusClick('en_proceso')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                currentReview?.status === 'en_proceso'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              En proceso
+            </button>
+
+            <button
+              onClick={() => handleStatusClick('terminada')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                currentReview?.status === 'terminada'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Check className="w-3.5 h-3.5" />
+              Terminada (Calificar)
+            </button>
+          </div>
+
+          {/* Navigation Tabs within modal */}
+          <div className="flex items-center gap-1 border-l border-white/10 pl-3">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'info' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Sinopsis
+            </button>
+
+            <button
+              onClick={() => setActiveTab('resena')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+                activeTab === 'resena' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Mi Reseña {currentReview?.status === 'terminada' && '⭐'}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('votaciones')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'votaciones' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Votación Detallada
+            </button>
+
+            <button
+              onClick={() => setActiveTab('comentarios')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+                activeTab === 'comentarios' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Comentarios ({selectedMedia.comments.length})
+            </button>
+          </div>
+
+        </div>
+
+        {/* Tab Body Content Area */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 divide-y divide-white/5">
+          
+          {/* TAB 1: SINOPSIS & FICHA TÉCNICA */}
+          {activeTab === 'info' && (
+            <div className="space-y-6">
+              {/* Trailer button */}
+              {selectedMedia.trailerYoutubeId && (
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-rose-600/20 via-white/5 to-[#161618] border border-rose-500/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-rose-600 text-white font-bold">
+                      <Play className="w-5 h-5 fill-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Ver Tráiler Oficial</h4>
+                      <p className="text-xs text-slate-400">Reproduce el adelanto en alta definición</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openTrailer(selectedMedia.trailerYoutubeId)}
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors"
+                  >
+                    Reproducir
+                  </button>
+                </div>
+              )}
+
+              {/* Synopsis */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Sinopsis
+                </h4>
+                <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-light">
+                  {selectedMedia.synopsis}
+                </p>
+              </div>
+
+              {/* Genres */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Géneros
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedMedia.genres.map((g) => (
+                    <span
+                      key={g}
+                      className="px-3 py-1 rounded-lg bg-white/5 text-xs font-medium text-slate-200 border border-white/10"
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Technical Details Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-[#0A0A0B] p-4 rounded-2xl border border-white/10">
+                <div>
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold">Director</span>
+                  <p className="text-sm font-semibold text-white mt-0.5">{selectedMedia.director}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold">Año de Estreno</span>
+                  <p className="text-sm font-semibold text-white mt-0.5">{selectedMedia.year}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold">Plataforma</span>
+                  <p className="text-sm font-semibold text-white mt-0.5">{selectedMedia.defaultPlatform}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold">En listas</span>
+                  <p className="text-sm font-semibold text-rose-400 mt-0.5">{selectedMedia.addedToListCount.toLocaleString()} cinéfilos</p>
+                </div>
+              </div>
+
+              {/* Cast */}
+              {selectedMedia.cast && selectedMedia.cast.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Reparto Principal
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedMedia.cast.map((actor) => (
+                      <span
+                        key={actor}
+                        className="px-3 py-1 rounded-full bg-white/5 text-xs text-slate-300 border border-white/10"
+                      >
+                        {actor}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: MI RESEÑA PERSONAL (All requested fields) */}
+          {activeTab === 'resena' && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-600/10 via-[#161618] to-[#161618] border border-rose-500/20 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-300">
+                  <p className="font-bold text-white mb-0.5">Ficha de Evaluación y Clasificación Personal</p>
+                  <p className="text-slate-400">
+                    Registra tu crítica, calificación con estrellas, plataforma, fecha y si la volverías a ver cuando completes este título.
+                  </p>
+                </div>
+              </div>
+
+              {saveSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  ¡Tu reseña y clasificación se han guardado con éxito en Mi Lista!
+                </div>
+              )}
+
+              <form onSubmit={handleSaveReview} className="space-y-5">
+                
+                {/* State selector */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Estado en tu lista
+                    </label>
+                    <select
+                      value={reviewForm.status}
+                      onChange={(e) => setReviewForm({ ...reviewForm, status: e.target.value as WatchStatus })}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    >
+                      <option value="pendiente">📌 Por ver / Pendiente</option>
+                      <option value="en_proceso">⏳ En proceso</option>
+                      <option value="terminada">⭐ Terminada</option>
+                    </select>
+                  </div>
+
+                  {/* Rating Stars */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Calificación (Estrellas 1 - 5)
+                    </label>
+                    <div className="flex items-center gap-3 bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2">
+                      <RatingStars
+                        rating={reviewForm.stars}
+                        interactive={true}
+                        size="lg"
+                        precision={0.5}
+                        onChange={(stars) => setReviewForm({ ...reviewForm, stars })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Evaluación Tag Preset */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                    Evaluación General
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {EVALUATION_PRESETS.map((evalPreset) => (
+                      <button
+                        type="button"
+                        key={evalPreset}
+                        onClick={() => setReviewForm({ ...reviewForm, evaluation: evalPreset })}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${
+                          reviewForm.evaluation === evalPreset
+                            ? 'bg-rose-600/20 text-rose-300 border-rose-500/50 font-bold'
+                            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        {evalPreset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Crítica / Opinión */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                    Crítica / Opinión Personal
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={reviewForm.critique}
+                    onChange={(e) => setReviewForm({ ...reviewForm, critique: e.target.value })}
+                    placeholder="Escribe tu análisis, qué te pareció el guión, actuaciones, fotografía o sensaciones que te dejó..."
+                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 leading-relaxed"
+                  />
+                </div>
+
+                {/* Metadata Row: Año, Director, Fecha en que la vi */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Año
+                    </label>
+                    <input
+                      type="number"
+                      value={reviewForm.year}
+                      onChange={(e) => setReviewForm({ ...reviewForm, year: parseInt(e.target.value) || 2024 })}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Director
+                    </label>
+                    <input
+                      type="text"
+                      value={reviewForm.director}
+                      onChange={(e) => setReviewForm({ ...reviewForm, director: e.target.value })}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Fecha en que la vi
+                    </label>
+                    <input
+                      type="date"
+                      value={reviewForm.watchedDate}
+                      onChange={(e) => setReviewForm({ ...reviewForm, watchedDate: e.target.value })}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Dónde la vi (Plataforma) & ¿La volvería a ver? */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Dónde la vi (Plataforma)
+                    </label>
+                    <select
+                      value={reviewForm.platform}
+                      onChange={(e) => setReviewForm({ ...reviewForm, platform: e.target.value })}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    >
+                      {PLATFORM_OPTIONS.map((plat) => (
+                        <option key={plat} value={plat}>
+                          {plat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      ¿La volvería a ver?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {REWATCH_OPTIONS.map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.value}
+                          onClick={() => setReviewForm({ ...reviewForm, wouldRewatch: opt.value })}
+                          className={`px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+                            reviewForm.wouldRewatch === opt.value
+                              ? 'bg-rose-600/20 text-rose-300 border-rose-500/50'
+                              : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          <span>{opt.icon}</span>
+                          <span className="truncate">{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save review button */}
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  {currentReview && (
+                    <button
+                      type="button"
+                      onClick={() => removeFromMyList(selectedMedia.id)}
+                      className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-white/10 transition-colors"
+                    >
+                      Quitar de mi lista
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-lg shadow-rose-900/30 active:scale-95 transition-all"
+                  >
+                    Guardar Clasificación y Reseña
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 3: VOTACIONES DETALLADAS DE LA COMUNIDAD */}
+          {activeTab === 'votaciones' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[#0A0A0B] border border-white/10">
+                <div className="text-center sm:text-left">
+                  <span className="text-xs text-slate-400 uppercase font-semibold">Promedio Global</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-4xl font-display font-black text-rose-500">
+                      {selectedMedia.communityRating.toFixed(1)}
+                    </span>
+                    <RatingStars rating={selectedMedia.communityRating} size="lg" showNumber={false} />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Basado en {selectedMedia.communityVotesCount.toLocaleString()} votos de la comunidad
+                  </p>
+                </div>
+
+                {/* Rating bars */}
+                <div className="w-full sm:w-64 space-y-1.5">
+                  {[5, 4, 3, 2, 1].map((starVal) => {
+                    const count = selectedMedia.detailedVotes.ratingDistribution[starVal] || 0;
+                    const percent = Math.min(100, Math.round((count / (selectedMedia.communityVotesCount || 1)) * 100));
+                    return (
+                      <div key={starVal} className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="w-3 text-right">{starVal}</span>
+                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full" style={{ width: `${percent}%` }} />
+                        </div>
+                        <span className="w-8 text-right text-[11px]">{percent}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detailed Breakdown Dimensions */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+                  Desglose Técnico de la Comunidad (Escala 1 - 10)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { label: 'Guión & Narrativa', score: selectedMedia.detailedVotes.script, icon: '📜' },
+                    { label: 'Actuaciones & Elenco', score: selectedMedia.detailedVotes.acting, icon: '🎭' },
+                    { label: 'Banda Sonora & Audio', score: selectedMedia.detailedVotes.soundtrack, icon: '🎵' },
+                    { label: 'Efectos Visuales & Foto', score: selectedMedia.detailedVotes.visuals, icon: '🎨' },
+                    { label: 'Dirección & Ritmo', score: selectedMedia.detailedVotes.direction, icon: '🎬' }
+                  ].map((dim) => (
+                    <div key={dim.label} className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">{dim.icon}</span>
+                        <div>
+                          <p className="text-xs font-bold text-white">{dim.label}</p>
+                          <div className="w-28 sm:w-36 h-1.5 bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full"
+                              style={{ width: `${(dim.score / 10) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-base font-extrabold text-rose-400 font-display">
+                        {dim.score.toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit user breakdown vote */}
+              <div className="p-5 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase">
+                    Emite tu Voto Detallado
+                  </h4>
+                  {hasVotedDetailed && (
+                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> ¡Voto registrado!
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {[
+                    { key: 'script', label: 'Guión (1-10)' },
+                    { key: 'acting', label: 'Actuaciones (1-10)' },
+                    { key: 'soundtrack', label: 'Banda Sonora (1-10)' },
+                    { key: 'visuals', label: 'Visuales (1-10)' },
+                    { key: 'direction', label: 'Dirección (1-10)' }
+                  ].map((field) => (
+                    <div key={field.key} className="flex items-center justify-between gap-2">
+                      <span className="text-slate-300">{field.label}</span>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="0.5"
+                        disabled={hasVotedDetailed}
+                        value={userDetailedVote[field.key as keyof typeof userDetailedVote]}
+                        onChange={(e) =>
+                          setUserDetailedVote({
+                            ...userDetailedVote,
+                            [field.key]: parseFloat(e.target.value)
+                          })
+                        }
+                        className="w-32 accent-rose-500"
+                      />
+                      <span className="w-6 text-right font-bold text-rose-400">
+                        {userDetailedVote[field.key as keyof typeof userDetailedVote]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={hasVotedDetailed}
+                  onClick={handleSendDetailedVote}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all ${
+                    hasVotedDetailed
+                      ? 'bg-white/10 text-slate-500 cursor-not-allowed'
+                      : 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/30'
+                  }`}
+                >
+                  {hasVotedDetailed ? 'Voto Enviado' : 'Enviar Calificación Detallada'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: COMENTARIOS DE LA COMUNIDAD */}
+          {activeTab === 'comentarios' && (
+            <div className="space-y-6">
+              {/* Add comment form */}
+              <form onSubmit={handleAddComment} className="p-4 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase">
+                    Deja tu comentario sobre este título
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Tu calificación:</span>
+                    <RatingStars
+                      rating={commentRating}
+                      interactive={true}
+                      size="sm"
+                      precision={1}
+                      onChange={(r) => setCommentRating(r)}
+                    />
+                  </div>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Comparte tu opinión, teorías, qué te sorprendió..."
+                  className="w-full bg-[#161618] border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+                />
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={!commentText.trim()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Publicar Comentario
+                  </button>
+                </div>
+              </form>
+
+              {/* Comment list */}
+              <div className="space-y-3">
+                {selectedMedia.comments.map((com) => (
+                  <div
+                    key={com.id}
+                    className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={com.avatar}
+                          alt={com.author}
+                          className="w-8 h-8 rounded-full object-cover border border-white/10"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div>
+                          <h5 className="text-xs font-bold text-white">{com.author}</h5>
+                          <span className="text-[10px] text-slate-400">{com.date}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
+                        <Star className="w-3.5 h-3.5 fill-amber-400" />
+                        <span>{com.rating}★</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-200 leading-relaxed font-light pl-10">
+                      {com.comment}
+                    </p>
+
+                    <div className="flex justify-end pl-10 pt-1">
+                      <button
+                        onClick={() => toggleCommentLike(selectedMedia.id, com.id)}
+                        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                          com.isUserLiked
+                            ? 'bg-rose-600/20 text-rose-400 border-rose-500/40'
+                            : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
+                        }`}
+                      >
+                        <ThumbsUp className={`w-3 h-3 ${com.isUserLiked ? 'fill-rose-400 text-rose-400' : ''}`} />
+                        <span>{com.likes}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+};

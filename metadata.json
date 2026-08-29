@@ -1,0 +1,7 @@
+{
+  "name": "ScreenLog - Clasificador de Películas y Series",
+  "description": "Plataforma para clasificar, calificar y organizar películas y series en Mi Lista con reseñas detalladas, opiniones comunitarias y animaciones cinemáticas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
