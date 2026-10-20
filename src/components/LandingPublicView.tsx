@@ -96,7 +96,7 @@ export const LandingPublicView: React.FC = () => {
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:py-4 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] text-white font-semibold text-sm sm:text-base border border-white/10 hover:border-white/20 backdrop-blur-md shadow-lg shadow-black/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#161618] focus-visible:outline-none"
               >
                 <UserCheck className="w-4 h-4 text-amber-400" aria-hidden="true" />
-                <span>Crear Cuenta Gratis</span>
+                <span>Únete a ScreenLog</span>
               </button>
             ) : (
               <button

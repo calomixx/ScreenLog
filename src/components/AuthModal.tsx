@@ -18,7 +18,9 @@ import {
   UserPlus,
   ArrowRight,
   KeyRound,
-  ShieldAlert
+  ShieldAlert,
+  Upload,
+  Camera
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { DEMO_USERS } from '../context/MediaContext';
@@ -67,8 +69,10 @@ export const AuthModal: React.FC = () => {
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['Ciencia Ficción', 'Drama']);
   const [regBio, setRegBio] = useState('');
   const [regError, setRegError] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const regFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync activeTab when authModalMode changes externally
   React.useEffect(() => {
@@ -83,18 +87,18 @@ export const AuthModal: React.FC = () => {
     e.preventDefault();
     setLoginError('');
     if (!loginEmail.trim()) {
-      setLoginError('Por favor ingresa tu correo electrónico.');
+      setLoginError('Escribe tu correo o usuario para continuar.');
       return;
     }
     if (!loginPassword.trim()) {
-      setLoginError('Por favor ingresa tu contraseña de acceso para continuar.');
+      setLoginError('Escribe tu clave secreta para entrar.');
       passwordInputRef.current?.focus();
       return;
     }
 
     const result = login(loginEmail, loginPassword);
     if (!result.success) {
-      setLoginError(result.message || 'No se pudo iniciar sesión. Verifica tus credenciales.');
+      setLoginError(result.message || 'Esa clave o usuario no encaja 🤔 ¿Lo escribimos otra vez?');
     }
   };
 
@@ -102,7 +106,7 @@ export const AuthModal: React.FC = () => {
     e.preventDefault();
     setRegError('');
     if (!regName.trim()) {
-      setRegError('Por favor ingresa tu nombre completo o seudónimo cinéfilo.');
+      setRegError('Escribe tu nombre o alias cinéfilo.');
       return;
     }
     if (!regEmail.trim() || !regEmail.includes('@')) {
@@ -110,7 +114,7 @@ export const AuthModal: React.FC = () => {
       return;
     }
     if (!regPassword.trim() || regPassword.length < 4) {
-      setRegError('Por favor ingresa una contraseña segura de al menos 4 caracteres.');
+      setRegError('Elige una clave de al menos 4 caracteres que puedas recordar.');
       return;
     }
 
@@ -125,7 +129,7 @@ export const AuthModal: React.FC = () => {
     });
 
     if (!result.success) {
-      setRegError(result.message || 'Error al registrar la cuenta.');
+      setRegError(result.message || 'No se pudo crear la cuenta. Intenta de nuevo.');
     }
   };
 
@@ -150,6 +154,20 @@ export const AuthModal: React.FC = () => {
     );
   };
 
+  const handleRegPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (uploadEvt) => {
+      const b64 = uploadEvt.target?.result as string;
+      if (b64) {
+        setCustomAvatarUrl(b64);
+        setUploadedFileName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div 
@@ -165,12 +183,12 @@ export const AuthModal: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-display font-black text-white tracking-tight flex items-center gap-2">
-                  {activeTab === 'login' ? 'Bienvenido a ScreenLog' : 'Crea tu Cuenta Cinéfila'}
+                  {activeTab === 'login' ? 'Bienvenido a ScreenLog' : 'Crea tu Espacio Cinéfilo'}
                 </h3>
                 <p className="text-xs text-slate-400">
                   {activeTab === 'login' 
-                    ? 'Accede de forma segura a tu lista personal, críticas y notas' 
-                    : 'Únete a la comunidad de calificación y reseñas más completa'}
+                    ? 'Tu lista, tus críticas y tus notas te están esperando' 
+                    : 'Guarda tus películas, califícalas y comparte tus opiniones'}
                 </p>
               </div>
             </div>
@@ -196,7 +214,7 @@ export const AuthModal: React.FC = () => {
               }`}
             >
               <LogIn className="w-3.5 h-3.5" />
-              Iniciar Sesión
+              Entrar
             </button>
             <button
               id="auth-tab-register"
@@ -209,7 +227,7 @@ export const AuthModal: React.FC = () => {
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              Crear Cuenta
+              Únete
             </button>
           </div>
         </div>
@@ -217,14 +235,14 @@ export const AuthModal: React.FC = () => {
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           
-          {/* Quick Demo Login Pills with Secure Password Requirement */}
+          {/* Quick Demo Login Pills with Human Microcopy */}
           <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
               <span className="flex items-center gap-1.5 text-amber-400 font-bold uppercase tracking-wider">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Acceso Rápido con Perfil Seguro
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                ¿Quién está viendo?
               </span>
-              <span className="text-[10px] text-slate-400">Pulsa la foto e ingresa clave</span>
+              <span className="text-[10px] text-slate-400">Toca tu foto y escribe tu clave</span>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -302,7 +320,7 @@ export const AuthModal: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                  Correo o Usuario
+                  Tu correo o usuario
                 </label>
                 <div className="relative flex items-center">
                   <Mail className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -321,9 +339,9 @@ export const AuthModal: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-slate-300 uppercase">
-                    Contraseña de Acceso
+                    Tu clave secreta
                   </label>
-                  <span className="text-[10px] text-slate-400">Requerida para ingresar</span>
+                  <span className="text-[10px] text-slate-400">Solo tú la conoces</span>
                 </div>
                 <div className="relative flex items-center">
                   <Lock className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -333,7 +351,7 @@ export const AuthModal: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Ingresa tu contraseña"
+                    placeholder="Escribe tu clave"
                     required
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
                   />
@@ -350,7 +368,7 @@ export const AuthModal: React.FC = () => {
               <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" defaultChecked className="rounded accent-rose-600" />
-                  <span>Recordar mi sesión</span>
+                  <span>Dejar abierta mi sesión</span>
                 </label>
               </div>
 
@@ -360,7 +378,7 @@ export const AuthModal: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-xl shadow-rose-900/30 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
-                Ingresar a ScreenLog
+                ¡A disfrutar del cine! 🍿
               </button>
 
               <div className="text-center pt-2">
@@ -371,7 +389,7 @@ export const AuthModal: React.FC = () => {
                     onClick={() => setActiveTab('register')}
                     className="text-rose-400 font-bold hover:underline"
                   >
-                    Regístrate gratis aquí
+                    Únete gratis aquí
                   </button>
                 </p>
               </div>
@@ -390,7 +408,7 @@ export const AuthModal: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                  Nombre Completo o Alias Cinéfilo
+                  Tu nombre o alias cinéfilo
                 </label>
                 <div className="relative flex items-center">
                   <User className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -409,7 +427,7 @@ export const AuthModal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                    Correo Electrónico
+                    Tu correo
                   </label>
                   <div className="relative flex items-center">
                     <Mail className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -427,7 +445,7 @@ export const AuthModal: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                    Contraseña
+                    Tu clave secreta
                   </label>
                   <div className="relative flex items-center">
                     <Lock className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -436,7 +454,7 @@ export const AuthModal: React.FC = () => {
                       type={showPassword ? 'text' : 'password'}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Crea una clave"
+                      placeholder="Elige una clave que recuerdes"
                       required
                       className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
                     />
@@ -451,11 +469,36 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Profile Avatar Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
-                  Elige tu Avatar Cinéfilo
-                </label>
+              {/* Profile Avatar Selection + Device Photo Upload */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">
+                    Elige tu avatar o sube tu foto
+                  </label>
+                  <input
+                    ref={regFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleRegPhotoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => regFileInputRef.current?.click()}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Subir foto propia
+                  </button>
+                </div>
+
+                {uploadedFileName && (
+                  <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Foto seleccionada: {uploadedFileName}
+                  </p>
+                )}
+
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   {AVATAR_PRESETS.map((av) => (
                     <button
@@ -464,6 +507,7 @@ export const AuthModal: React.FC = () => {
                       onClick={() => {
                         setSelectedAvatar(av.url);
                         setCustomAvatarUrl('');
+                        setUploadedFileName(null);
                       }}
                       className={`relative flex-shrink-0 rounded-full p-0.5 transition-all ${
                         selectedAvatar === av.url && !customAvatarUrl
@@ -516,7 +560,7 @@ export const AuthModal: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-xl shadow-rose-900/30 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 <UserPlus className="w-4 h-4" />
-                Completar Registro y Empezar
+                ¡Listo, unirme a ScreenLog!
               </button>
 
               <div className="text-center pt-1">
@@ -527,7 +571,7 @@ export const AuthModal: React.FC = () => {
                     onClick={() => setActiveTab('login')}
                     className="text-rose-400 font-bold hover:underline"
                   >
-                    Inicia sesión aquí
+                    Entra aquí
                   </button>
                 </p>
               </div>

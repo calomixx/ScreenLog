@@ -11,7 +11,10 @@ import {
   Calendar,
   User,
   Clock,
-  Play
+  Play,
+  Loader2,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { MediaType } from '../types';
@@ -53,6 +56,90 @@ export const AddMediaModal: React.FC = () => {
   const [backdropUrl, setBackdropUrl] = useState('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80');
   const [trailerUrl, setTrailerUrl] = useState('');
   const [imageTab, setImageTab] = useState<'url' | 'upload' | 'presets'>('url');
+
+  // Gemini AI Autofill States
+  const [isAutofilling, setIsAutofilling] = useState(false);
+  const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
+  const [autofillWarning, setAutofillWarning] = useState<string | null>(null);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
+  const [hasAutofilled, setHasAutofilled] = useState(false);
+
+  const handleAutofill = async () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle || trimmedTitle.length < 2 || isAutofilling) return;
+
+    setIsAutofilling(true);
+    setAutofillError(null);
+    setAutofillWarning(null);
+    setAutofillSuccess(null);
+
+    try {
+      const response = await fetch('/api/autofill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: trimmedTitle }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error || 'No se pudo obtener la información de la obra cinematográfica.');
+      }
+
+      const data = result.data;
+
+      // Autocomplete all form fields
+      if (data.title && typeof data.title === 'string') {
+        setTitle(data.title);
+      }
+      if (data.originalTitle && typeof data.originalTitle === 'string') {
+        setOriginalTitle(data.originalTitle);
+      }
+      if (data.type && ['pelicula', 'serie', 'anime', 'documental'].includes(data.type)) {
+        setType(data.type as MediaType);
+      }
+      if (data.year && !isNaN(Number(data.year))) {
+        setYear(Number(data.year));
+      }
+      if (data.director && typeof data.director === 'string') {
+        setDirector(data.director);
+      }
+      if (Array.isArray(data.cast) && data.cast.length > 0) {
+        setCastInput(data.cast.join(', '));
+      }
+      if (data.duration && typeof data.duration === 'string') {
+        setDuration(data.duration);
+      }
+      if (data.defaultPlatform && typeof data.defaultPlatform === 'string') {
+        setDefaultPlatform(data.defaultPlatform);
+      }
+      if (data.synopsis && typeof data.synopsis === 'string') {
+        setSynopsis(data.synopsis);
+      }
+      if (data.trailerYoutubeId && typeof data.trailerYoutubeId === 'string') {
+        setTrailerUrl(data.trailerYoutubeId);
+      }
+      if (Array.isArray(data.genres) && data.genres.length > 0) {
+        setSelectedGenres(data.genres);
+      }
+
+      setHasAutofilled(true);
+
+      const confidence = typeof data.confidence === 'number' ? data.confidence : 1.0;
+      if (confidence < 0.5) {
+        setAutofillWarning(`Se completaron los datos con baja confianza (${Math.round(confidence * 100)}%), por favor revisa los campos.`);
+      } else {
+        setAutofillSuccess(`¡Ficha autocompletada por Gemini! (${Math.round(confidence * 100)}% de confianza). Puedes editar cualquier campo.`);
+      }
+    } catch (err: any) {
+      console.warn('Autofill error:', err);
+      setAutofillError(err.message || 'No fue posible autocompletar la ficha automáticamente. Puedes rellenar los datos manualmente.');
+    } finally {
+      setIsAutofilling(false);
+    }
+  };
 
   if (!isAddModalOpen) return null;
 
@@ -161,19 +248,52 @@ export const AddMediaModal: React.FC = () => {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
           
-          {/* Main Info */}
+          {/* Main Info with AI Autofill */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                Título del Título / Película *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-300 uppercase">
+                  Título de la Película / Serie *
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAutofill}
+                  disabled={isAutofilling || title.trim().length < 2}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-rose-600/20 border border-amber-500/30 text-amber-300 hover:text-white hover:from-amber-500/30 hover:to-rose-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all active:scale-95 shadow-sm"
+                  title="Rellenar ficha técnica automáticamente con Gemini 2.5 Flash"
+                >
+                  {isAutofilling ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                      <span>Buscando ficha con Gemini...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>✨ Autocompletar con IA</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ej: Gladiador II, Oppenheimer, etc."
-                className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isAutofilling && title.trim().length >= 2 && !hasAutofilled) {
+                    e.preventDefault();
+                    handleAutofill();
+                  }
+                }}
+                placeholder="ej: Gladiador II, Oppenheimer, Arcane..."
+                className={`w-full bg-[#0A0A0B] border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all ${
+                  isAutofilling 
+                    ? 'border-amber-500/60 ring-2 ring-amber-500/20 animate-pulse' 
+                    : hasAutofilled
+                    ? 'border-emerald-500/50 focus:border-rose-500'
+                    : 'border-white/10 focus:border-rose-500'
+                }`}
               />
             </div>
 
@@ -190,6 +310,75 @@ export const AddMediaModal: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* AI Status / Feedback Banners */}
+          {isAutofilling && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin text-amber-400 flex-shrink-0" />
+              <div className="flex-1">
+                <span className="font-bold">Gemini 2.5 Flash:</span> Analizando ficha técnica, director, reparto, duración, géneros y plataforma oficial para "{title.trim()}"...
+              </div>
+            </div>
+          )}
+
+          {autofillSuccess && !isAutofilling && (
+            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-400 flex-shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>{autofillSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutofillSuccess(null)}
+                className="text-emerald-400 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {autofillWarning && !isAutofilling && (
+            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>{autofillWarning}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutofillWarning(null)}
+                className="text-amber-400 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {autofillError && !isAutofilling && (
+            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>{autofillError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutofillError(null)}
+                className="text-rose-400 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {title.trim().length >= 3 && !hasAutofilled && !isAutofilling && !autofillError && !autofillSuccess && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-slate-400">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <span>
+                Consejo cinéfilo: Pulsa <strong className="text-amber-300">"✨ Autocompletar con IA"</strong> para que Gemini rellene automáticamente el director, actores, duración, géneros y sinopsis.
+              </span>
+            </div>
+          )}
 
           {/* Type, Year, Platform, Duration */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -291,7 +480,7 @@ export const AddMediaModal: React.FC = () => {
               Géneros (Selecciona al menos uno)
             </label>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {AVAILABLE_GENRES.map((genre) => (
+              {Array.from(new Set([...AVAILABLE_GENRES, ...selectedGenres])).map((genre) => (
                 <button
                   type="button"
                   key={genre}

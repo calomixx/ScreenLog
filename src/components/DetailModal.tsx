@@ -107,22 +107,56 @@ export const DetailModal: React.FC = () => {
     addCommunityComment, 
     toggleCommentLike, 
     submitDetailedVote,
-    openTrailer 
+    openTrailer,
+    currentUser,
+    openEditMediaModal 
   } = useMedia();
 
   const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const top = e.currentTarget.scrollTop;
-    if (top > 25) {
-      if (!isScrolled) setIsScrolled(true);
-    } else if (top < 10) {
-      if (isScrolled) setIsScrolled(false);
+  // Tab scroll position preservation & body scroll-lock
+  const contentContainerRef = useRef<HTMLDivElement>(null);
+  const tabScrollsRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (selectedMedia) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+      document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+
+      // Reset scroll for the new media modal
+      tabScrollsRef.current = {};
+      if (contentContainerRef.current) {
+        contentContainerRef.current.scrollTop = 0;
+      }
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
     }
+  }, [selectedMedia?.id]);
+
+  const handleTabChange = (newTab: 'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver') => {
+    if (contentContainerRef.current) {
+      tabScrollsRef.current[activeTab] = contentContainerRef.current.scrollTop;
+    }
+    setActiveTab(newTab);
+    // Restore saved scroll position without animations or page jumping
+    requestAnimationFrame(() => {
+      if (contentContainerRef.current) {
+        const targetScroll = tabScrollsRef.current[newTab] || 0;
+        contentContainerRef.current.scrollTop = targetScroll;
+      }
+    });
   };
 
   // Community detailed vote state
@@ -134,6 +168,28 @@ export const DetailModal: React.FC = () => {
     direction: 9
   });
   const [hasVotedDetailed, setHasVotedDetailed] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Smooth scroll handler with hysteresis to prevent jump/flicker
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    if (top > 45 && !isScrolled) {
+      setIsScrolled(true);
+    } else if (top < 15 && isScrolled) {
+      setIsScrolled(false);
+    }
+  };
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedMediaId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setSelectedMediaId]);
 
   // Personal Review Form State
   const currentReview = selectedMedia ? userReviews[selectedMedia.id] : undefined;
@@ -158,6 +214,7 @@ export const DetailModal: React.FC = () => {
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
+  // Synchronize reviewForm when a new media is selected (ONLY on selectedMedia?.id change)
   useEffect(() => {
     if (selectedMedia) {
       const existing = userReviews[selectedMedia.id];
@@ -175,21 +232,21 @@ export const DetailModal: React.FC = () => {
       if (existing) {
         setReviewForm({
           ...existing,
-          genres: existing.genres || selectedMedia.genres,
-          year: existing.year || selectedMedia.year,
-          director: existing.director || selectedMedia.director,
-          platform: existing.platform || selectedMedia.defaultPlatform
+          genres: existing.genres || selectedMedia.genres || [],
+          year: existing.year || selectedMedia.year || new Date().getFullYear(),
+          director: existing.director || selectedMedia.director || '',
+          platform: existing.platform || selectedMedia.defaultPlatform || 'Netflix'
         });
       } else {
         setReviewForm({
           mediaId: selectedMedia.id,
           status: 'pendiente',
           stars: 4.5,
-          year: selectedMedia.year,
-          genres: selectedMedia.genres,
+          year: selectedMedia.year || new Date().getFullYear(),
+          genres: selectedMedia.genres || [],
           evaluation: 'Excelente (9/10)',
           critique: '',
-          director: selectedMedia.director,
+          director: selectedMedia.director || '',
           watchedDate: new Date().toISOString().split('T')[0],
           platform: selectedMedia.defaultPlatform || 'Netflix',
           wouldRewatch: 'si_totalmente',
@@ -200,8 +257,11 @@ export const DetailModal: React.FC = () => {
       setActiveTab('info');
       setHasVotedDetailed(false);
       setIsScrolled(false);
+      if (contentContainerRef.current) {
+        contentContainerRef.current.scrollTop = 0;
+      }
     }
-  }, [selectedMedia, userReviews]);
+  }, [selectedMedia?.id]);
 
   if (!selectedMedia) return null;
 

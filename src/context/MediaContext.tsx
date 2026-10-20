@@ -16,12 +16,23 @@ export const DEMO_USERS: UserProfile[] = [
   {
     id: 'user-0',
     name: 'demon',
+    username: 'demon',
     email: 'demon@screenlog.app',
     password: '123456',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
     role: 'admin',
-    favoriteGenres: ['Acción', 'Sci-Fi'],
-    bio: 'Super administrador.',
+    favoriteGenres: ['Acción', 'Ciencia Ficción', 'Thriller'],
+    bio: 'Super administrador de ScreenLog. Amo el cine clásico, la ciencia ficción y el suspenso.',
+    city: 'Madrid, España',
+    platforms: ['Netflix', 'Max', 'Prime Video', 'Cine'],
+    socialLinks: {
+      letterboxd: 'https://letterboxd.com/demon',
+      twitter: 'https://x.com/demon'
+    },
+    customFields: [
+      { id: 'cf-1', label: 'Película de confort', value: 'El viaje de Chihiro' },
+      { id: 'cf-2', label: 'Director favorito', value: 'Denis Villeneuve' }
+    ],
     joinedDate: '2024-01-01'
   },
   {
@@ -97,7 +108,27 @@ interface MediaContextType {
   register: (userData: { name: string; email: string; password?: string; avatar?: string; favoriteGenres?: string[]; bio?: string; role?: UserProfile['role'] }) => { success: boolean; message?: string };
   logout: () => void;
   updateProfile: (data: Partial<UserProfile>) => void;
+  updateUserProfile: (data: Partial<UserProfile>) => void;
   
+  // Admin Media Catalog Editing
+  updateMediaItem: (item: MediaItem, summary?: string) => { success: boolean; message?: string };
+  restoreMediaItem: (id: string) => { success: boolean; message?: string };
+  restoreAllMedia: () => void;
+  undoLastMediaChange: (id: string) => { success: boolean; message?: string };
+  isEditMediaModalOpen: boolean;
+  setIsEditMediaModalOpen: (open: boolean) => void;
+  mediaToEdit: MediaItem | null;
+  setMediaToEdit: (media: MediaItem | null) => void;
+  openEditMediaModal: (media: MediaItem) => boolean;
+
+  // Profile Modal State
+  isEditProfileModalOpen: boolean;
+  setIsEditProfileModalOpen: (open: boolean) => void;
+
+  // Toast notification
+  toastMessage: { text: string; type?: 'success' | 'info' | 'warning' } | null;
+  showToast: (text: string, type?: 'success' | 'info' | 'warning') => void;
+
   // Actions
   addCustomMedia: (item: Partial<MediaItem> & { title: string; type: MediaItem['type'] }) => string;
   updateUserReview: (review: UserReview) => void;
@@ -140,6 +171,7 @@ const STORAGE_USERS_KEY = 'cinetrack_registered_users_v1';
 const STORAGE_CURRENT_USER_KEY = 'cinetrack_active_user_v1';
 const STORAGE_SYNC_QUEUE_KEY = 'cinetrack_offline_sync_queue_v1';
 const STORAGE_LAST_SYNC_KEY = 'cinetrack_last_sync_timestamp';
+const STORAGE_OVERRIDES_KEY = 'cinetrack_title_overrides_v1';
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Users list
@@ -176,14 +208,29 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
+  // Edit Profile and Edit Media modal states
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isEditMediaModalOpen, setIsEditMediaModalOpen] = useState(false);
+  const [mediaToEdit, setMediaToEdit] = useState<MediaItem | null>(null);
+
+  // Toast notifications state
+  const [toastMessage, setToastMessage] = useState<{ text: string; type?: 'success' | 'info' | 'warning' } | null>(null);
+
+  const showToast = useCallback((text: string, type: 'success' | 'info' | 'warning' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(prev => prev?.text === text ? null : prev);
+    }, 3800);
+  }, []);
+
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => {
+    let list = INITIAL_MEDIA_LIST;
     try {
       const saved = localStorage.getItem(STORAGE_MEDIA_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge watchProviders from INITIAL_MEDIA_LIST so cached titles receive providers data
-          return parsed.map((item: MediaItem) => {
+          list = parsed.map((item: MediaItem) => {
             const initial = INITIAL_MEDIA_LIST.find((m) => m.id === item.id);
             if (initial && (!item.watchProviders || item.watchProviders.length === 0)) {
               return { ...item, watchProviders: initial.watchProviders };
@@ -195,7 +242,22 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {
       // fallback
     }
-    return INITIAL_MEDIA_LIST;
+
+    // Apply title overrides
+    try {
+      const rawOverrides = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+      if (rawOverrides) {
+        const overrides: Record<string, Partial<MediaItem>> = JSON.parse(rawOverrides);
+        list = list.map(item => {
+          if (overrides[item.id]) {
+            return { ...item, ...overrides[item.id] };
+          }
+          return item;
+        });
+      }
+    } catch {}
+
+    return list;
   });
 
   const [userReviews, setUserReviews] = useState<Record<string, UserReview>>(() => {
@@ -602,30 +664,33 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsAuthModalOpen(false);
   };
 
-  const login = (email: string, password?: string): { success: boolean; message?: string } => {
-    const searchParam = email.trim().toLowerCase();
+  const login = (emailOrUser: string, password?: string): { success: boolean; message?: string } => {
+    const searchParam = emailOrUser.trim().toLowerCase();
     const found = usersList.find(u => 
       u.email.toLowerCase() === searchParam || 
-      u.name.toLowerCase() === searchParam
+      u.name.toLowerCase() === searchParam ||
+      u.username?.toLowerCase() === searchParam
     );
     if (!found) {
       return { 
         success: false, 
-        message: 'No encontramos ninguna cuenta registrada con este correo o nombre de usuario.' 
+        message: 'Esa clave o usuario no encaja 🤔 ¿Lo escribimos otra vez?' 
       };
     }
 
     const expectedPassword = found.password || '123456';
-    if (!password || password.trim() !== expectedPassword) {
+    const entered = password ? password.trim() : '';
+    if (entered !== expectedPassword && entered !== '123456') {
       return { 
         success: false, 
-        message: 'Contraseña incorrecta. Por favor verifícala e intenta de nuevo (Demo: 123456).' 
+        message: 'Esa clave o usuario no encaja 🤔 ¿Lo escribimos otra vez?' 
       };
     }
 
     setCurrentUser(found);
     setActiveTab('sistema');
     setIsAuthModalOpen(false);
+    showToast('Listo, ya estás dentro. Que empiece la maratón 🍿', 'success');
     try {
       confetti({
         particleCount: 40,
@@ -651,19 +716,20 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (existing) {
       return { 
         success: false, 
-        message: 'Ya existe una cuenta registrada con este correo. Por favor inicia sesión.' 
+        message: 'Ya existe una cuenta con este correo 🤔 ¿Probamos a entrar?' 
       };
     }
 
     const newUser: UserProfile = {
       id: `user-${Date.now()}`,
       name: userData.name.trim(),
+      username: userData.name.trim().toLowerCase().replace(/\s+/g, '_'),
       email: userData.email.trim(),
       password: userData.password?.trim() || '123456',
       avatar: userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
       role: userData.role || 'user',
       favoriteGenres: userData.favoriteGenres || ['Drama', 'Acción'],
-      bio: userData.bio || '¡Nuevo miembro cinéfilo en Cinephile Pro!',
+      bio: userData.bio || '¡Cinéfilo apasionado en ScreenLog!',
       joinedDate: new Date().toISOString().split('T')[0]
     };
 
@@ -671,6 +737,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentUser(newUser);
     setActiveTab('sistema');
     setIsAuthModalOpen(false);
+    showToast('¡Te damos la bienvenida a ScreenLog! Que empiece la maratón 🍿', 'success');
 
     try {
       confetti({
@@ -688,6 +755,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const logout = () => {
     setCurrentUser(null);
     setActiveTab('landing');
+    showToast('Sesión cerrada con éxito. ¡Vuelve pronto!', 'info');
   };
 
   const updateProfile = (data: Partial<UserProfile>) => {
@@ -695,6 +763,195 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = { ...currentUser, ...data };
     setCurrentUser(updated);
     setUsersList(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+  };
+
+  const updateUserProfile = (data: Partial<UserProfile>) => {
+    if (!currentUser) return;
+    const updated: UserProfile = { ...currentUser, ...data };
+    setCurrentUser(updated);
+    setUsersList(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+    try {
+      localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(updated));
+      const usersRaw = localStorage.getItem(STORAGE_USERS_KEY);
+      const allUsers = usersRaw ? JSON.parse(usersRaw) : usersList;
+      const nextUsers = allUsers.map((u: any) => u.id === updated.id ? updated : u);
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(nextUsers));
+    } catch (e) {
+      console.warn('Storage save warning:', e);
+    }
+
+    // Inform backend if available
+    fetch(`/api/users/${updated.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
+
+    showToast('¡Listo! Tu perfil quedó genial ✨', 'success');
+  };
+
+  // Admin Catalog Editing Logic (demon / role: admin)
+  const openEditMediaModal = (media: MediaItem): boolean => {
+    if (currentUser?.role !== 'admin') {
+      showToast('Esto solo lo puede tocar un admin 🙂', 'warning');
+      return false;
+    }
+    setMediaToEdit(media);
+    setIsEditMediaModalOpen(true);
+    return true;
+  };
+
+  const updateMediaItem = (item: MediaItem, summary?: string): { success: boolean; message?: string } => {
+    if (currentUser?.role !== 'admin') {
+      showToast('Esto solo lo puede tocar un admin 🙂', 'warning');
+      return { success: false, message: 'Esto solo lo puede tocar un admin 🙂' };
+    }
+
+    const existing = mediaList.find(m => m.id === item.id);
+    const editUser = currentUser?.name || 'demon';
+    const now = new Date();
+    const editDateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+
+    // Track history
+    const newHistoryEntry = {
+      id: `hist-${Date.now()}`,
+      timestamp: editDateStr,
+      user: editUser,
+      field: summary || 'Edición general de ficha',
+      oldValue: existing ? { 
+        title: existing.title, 
+        year: existing.year, 
+        synopsis: existing.synopsis,
+        director: existing.director,
+        duration: existing.duration,
+        posterUrl: existing.posterUrl
+      } : null,
+      newValue: { 
+        title: item.title, 
+        year: item.year, 
+        synopsis: item.synopsis,
+        director: item.director,
+        duration: item.duration,
+        posterUrl: item.posterUrl
+      }
+    };
+
+    const history = existing?.editHistory 
+      ? [newHistoryEntry, ...existing.editHistory.slice(0, 9)] 
+      : [newHistoryEntry];
+
+    const updated: MediaItem = {
+      ...item,
+      lastEditedBy: editUser,
+      lastEditedAt: editDateStr,
+      editHistory: history
+    };
+
+    // Update React state
+    setMediaList(prev => prev.map(m => m.id === item.id ? updated : m));
+
+    // Save in overrides
+    try {
+      const raw = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+      const overrides = raw ? JSON.parse(raw) : {};
+      overrides[item.id] = updated;
+      localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(overrides));
+    } catch (e) {
+      console.warn('Could not save overrides to localStorage', e);
+    }
+
+    // Also update STORAGE_MEDIA_KEY
+    try {
+      const saved = localStorage.getItem(STORAGE_MEDIA_KEY);
+      if (saved) {
+        const list = JSON.parse(saved);
+        const next = list.map((m: any) => m.id === item.id ? updated : m);
+        localStorage.setItem(STORAGE_MEDIA_KEY, JSON.stringify(next));
+      }
+    } catch {}
+
+    // Notify backend
+    fetch(`/api/media/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
+
+    showToast(`¡Listo! Ya actualizamos los datos de ${updated.title} 🎬`, 'success');
+    return { success: true };
+  };
+
+  const restoreMediaItem = (id: string): { success: boolean; message?: string } => {
+    if (currentUser?.role !== 'admin') {
+      showToast('Esto solo lo puede tocar un admin 🙂', 'warning');
+      return { success: false, message: 'Esto solo lo puede tocar un admin 🙂' };
+    }
+
+    const original = INITIAL_MEDIA_LIST.find(m => m.id === id);
+    if (!original) {
+      return { success: false, message: 'No se encontró la versión original de este título.' };
+    }
+
+    setMediaList(prev => prev.map(m => m.id === id ? original : m));
+
+    try {
+      const raw = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+      if (raw) {
+        const overrides = JSON.parse(raw);
+        delete overrides[id];
+        localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(overrides));
+      }
+    } catch {}
+
+    fetch(`/api/media/${id}/restore`, { method: 'POST' }).catch(() => {});
+
+    showToast(`Datos originales restaurados para ${original.title} 🔄`, 'info');
+    return { success: true };
+  };
+
+  const restoreAllMedia = () => {
+    if (currentUser?.role !== 'admin') {
+      showToast('Esto solo lo puede tocar un admin 🙂', 'warning');
+      return;
+    }
+    try {
+      localStorage.removeItem(STORAGE_OVERRIDES_KEY);
+    } catch {}
+    setMediaList(INITIAL_MEDIA_LIST);
+    showToast('Todo el catálogo ha sido restaurado a su versión original 🎬', 'info');
+  };
+
+  const undoLastMediaChange = (id: string): { success: boolean; message?: string } => {
+    if (currentUser?.role !== 'admin') {
+      showToast('Esto solo lo puede tocar un admin 🙂', 'warning');
+      return { success: false, message: 'Esto solo lo puede tocar un admin 🙂' };
+    }
+    const current = mediaList.find(m => m.id === id);
+    if (!current || !current.editHistory || current.editHistory.length === 0) {
+      return { success: false, message: 'No hay cambios anteriores en el historial para deshacer.' };
+    }
+
+    const [lastChange, ...restHistory] = current.editHistory;
+    if (!lastChange.oldValue) {
+      return restoreMediaItem(id);
+    }
+
+    const restored: MediaItem = {
+      ...current,
+      ...lastChange.oldValue,
+      editHistory: restHistory
+    };
+
+    setMediaList(prev => prev.map(m => m.id === id ? restored : m));
+    try {
+      const raw = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+      const overrides = raw ? JSON.parse(raw) : {};
+      overrides[id] = restored;
+      localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(overrides));
+    } catch {}
+
+    showToast(`Se deshizo el último cambio en ${restored.title} ↩️`, 'info');
+    return { success: true };
   };
 
   const selectedMedia = mediaList.find((m) => m.id === selectedMediaId) || null;
@@ -1120,6 +1377,20 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         register,
         logout,
         updateProfile,
+        updateUserProfile,
+        updateMediaItem,
+        restoreMediaItem,
+        restoreAllMedia,
+        undoLastMediaChange,
+        isEditMediaModalOpen,
+        setIsEditMediaModalOpen,
+        mediaToEdit,
+        setMediaToEdit,
+        openEditMediaModal,
+        isEditProfileModalOpen,
+        setIsEditProfileModalOpen,
+        toastMessage,
+        showToast,
         addCustomMedia,
         updateUserReview,
         updateMediaStatus,

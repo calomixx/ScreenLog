@@ -10,6 +10,8 @@ import { DetailModal } from './components/DetailModal';
 import { AddMediaModal } from './components/AddMediaModal';
 import { TrailerModal } from './components/TrailerModal';
 import { AuthModal } from './components/AuthModal';
+import { EditProfileModal } from './components/EditProfileModal';
+import { EditMediaModal } from './components/EditMediaModal';
 import { AIAssistantModal } from './components/AIAssistantModal';
 import { Clapperboard, Twitter, Instagram, Github, Linkedin } from 'lucide-react';
 
@@ -54,6 +56,8 @@ const MainAppContent: React.FC = () => {
       <AddMediaModal />
       <TrailerModal />
       <AuthModal />
+      <EditProfileModal />
+      <EditMediaModal />
       <AIAssistantModal />
 
       {/* Cinematic Footer */}

@@ -9,7 +9,8 @@ import {
   Bookmark, 
   Trash2, 
   Eye,
-  Film
+  Film,
+  Edit3
 } from 'lucide-react';
 import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -27,7 +28,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     userReviews, 
     updateMediaStatus, 
     removeFromMyList,
-    openTrailer
+    openTrailer,
+    currentUser,
+    openEditMediaModal
   } = useMedia();
 
   const cardRef = useRef<HTMLDivElement>(null);
@@ -179,12 +182,25 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           </span>
 
           <div className="flex items-center gap-1">
+            {currentUser?.role === 'admin' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEditMediaModal(media);
+                }}
+                className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
+                title="Editar título (Admin demon)"
+              >
+                <Edit3 className="w-3 h-3" />
+              </button>
+            )}
             {getStatusBadge()}
           </div>
         </div>
 
         {/* Cinematic Parallax Overlay: Full Movie Synopsis & Quick Actions */}
-        <div className={`absolute inset-0 z-20 flex flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-xs transition-all duration-300 ${
+        <div className={`absolute inset-0 z-20 flex flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-sm transition-all duration-300 ${
           isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
         }`}>
           {/* Top of hover overlay: Platform / Category & Menu */}
@@ -193,17 +209,32 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
               {media.type} • {media.year}
             </span>
 
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsMenuOpen(!isMenuOpen);
-                }}
-                className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
-                title="Opciones de estado"
-              >
-                <MoreVertical className="w-3.5 h-3.5" />
-              </button>
+            <div className="flex items-center gap-1">
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditMediaModal(media);
+                  }}
+                  className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
+                  title="Editar catálogo (Admin demon)"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMenuOpen(!isMenuOpen);
+                  }}
+                  className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
+                  title="Opciones de estado"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
 
               {/* Status Dropdown Menu */}
               {isMenuOpen && (
@@ -251,6 +282,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
               )}
             </div>
           </div>
+        </div>
 
           {/* Center of hover overlay: Full & Clear Movie Synopsis */}
           <div className="my-auto py-1 space-y-1.5 text-left">
@@ -313,7 +345,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           </span>
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[11px] font-bold text-amber-400 border border-white/10">
             <Star className="w-3 h-3 fill-amber-400" />
-            {media.communityRating.toFixed(1)}
+            {(Number(media.communityRating) || 5.0).toFixed(1)}
           </div>
         </div>
       </div>
@@ -332,7 +364,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Genre Tags */}
         <div className="flex flex-wrap gap-1 pt-1">
-          {media.genres.slice(0, 2).map((g) => (
+          {(media.genres || []).slice(0, 2).map((g) => (
             <span
               key={g}
               className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-300 font-medium border border-white/5"
@@ -340,9 +372,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
               {g}
             </span>
           ))}
-          {media.genres.length > 2 && (
+          {(media.genres || []).length > 2 && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-slate-400">
-              +{media.genres.length - 2}
+              +{(media.genres || []).length - 2}
             </span>
           )}
         </div>

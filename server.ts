@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import { db } from './src/db/index';
 import { users, mediaItems, userListEntries, mediaReviews, siteTestimonials, contactTickets } from './src/db/schema';
@@ -110,6 +110,132 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error inserting media item:', error);
       res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
+    }
+  });
+
+  // AI Media Autofill Endpoint via Gemini 2.5 Flash
+  app.post('/api/autofill', async (req, res) => {
+    try {
+      const { title } = req.body;
+      if (!title || typeof title !== 'string' || title.trim().length < 2) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'El título debe tener al menos 2 caracteres para autocompletar' 
+        });
+      }
+
+      const activeKey = process.env.GEMINI_API_KEY || geminiApiKey;
+      if (!activeKey) {
+        return res.status(503).json({ 
+          success: false, 
+          error: 'GEMINI_API_KEY no está disponible en las variables de entorno del servidor.' 
+        });
+      }
+
+      const aiClient = new GoogleGenAI({
+        apiKey: activeKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: 'Título en español de la película o serie' },
+          originalTitle: { type: Type.STRING, description: 'Título original en su idioma de origen' },
+          type: { 
+            type: Type.STRING, 
+            enum: ['pelicula', 'serie', 'anime', 'documental'],
+            description: 'Tipo de producción audiovisual' 
+          },
+          year: { type: Type.INTEGER, description: 'Año de estreno o emisión inicial' },
+          director: { type: Type.STRING, description: 'Director, creador o showrunner principal' },
+          cast: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING },
+            description: '3 a 6 actores o actrices principales' 
+          },
+          genres: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING },
+            description: 'Lista de géneros en español' 
+          },
+          synopsis: { type: Type.STRING, description: 'Sinopsis o resumen argumental en español' },
+          duration: { 
+            type: Type.STRING, 
+            description: 'Duración. Películas en formato "2h 15m"; series/animes en "X Temporadas (Y eps)"' 
+          },
+          defaultPlatform: { 
+            type: Type.STRING, 
+            enum: ['Netflix', 'Max (HBO)', 'Prime Video', 'Disney+', 'Apple TV+', 'Crunchyroll', 'Cine / Sala de Cine', 'Otra'],
+            description: 'Plataforma de streaming legal o sala de cine' 
+          },
+          trailerYoutubeId: { 
+            type: Type.STRING, 
+            description: 'ID de YouTube del tráiler oficial (11 caracteres) o cadena vacía si no estás 100% seguro. Nunca inventes URLs.' 
+          },
+          confidence: { 
+            type: Type.NUMBER, 
+            description: 'Nivel de confianza en los datos entre 0.0 y 1.0' 
+          }
+        },
+        required: [
+          'title',
+          'originalTitle',
+          'type',
+          'year',
+          'director',
+          'cast',
+          'genres',
+          'synopsis',
+          'duration',
+          'defaultPlatform',
+          'trailerYoutubeId',
+          'confidence'
+        ]
+      };
+
+      const systemInstruction = `Eres un asistente de base de datos cinematográfica para "ScreenLog". Tu tarea es autocompletar la ficha técnica oficial de una película, serie, anime o documental basándote en el título ingresado por el usuario.
+
+REGLAS ESTRICTAS:
+1. Todos los textos deben estar en español (título si tiene traducción común, sinopsis y géneros).
+2. Géneros: Selecciona preferentemente de: Acción, Aventura, Animación, Ciencia Ficción, Comedia, Crimen, Documental, Drama, Fantasía, Historia, Misterio, Romance, Suspense, Terror, Biografía. Si ninguno aplica, usa el género real en español.
+3. Formato de duración:
+   - Películas y documentales: formato exacto como "2h 15m" o "1h 48m".
+   - Series y animes: formato exacto como "X Temporadas (Y eps)", por ejemplo "4 Temporadas (32 eps)" o "1 Temporada (12 eps)".
+4. defaultPlatform: Debe ser exactamente una de estas opciones: Netflix, Max (HBO), Prime Video, Disney+, Apple TV+, Crunchyroll, Cine / Sala de Cine, Otra.
+5. NO inventes enlaces ni identificadores: para trailerYoutubeId solo incluye el ID si lo conoces con certeza (11 caracteres, ej. "dQw4w9WgXcQ"); si no estás 100% seguro, devuelve cadena vacía "". Prohibido inventar URLs de imágenes.
+6. Confidence: Devuelve un valor numérico entre 0.0 y 1.0 indicando tu grado de confianza en que los datos corresponden a la obra buscada. Si el título es muy vago o no existe certeza, asigna menos de 0.5. Si no hay certeza en algún campo de texto, usa cadena vacía "", o 0 para año.`;
+
+      const prompt = `Proporciona los datos técnicos verídicos de la siguiente película o serie para catalogación: "${title.trim()}".`;
+
+      const geminiResponse = await aiClient.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema,
+          temperature: 0.1,
+        },
+      });
+
+      const responseText = geminiResponse.text;
+      if (!responseText) {
+        return res.status(500).json({ success: false, error: 'No se obtuvo respuesta de la IA' });
+      }
+
+      const parsedData = JSON.parse(responseText);
+      res.json({ success: true, data: parsedData });
+    } catch (error: any) {
+      console.error('Error in /api/autofill endpoint:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Error al procesar el autocompletado con IA' 
+      });
     }
   });
 

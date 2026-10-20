@@ -68,14 +68,14 @@ export const MyListView: React.FC = () => {
 
         <div className="space-y-3 max-w-xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-600/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider">
-            <Shield className="w-3.5 h-3.5" />
-            Acceso Privado a Tu Lista Personal
+            <Sparkles className="w-3.5 h-3.5" />
+            Tu Espacio Personal de Cine
           </div>
           <h2 className="text-3xl sm:text-4xl font-display font-extrabold text-white tracking-tight">
-            Inicia Sesión para Gestionar tu Lista Cinéfila
+            Tu lista, tus críticas y tus notas te están esperando
           </h2>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Tu colección de películas por ver, en proceso y terminadas, tu cuaderno de notas y las plataformas donde las viste se guardan de forma segura en tu perfil de usuario.
+            Tus películas por ver, en proceso y terminadas, tu cuaderno de notas y tus plataformas favoritas, todo guardado y siempre a mano en tu perfil cinéfilo.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export const MyListView: React.FC = () => {
             className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-xl shadow-rose-900/40 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <LogIn className="w-4 h-4" />
-            Iniciar Sesión con Contraseña
+            Entrar a mi cuenta
           </button>
           <button
             id="auth-gate-register-btn"
@@ -95,7 +95,7 @@ export const MyListView: React.FC = () => {
             className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-sm border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <UserPlus className="w-4 h-4 text-rose-400" />
-            Crear Cuenta Gratis
+            Únete gratis
           </button>
           <button
             id="auth-gate-offline-btn"

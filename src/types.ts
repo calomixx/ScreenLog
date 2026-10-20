@@ -1,12 +1,27 @@
+export interface CustomUserField {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
+  username?: string;
   email: string;
   password?: string;
   avatar: string;
   role: 'user' | 'critic' | 'admin';
   favoriteGenres?: string[];
   bio?: string;
+  city?: string;
+  platforms?: string[];
+  socialLinks?: {
+    letterboxd?: string;
+    instagram?: string;
+    twitter?: string;
+  };
+  customFields?: CustomUserField[];
   joinedDate: string;
 }
 
@@ -106,6 +121,25 @@ export interface MediaItem {
   createdAt: string;
   isCustomUserCreated?: boolean;
   watchProviders?: WatchProvider[];
+  seasonsCount?: number;
+  episodesCount?: number;
+  releaseDate?: string;
+  country?: string;
+  language?: string;
+  ageRating?: string;
+  status?: 'En emisión' | 'Finalizada' | 'Película';
+  tags?: string[];
+  customFields?: CustomUserField[];
+  lastEditedBy?: string;
+  lastEditedAt?: string;
+  editHistory?: {
+    id: string;
+    timestamp: string;
+    user: string;
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[];
 }
 
 export interface OfflineSyncAction {
