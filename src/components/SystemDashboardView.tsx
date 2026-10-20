@@ -36,7 +36,7 @@ export const SystemDashboardView: React.FC = () => {
   const customUserCreated = mediaList.filter((m) => m.isCustomUserCreated);
 
   return (
-    <div id="system-dashboard-view" className="space-y-12 pb-16">
+    <div id="system-dashboard-view" className="space-y-12 pb-16 scroll-mt-20">
       {/* Animated Hero Carousel with Dynamic Moving Backdrops & Trailers */}
       <HeroSlider items={featuredMedia.length > 0 ? featuredMedia : mediaList.slice(0, 5)} />
 

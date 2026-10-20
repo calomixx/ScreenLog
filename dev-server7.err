@@ -1,0 +1,29 @@
+API key should be set when using the Gemini API.
+API key should be set when using the Gemini API.
+Seed error (ignored): Failed query: insert into "users" ("id", "name", "email", "password", "avatar", "role", "bio", "favorite_genres", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, default) on conflict ("id") do nothing
+params: user-0,demon,demon@screenlog.app,123456,https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80,admin,Super administrador.,["Acción","Sci-Fi"]
+[31mfailed to load config from D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\vite.config.ts[39m
+node:internal/modules/cjs/loader:1564
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module '../lightningcss.win32-x64-msvc.node'
+Require stack:
+- D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\lightningcss\node\index.js
+    at node:internal/modules/cjs/loader:1564:15
+    at nextResolveSimple (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\tsx\dist\register-B1c7OH6V.cjs:23:1010)
+    at D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\tsx\dist\register-B1c7OH6V.cjs:22:4512
+    at D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\tsx\dist\register-B1c7OH6V.cjs:22:2830
+    at resolveTsPaths (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\tsx\dist\register-B1c7OH6V.cjs:23:762)
+    at D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\tsx\dist\register-B1c7OH6V.cjs:23:1203
+    at j._resolveFilename (file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:18825)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1118:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1142:10)
+    at defaultResolve (node:internal/modules/cjs/loader:1199:20) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'D:\\Users\\datin501\\.local\\share\\opencode\\worktree\\54911b\\lucky-knight\\ScreenLog\\node_modules\\lightningcss\\node\\index.js'
+  ]
+}
+
+Node.js v24.20.0

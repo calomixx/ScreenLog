@@ -3,28 +3,56 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { db } from './src/db/index';
-import { users, mediaItems, userListEntries, mediaReviews, siteTestimonials, contactTickets } from './src/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
-import { seedDb } from './seed';
 
 dotenv.config();
 
+// Lazy imports to avoid hard crashes if deps have native issues
+let db: any = null;
+let schema: any = {};
+let eq: any = () => { };
+let desc: any = (x: any) => x;
+let and: any = (...args: any[]) => args;
+let seedDb: any = async () => { console.log('DB seeding skipped (optional)'); };
+
+try {
+  const dbModule = await import('./src/db/index');
+  db = dbModule.db;
+  const schemaModule = await import('./src/db/schema');
+  schema = schemaModule;
+  const drizzle = await import('drizzle-orm');
+  eq = drizzle.eq;
+  desc = drizzle.desc;
+  and = drizzle.and;
+  const seed = await import('./seed');
+  seedDb = seed.seedDb;
+} catch (e: any) {
+  console.warn('DB/drizzle modules not fully available, running in limited mode:', e?.message);
+}
+
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({
-  apiKey: geminiApiKey,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+let ai: any = null;
+try {
+  ai = new GoogleGenAI({
+    apiKey: geminiApiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+} catch (e: any) {
+  console.warn('Gemini AI init failed:', e?.message);
+}
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-  await seedDb().catch(console.error);
+  if (db && seedDb) {
+    await seedDb().catch((err: any) => console.error('Seed error (ignored):', err?.message));
+  } else {
+    console.log('Skipping DB seed - no database connection');
+  }
 
   app.use(express.json());
 

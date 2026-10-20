@@ -690,6 +690,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentUser(found);
     setActiveTab('sistema');
     setIsAuthModalOpen(false);
+    setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
     showToast('Listo, ya estás dentro. Que empiece la maratón 🍿', 'success');
     try {
       confetti({
@@ -737,6 +738,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentUser(newUser);
     setActiveTab('sistema');
     setIsAuthModalOpen(false);
+    setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
     showToast('¡Te damos la bienvenida a ScreenLog! Que empiece la maratón 🍿', 'success');
 
     try {

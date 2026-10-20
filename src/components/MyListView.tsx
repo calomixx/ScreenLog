@@ -411,39 +411,39 @@ export const MyListView: React.FC = () => {
         {/* Secondary Filters: Type, Search & Sort */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Type filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full -mx-0.5">
             {(['todos', 'pelicula', 'serie', 'anime', 'documental'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTypeFilter(t)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition-all ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold capitalize whitespace-nowrap transition-all ${
                   typeFilter === t
                     ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
                     : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
                 }`}
               >
-                {t === 'todos' ? 'Todos los tipos' : t}
+                {t === 'todos' ? 'Todos' : t}
               </button>
             ))}
           </div>
 
           {/* Search and Sort within list */}
-          <div className="flex items-center gap-2.5 ml-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto flex-wrap sm:flex-nowrap justify-end w-full sm:w-auto">
+            <div className="relative z-20 flex-shrink-0">
+              <Search className="absolute left-2.5 sm:left-3 top-1.5 sm:top-2.5 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en mi lista..."
-                className="bg-[#0A0A0B] border border-white/10 text-xs text-white placeholder-slate-400 pl-9 pr-3 py-2 rounded-xl focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 transition-all w-36 sm:w-56"
+                placeholder="Buscar..."
+                className="bg-[#0A0A0B] border border-white/10 text-[11px] sm:text-xs text-white placeholder-slate-400 pl-7 sm:pl-9 pr-2.5 sm:pr-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 transition-all w-24 xs:w-28 sm:w-56"
               />
             </div>
 
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-[#0A0A0B] border border-white/10 text-xs text-slate-200 px-3 py-2 rounded-xl focus:border-rose-500 focus:outline-none cursor-pointer"
+              className="bg-[#0A0A0B] border border-white/10 text-[11px] sm:text-xs text-slate-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl focus:border-rose-500 focus:outline-none cursor-pointer flex-shrink-0"
             >
               <option value="recientes">Recientes</option>
               <option value="estrellas">Mayor Calificación</option>

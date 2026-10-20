@@ -151,7 +151,7 @@ export const DetailModal: React.FC = () => {
     }
     setActiveTab(newTab);
     // Restore saved scroll position without animations or page jumping
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       if (contentContainerRef.current) {
         const targetScroll = tabScrollsRef.current[newTab] || 0;
         contentContainerRef.current.scrollTop = targetScroll;
@@ -171,13 +171,20 @@ export const DetailModal: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Smooth scroll handler with hysteresis to prevent jump/flicker
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const top = e.currentTarget.scrollTop;
-    if (top > 45 && !isScrolled) {
-      setIsScrolled(true);
-    } else if (top < 15 && isScrolled) {
-      setIsScrolled(false);
+    const target = e.currentTarget;
+    const top = target.scrollTop;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (top > 40 && !isScrolled) {
+        setIsScrolled(true);
+      } else if (top < 10 && isScrolled) {
+        setIsScrolled(false);
+      }
+    scrollTimeoutRef.current = null; });
   };
 
   // Close on Escape key
@@ -314,21 +321,21 @@ export const DetailModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/90  flex items-start sm:items-center justify-center p-1.5 sm:p-4 md:p-6 ">
       <div 
         id="detail-modal-container"
-        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 my-auto text-slate-100 flex flex-col h-[94vh] md:h-[88vh]"
+        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90  text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
       >
         {/* Modal Header with Backdrop Image - Contracts smoothly on scroll */}
         <div 
-          className={`relative w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B] transition-all duration-300 ease-in-out ${
-            isScrolled ? 'h-24 sm:h-28' : 'h-52 sm:h-60 md:h-64'
+          className={`relative w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B] transition-none ease-in-out ${
+            isScrolled ? 'h-28 sm:h-32' : 'h-48 sm:h-56 md:h-60'
           }`}
         >
           <img
             src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
             alt={selectedMedia.title}
-            className={`w-full h-full object-cover filter transition-all duration-500 ease-out hover:scale-105 ${
+            className={`w-full h-full object-cover filter transition-none ease-out ${
               isScrolled ? 'brightness-40' : 'brightness-60'
             }`}
             referrerPolicy="no-referrer"
@@ -340,7 +347,7 @@ export const DetailModal: React.FC = () => {
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
             <button
               onClick={handleShare}
-              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10  transition-colors"
               title="Copiar enlace"
             >
               <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -353,7 +360,7 @@ export const DetailModal: React.FC = () => {
             <button
               id="detail-modal-close-btn"
               onClick={() => setSelectedMediaId(null)}
-              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10  transition-colors"
               title="Cerrar ventana"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -361,20 +368,20 @@ export const DetailModal: React.FC = () => {
           </div>
 
           {/* Banner Details (Poster + Title + Basic Info) */}
-          <div className={`absolute left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-3.5 sm:gap-5 z-10 transition-all duration-300 ${
-            isScrolled ? 'bottom-2 sm:bottom-2.5' : 'bottom-4 sm:bottom-5'
+          <div className={`absolute left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-3.5 sm:gap-5 z-10 transition-none ${
+            isScrolled ? 'bottom-3 sm:bottom-3.5' : 'bottom-4 sm:bottom-5'
           }`}>
             <img
               src={selectedMedia.posterUrl}
               alt={selectedMedia.title}
-              className={`aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 transition-all duration-300 ease-out hover:scale-105 hover:shadow-2xl hover:shadow-rose-950/80 hover:border-rose-500/50 cursor-pointer ${
+              className={`aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 transition-none ease-out hover:scale-105 hover:shadow-2xl hover:shadow-rose-950/80 hover:border-rose-500/50 cursor-pointer ${
                 isScrolled ? 'w-12 sm:w-16' : 'w-20 sm:w-28 md:w-32'
               }`}
               referrerPolicy="no-referrer"
             />
             <div className="flex-1 min-w-0 pb-0.5">
               {!isScrolled && (
-                <div className="flex flex-wrap items-center gap-2 mb-1.5 overflow-hidden transition-all duration-200">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5 overflow-hidden transition-none">
                   <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
                     {selectedMedia.type}
                   </span>
@@ -388,7 +395,7 @@ export const DetailModal: React.FC = () => {
                 </div>
               )}
 
-              <h2 className={`font-display font-extrabold text-white truncate transition-all duration-200 leading-tight ${
+              <h2 className={`font-display font-extrabold text-white truncate transition-none leading-tight ${
                 isScrolled ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl md:text-3xl'
               }`}>
                 {selectedMedia.title}
@@ -413,7 +420,7 @@ export const DetailModal: React.FC = () => {
                 /* Status Action Selector integrated into movie header */
                 <div 
                   id="detail-modal-status-selector"
-                  className="mt-3 flex items-center gap-1.5 group/status transition-all duration-200"
+                  className="mt-3 flex items-center gap-1.5 group/status transition-none"
                 >
                   <span className="text-xs font-semibold text-slate-300 mr-1 hidden sm:inline select-none drop-shadow">
                     Tu estado:
@@ -434,21 +441,21 @@ export const DetailModal: React.FC = () => {
                             ? `${item.label} (activo • clic para desmarcar)` 
                             : `Marcar como ${item.label}`
                         }
-                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-all duration-300 ease-out backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
+                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-none ease-out  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
                           isSelected
                             ? `${item.activeClass} px-3 py-1.5 scale-100 z-10 border ${item.activeBorder}`
                             : isShrunk
-                              ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} group-hover/status:px-3 hover:px-3 group-hover/status:bg-black/80 hover:bg-black/80`
+                              ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} hover:px-3 hover:bg-black/80`
                               : `px-3 py-1.5 text-slate-200 bg-black/60 border border-white/15 ${item.hoverColor} hover:bg-black/80`
                         }`}
                       >
                         <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`} />
                         <span
-                          className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+                          className={`whitespace-nowrap overflow-hidden transition-none ease-out ${
                             isSelected
                               ? 'max-w-[140px] opacity-100 ml-1.5'
                             : isShrunk
-                              ? 'max-w-0 opacity-0 group-hover/status:max-w-[120px] group-hover/status:opacity-100 group-hover/status:ml-1.5 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
+                              ? 'max-w-0 opacity-0 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
                               : 'max-w-[120px] opacity-100 ml-1.5'
                           }`}
                         >
@@ -456,7 +463,7 @@ export const DetailModal: React.FC = () => {
                         </span>
                         {isSelected && (
                           <span 
-                            className="ml-1.5 text-[10px] opacity-70 group-hover/status:opacity-100 hover:text-black font-bold hidden sm:inline"
+                            className="ml-1.5 text-[10px] opacity-70 hover:opacity-100 hover:text-black font-bold hidden sm:inline"
                             title="Desmarcar"
                           >
                             ×

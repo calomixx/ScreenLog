@@ -132,15 +132,15 @@ export const Navbar: React.FC = () => {
       <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-rose-500/35 to-transparent pointer-events-none" />
       <div 
         id="navbar-inner-container"
-        className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 min-h-[72px] py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-4 lg:gap-6"
+        className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 min-h-[72px] py-2 sm:py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6"
       >
         
         {/* Brand Logo & Navigation */}
-        <div className="flex items-center gap-3 sm:gap-4 lg:gap-6 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-6 min-w-0">
           <button
             id="brand-logo-btn"
             onClick={handleGoHome}
-            className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-none flex-shrink-0"
+            className="flex items-center gap-2 sm:gap-2.5 lg:gap-3 text-left group focus:outline-none flex-shrink-0"
             title="ScreenLog Pro - Ir al Inicio"
           >
             <div className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-rose-700 via-rose-600 to-amber-500 text-white shadow-lg shadow-rose-950/40 ring-1 ring-white/20 group-hover:scale-105 group-hover:shadow-rose-600/30 transition-all duration-300">
@@ -148,13 +148,13 @@ export const Navbar: React.FC = () => {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping opacity-75" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 font-display text-lg sm:text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-rose-300 to-amber-400 group-hover:opacity-90 transition-opacity">
+              <div className="flex items-center gap-1 sm:gap-1.5 font-display text-sm sm:text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-rose-300 to-amber-400 group-hover:opacity-90 transition-opacity whitespace-nowrap">
                 SCREENLOG
-                <span className="text-[9px] sm:text-[10px] uppercase font-extrabold tracking-widest px-1.5 py-0.5 rounded-md bg-rose-600/25 text-rose-300 border border-rose-500/30 shadow-sm">
+                <span className="text-[8px] sm:text-[10px] uppercase font-extrabold tracking-widest px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded-md bg-rose-600/25 text-rose-300 border border-rose-500/30 shadow-sm">
                   PRO
                 </span>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden sm:block">Explora • Clasifica • Tu Lista</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 font-medium hidden sm:block">Explora • Clasifica • Tu Lista</p>
             </div>
           </button>
 
@@ -234,15 +234,15 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Right Section: Search, AI Assistant, Add Button, Auth / Profile */}
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           
           {/* Search and Add Buttons (Hidden on Landing) */}
           {activeTab !== 'landing' && activeTab !== 'inicio' && activeTab !== 'opiniones' && activeTab !== 'contacto' && (
             <>
               {/* Search bar with responsive fluid width */}
-              <div ref={searchRef} className="relative">
+              <div ref={searchRef} className="relative z-30 flex-shrink-0 order-last sm:order-none">
                 <div className="relative flex items-center">
-                  <Search className="absolute left-3 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  <Search className="absolute left-2.5 sm:left-3 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 pointer-events-none" />
                   <input
                     id="header-search-input"
                     type="text"
@@ -252,8 +252,8 @@ export const Navbar: React.FC = () => {
                       setSearchQuery(e.target.value);
                       setIsSearchOpen(true);
                     }}
-                    placeholder="Buscar película..."
-                    className="w-28 sm:w-40 md:w-48 lg:w-60 focus:w-36 sm:focus:w-52 md:focus:w-60 lg:focus:w-72 bg-white/5 text-xs sm:text-sm text-slate-100 placeholder-slate-400 pl-8 pr-7 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/20 transition-all duration-300"
+                    placeholder="Buscar..."
+                    className="w-20 xs:w-24 sm:w-40 md:w-48 lg:w-60 focus:w-28 xs:focus:w-32 sm:focus:w-52 md:focus:w-60 lg:focus:w-72 bg-white/5 text-[11px] sm:text-sm text-slate-100 placeholder-slate-400 pl-7 sm:pl-8 pr-6 sm:pr-7 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-white/10 focus:outline-none focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/20 transition-all duration-300"
                   />
                   {searchQuery && (
                     <button
