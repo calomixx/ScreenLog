@@ -48,7 +48,7 @@ export const FeaturesShowcase: React.FC = () => {
     {
       icon: Bookmark,
       title: 'Mi Lista & Cuaderno Personal',
-      desc: 'Organiza tus obras en "Pendientes (Por ver)", "En Proceso" y "Terminadas". Visualiza tu progreso en cuadrícula, tabla detallada o notas.',
+      desc: 'Organiza tus obras en "Pendientes", "En Proceso" y "Terminadas". Visualiza tu progreso en cuadrícula, tabla detallada o notas.',
       badge: 'Seguimiento Total',
       accent: 'from-emerald-500/20 to-emerald-600/5 text-emerald-400 border-emerald-500/30'
     },
@@ -77,7 +77,7 @@ export const FeaturesShowcase: React.FC = () => {
     {
       number: '02',
       title: 'Organiza en Tu Lista',
-      desc: 'Marca tu estado de visionado: Por ver, En proceso o Terminada para construir tu bitácora personal.'
+      desc: 'Marca tu estado de visionado: Pendiente, En proceso o Terminada para construir tu bitácora personal.'
     },
     {
       number: '03',
@@ -95,7 +95,7 @@ export const FeaturesShowcase: React.FC = () => {
     <div id="features-showcase-section" className="space-y-16 py-6">
       
       {/* SECTION 1: QUÉ OFRECEMOS */}
-      <section className="space-y-8">
+      <section id="features-section" className="space-y-8">
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-600/10 border border-rose-500/25 text-rose-400 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
@@ -148,7 +148,7 @@ export const FeaturesShowcase: React.FC = () => {
       </section>
 
       {/* SECTION 2: CÓMO LO HACEMOS (Workflow / Step-by-Step) */}
-      <section className="relative overflow-hidden rounded-3xl bg-[#111113] border border-white/10 p-8 sm:p-12 shadow-2xl">
+      <section id="how-it-works-section" className="relative overflow-hidden rounded-3xl bg-[#111113] border border-white/10 p-8 sm:p-12 shadow-2xl">
         <div className="relative z-10 space-y-10">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">

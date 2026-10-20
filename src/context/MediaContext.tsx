@@ -1,9 +1,29 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MediaItem, UserReview, WatchStatus, CommunityComment, DetailedCommunityVotes, UserProfile } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { 
+  MediaItem, 
+  UserReview, 
+  WatchStatus, 
+  CommunityComment, 
+  DetailedCommunityVotes, 
+  UserProfile,
+  OfflineSyncAction,
+  LocalBackupData
+} from '../types';
 import { INITIAL_MEDIA_LIST, INITIAL_USER_REVIEWS } from '../data/initialMedia';
 import confetti from 'canvas-confetti';
 
 export const DEMO_USERS: UserProfile[] = [
+  {
+    id: 'user-0',
+    name: 'demon',
+    email: 'demon@screenlog.app',
+    password: '123456',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+    role: 'admin',
+    favoriteGenres: ['Acción', 'Sci-Fi'],
+    bio: 'Super administrador.',
+    joinedDate: '2024-01-01'
+  },
   {
     id: 'user-1',
     name: 'Miguel Torrealba',
@@ -39,11 +59,13 @@ export const DEMO_USERS: UserProfile[] = [
   }
 ];
 
+export type AppTab = 'landing' | 'sistema' | 'explorar' | 'mi_lista' | 'estadisticas' | 'opiniones' | 'contacto' | 'inicio';
+
 interface MediaContextType {
   mediaList: MediaItem[];
   userReviews: Record<string, UserReview>;
-  activeTab: 'inicio' | 'explorar' | 'mi_lista';
-  setActiveTab: (tab: 'inicio' | 'explorar' | 'mi_lista') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   selectedMediaId: string | null;
   setSelectedMediaId: (id: string | null) => void;
   selectedMedia: MediaItem | null;
@@ -56,6 +78,13 @@ interface MediaContextType {
   closeTrailer: () => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+
+  // AI Assistant state & actions
+  isAssistantOpen: boolean;
+  setIsAssistantOpen: (open: boolean) => void;
+  openAssistant: (initialPrompt?: string) => void;
+  closeAssistant: () => void;
+  assistantInitialPrompt: string | null;
   
   // Auth state & actions
   currentUser: UserProfile | null;
@@ -83,6 +112,17 @@ interface MediaContextType {
   setUserName: (name: string) => void;
   userAvatar: string;
   
+  // Offline persistence & sync
+  isOnline: boolean;
+  offlineSyncQueue: OfflineSyncAction[];
+  lastSyncTime: string | null;
+  isSyncing: boolean;
+  syncOfflineQueue: () => Promise<{ success: boolean; syncedCount: number }>;
+  exportLocalBackup: () => void;
+  importLocalBackup: (file: File) => Promise<{ success: boolean; message: string; count: number }>;
+  enableGuestOfflineMode: () => void;
+  clearLocalData: () => void;
+  
   // Helpers
   getReview: (mediaId: string) => UserReview | undefined;
   topClassifiedMedia: MediaItem[];
@@ -98,6 +138,8 @@ const STORAGE_MEDIA_KEY = 'cinetrack_media_items_v1';
 const STORAGE_REVIEWS_KEY = 'cinetrack_user_reviews_v1';
 const STORAGE_USERS_KEY = 'cinetrack_registered_users_v1';
 const STORAGE_CURRENT_USER_KEY = 'cinetrack_active_user_v1';
+const STORAGE_SYNC_QUEUE_KEY = 'cinetrack_offline_sync_queue_v1';
+const STORAGE_LAST_SYNC_KEY = 'cinetrack_last_sync_timestamp';
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Users list
@@ -105,7 +147,11 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem(STORAGE_USERS_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure new demo users (like 'demon') are added even if localStorage exists
+        const existingIds = new Set(parsed.map((u: UserProfile) => u.id));
+        const missingDemos = DEMO_USERS.filter(du => !existingIds.has(du.id));
+        return [...parsed, ...missingDemos];
       }
     } catch {
       // fallback
@@ -134,7 +180,17 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem(STORAGE_MEDIA_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge watchProviders from INITIAL_MEDIA_LIST so cached titles receive providers data
+          return parsed.map((item: MediaItem) => {
+            const initial = INITIAL_MEDIA_LIST.find((m) => m.id === item.id);
+            if (initial && (!item.watchProviders || item.watchProviders.length === 0)) {
+              return { ...item, watchProviders: initial.watchProviders };
+            }
+            return item;
+          });
+        }
       }
     } catch {
       // fallback
@@ -146,7 +202,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem(STORAGE_REVIEWS_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return { ...INITIAL_USER_REVIEWS, ...parsed };
       }
     } catch {
       // fallback
@@ -154,12 +211,30 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_USER_REVIEWS;
   });
 
-  const [activeTab, setActiveTab] = useState<'inicio' | 'explorar' | 'mi_lista'>('inicio');
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    return currentUser ? 'sistema' : 'landing';
+  });
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
   const [activeTrailerUrl, setActiveTrailerUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // AI Assistant state
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState<string | null>(null);
+
+  const openAssistant = (initialPrompt?: string) => {
+    if (initialPrompt) {
+      setAssistantInitialPrompt(initialPrompt);
+    }
+    setIsAssistantOpen(true);
+  };
+
+  const closeAssistant = () => {
+    setIsAssistantOpen(false);
+    setAssistantInitialPrompt(null);
+  };
 
   // Fetch initial media and users from PostgreSQL backend on mount
   useEffect(() => {
@@ -217,6 +292,155 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     syncFromDb();
   }, []);
 
+  // Offline persistence and network status
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      return navigator.onLine;
+    }
+    return true;
+  });
+
+  const [offlineSyncQueue, setOfflineSyncQueue] = useState<OfflineSyncAction[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_SYNC_QUEUE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_LAST_SYNC_KEY);
+    } catch {}
+    return null;
+  });
+
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Helper to enqueue offline operations
+  const enqueueOfflineAction = useCallback((action: Omit<OfflineSyncAction, 'id' | 'timestamp'>) => {
+    const newAction: OfflineSyncAction = {
+      ...action,
+      id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString()
+    };
+    setOfflineSyncQueue((prev) => {
+      const filtered = prev.filter(
+        (a) => !(a.type === action.type && a.payload?.mediaId === action.payload?.mediaId)
+      );
+      const next = [...filtered, newAction];
+      try {
+        localStorage.setItem(STORAGE_SYNC_QUEUE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  // Sync offline queue to backend when connection is available
+  const syncOfflineQueue = useCallback(async (): Promise<{ success: boolean; syncedCount: number }> => {
+    let currentQueue: OfflineSyncAction[] = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_SYNC_QUEUE_KEY);
+      if (saved) currentQueue = JSON.parse(saved);
+    } catch {}
+
+    if (currentQueue.length === 0) {
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setLastSyncTime(now);
+      try { localStorage.setItem(STORAGE_LAST_SYNC_KEY, now); } catch {}
+      return { success: true, syncedCount: 0 };
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { success: false, syncedCount: 0 };
+    }
+
+    setIsSyncing(true);
+    let successfulCount = 0;
+    const remainingQueue: OfflineSyncAction[] = [];
+
+    for (const action of currentQueue) {
+      try {
+        if (action.type === 'save_list_entry') {
+          const res = await fetch('/api/list', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(action.payload)
+          });
+          if (res.ok) {
+            successfulCount++;
+          } else {
+            remainingQueue.push(action);
+          }
+        } else if (action.type === 'delete_list_entry') {
+          const res = await fetch(`/api/list/${action.payload.userId}/${action.payload.mediaId}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            successfulCount++;
+          } else {
+            remainingQueue.push(action);
+          }
+        } else if (action.type === 'create_media') {
+          const res = await fetch('/api/media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(action.payload)
+          });
+          if (res.ok) {
+            successfulCount++;
+          } else {
+            remainingQueue.push(action);
+          }
+        } else if (action.type === 'create_review') {
+          const res = await fetch('/api/reviews', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(action.payload)
+          });
+          if (res.ok) {
+            successfulCount++;
+          } else {
+            remainingQueue.push(action);
+          }
+        }
+      } catch {
+        remainingQueue.push(action);
+      }
+    }
+
+    setOfflineSyncQueue(remainingQueue);
+    try {
+      localStorage.setItem(STORAGE_SYNC_QUEUE_KEY, JSON.stringify(remainingQueue));
+    } catch {}
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setLastSyncTime(now);
+    try { localStorage.setItem(STORAGE_LAST_SYNC_KEY, now); } catch {}
+
+    setIsSyncing(false);
+    return { success: remainingQueue.length === 0, syncedCount: successfulCount };
+  }, []);
+
+  // Listen for online/offline window events
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineQueue();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncOfflineQueue]);
+
   // Persist active user
   useEffect(() => {
     try {
@@ -239,14 +463,124 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [mediaList]);
 
-  // Persist reviews
+  // Persist reviews locally (both global fallback and user-scoped key)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_REVIEWS_KEY, JSON.stringify(userReviews));
+      if (currentUser?.id) {
+        localStorage.setItem(`cinetrack_user_reviews_${currentUser.id}_v1`, JSON.stringify(userReviews));
+      }
     } catch {
       // ignore
     }
-  }, [userReviews]);
+  }, [userReviews, currentUser]);
+
+  // When switching user, restore user-scoped reviews from localStorage if available
+  useEffect(() => {
+    if (currentUser?.id) {
+      try {
+        const userSaved = localStorage.getItem(`cinetrack_user_reviews_${currentUser.id}_v1`);
+        if (userSaved) {
+          const parsed = JSON.parse(userSaved);
+          if (parsed && typeof parsed === 'object') {
+            setUserReviews((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch {}
+    }
+  }, [currentUser?.id]);
+
+  // Export local backup file (JSON)
+  const exportLocalBackup = () => {
+    try {
+      const backupData: LocalBackupData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        currentUser,
+        mediaList,
+        userReviews
+      };
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `screenlog-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting backup:', err);
+    }
+  };
+
+  // Import local backup file (JSON)
+  const importLocalBackup = async (file: File): Promise<{ success: boolean; message: string; count: number }> => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.userReviews || typeof data.userReviews !== 'object') {
+        return { success: false, message: 'Archivo de respaldo inválido: no contiene reseñas válidas.', count: 0 };
+      }
+      
+      setUserReviews((prev) => {
+        const merged = { ...prev, ...data.userReviews };
+        try { 
+          localStorage.setItem(STORAGE_REVIEWS_KEY, JSON.stringify(merged));
+          if (currentUser?.id) {
+            localStorage.setItem(`cinetrack_user_reviews_${currentUser.id}_v1`, JSON.stringify(merged));
+          }
+        } catch {}
+        return merged;
+      });
+
+      if (Array.isArray(data.mediaList) && data.mediaList.length > 0) {
+        setMediaList((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newOnes = data.mediaList.filter((m: any) => !existingIds.has(m.id));
+          const mergedMedia = [...newOnes, ...prev];
+          try { localStorage.setItem(STORAGE_MEDIA_KEY, JSON.stringify(mergedMedia)); } catch {}
+          return mergedMedia;
+        });
+      }
+
+      const reviewCount = Object.keys(data.userReviews).length;
+      return { success: true, message: `Se restauraron exitosamente ${reviewCount} títulos en tu lista local.`, count: reviewCount };
+    } catch (err: any) {
+      return { success: false, message: `Error al leer el archivo JSON: ${err.message}`, count: 0 };
+    }
+  };
+
+  // Enable guest offline mode (instantly grants offline access without requiring server credentials)
+  const enableGuestOfflineMode = () => {
+    const guestUser: UserProfile = {
+      id: 'user-guest-offline',
+      name: 'Cinéfilo Local',
+      email: 'local@screenlog.offline',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      role: 'user',
+      favoriteGenres: ['Drama', 'Ciencia Ficción'],
+      bio: 'Modo sin conexión activo. Tus listas y notas se almacenan en este dispositivo.',
+      joinedDate: new Date().toISOString().split('T')[0]
+    };
+    setCurrentUser(guestUser);
+    setActiveTab('mi_lista');
+  };
+
+  // Clear local data and reset to initial seed
+  const clearLocalData = () => {
+    try {
+      localStorage.removeItem(STORAGE_MEDIA_KEY);
+      localStorage.removeItem(STORAGE_REVIEWS_KEY);
+      localStorage.removeItem(STORAGE_SYNC_QUEUE_KEY);
+      localStorage.removeItem(STORAGE_LAST_SYNC_KEY);
+      setMediaList(INITIAL_MEDIA_LIST);
+      setUserReviews(INITIAL_USER_REVIEWS);
+      setOfflineSyncQueue([]);
+      setLastSyncTime(null);
+    } catch {}
+  };
 
   const userName = currentUser?.name || 'Invitado';
   const userAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
@@ -269,11 +603,15 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const login = (email: string, password?: string): { success: boolean; message?: string } => {
-    const found = usersList.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    const searchParam = email.trim().toLowerCase();
+    const found = usersList.find(u => 
+      u.email.toLowerCase() === searchParam || 
+      u.name.toLowerCase() === searchParam
+    );
     if (!found) {
       return { 
         success: false, 
-        message: 'No encontramos ninguna cuenta registrada con este correo electrónico.' 
+        message: 'No encontramos ninguna cuenta registrada con este correo o nombre de usuario.' 
       };
     }
 
@@ -286,6 +624,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     setCurrentUser(found);
+    setActiveTab('sistema');
     setIsAuthModalOpen(false);
     try {
       confetti({
@@ -330,6 +669,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setUsersList(prev => [newUser, ...prev]);
     setCurrentUser(newUser);
+    setActiveTab('sistema');
     setIsAuthModalOpen(false);
 
     try {
@@ -347,6 +687,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const logout = () => {
     setCurrentUser(null);
+    setActiveTab('landing');
   };
 
   const updateProfile = (data: Partial<UserProfile>) => {
@@ -442,29 +783,43 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }));
 
-    // Save to PostgreSQL backend
-    fetch('/api/media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: newId,
-        title: newMedia.title,
-        originalTitle: newMedia.originalTitle,
-        year: newMedia.year,
-        type: newMedia.type,
-        genres: newMedia.genres,
-        director: newMedia.director,
-        cast: newMedia.cast,
-        synopsis: newMedia.synopsis,
-        posterUrl: newMedia.posterUrl,
-        backdropUrl: newMedia.backdropUrl,
-        trailerUrl: newMedia.trailerYoutubeId,
-        duration: newMedia.duration,
-        streamingPlatforms: [newMedia.defaultPlatform],
-        rating: 5.0,
-        createdByUserId: currentUser?.id
-      })
-    }).catch(() => {});
+    // Save to PostgreSQL backend or enqueue if offline
+    const mediaPayload = {
+      id: newId,
+      title: newMedia.title,
+      originalTitle: newMedia.originalTitle,
+      year: newMedia.year,
+      type: newMedia.type,
+      genres: newMedia.genres,
+      director: newMedia.director,
+      cast: newMedia.cast,
+      synopsis: newMedia.synopsis,
+      posterUrl: newMedia.posterUrl,
+      backdropUrl: newMedia.backdropUrl,
+      trailerUrl: newMedia.trailerYoutubeId,
+      duration: newMedia.duration,
+      streamingPlatforms: [newMedia.defaultPlatform],
+      rating: 5.0,
+      createdByUserId: currentUser?.id
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      enqueueOfflineAction({
+        type: 'create_media',
+        payload: mediaPayload
+      });
+    } else {
+      fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mediaPayload)
+      }).catch(() => {
+        enqueueOfflineAction({
+          type: 'create_media',
+          payload: mediaPayload
+        });
+      });
+    }
 
     try {
       confetti({
@@ -483,23 +838,37 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const isNowTerminada = review.status === 'terminada';
     const wasTerminada = userReviews[review.mediaId]?.status === 'terminada';
 
-    // Save to PostgreSQL user_list_entries
+    // Save to PostgreSQL user_list_entries or enqueue offline
     if (currentUser) {
-      fetch('/api/list', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          mediaId: review.mediaId,
-          status: review.status,
-          rating: review.stars,
-          userNotes: review.critique || review.evaluation || '',
-          platformWatched: review.platform,
-          dateWatched: review.watchedDate,
-          rewatch: review.wouldRewatch === 'si_totalmente',
-          emotionalTag: review.evaluation
-        })
-      }).catch(() => {});
+      const listPayload = {
+        userId: currentUser.id,
+        mediaId: review.mediaId,
+        status: review.status,
+        rating: review.stars,
+        userNotes: review.critique || review.evaluation || '',
+        platformWatched: review.platform,
+        dateWatched: review.watchedDate,
+        rewatch: review.wouldRewatch === 'si_totalmente',
+        emotionalTag: review.evaluation
+      };
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        enqueueOfflineAction({
+          type: 'save_list_entry',
+          payload: listPayload
+        });
+      } else {
+        fetch('/api/list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(listPayload)
+        }).catch(() => {
+          enqueueOfflineAction({
+            type: 'save_list_entry',
+            payload: listPayload
+          });
+        });
+      }
     }
 
     setUserReviews((prev) => ({
@@ -582,7 +951,19 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const removeFromMyList = (mediaId: string) => {
     if (currentUser) {
-      fetch(`/api/list/${currentUser.id}/${mediaId}`, { method: 'DELETE' }).catch(() => {});
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        enqueueOfflineAction({
+          type: 'delete_list_entry',
+          payload: { userId: currentUser.id, mediaId }
+        });
+      } else {
+        fetch(`/api/list/${currentUser.id}/${mediaId}`, { method: 'DELETE' }).catch(() => {
+          enqueueOfflineAction({
+            type: 'delete_list_entry',
+            payload: { userId: currentUser.id, mediaId }
+          });
+        });
+      }
     }
 
     setUserReviews((prev) => {
@@ -724,6 +1105,11 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         closeTrailer,
         searchQuery,
         setSearchQuery,
+        isAssistantOpen,
+        setIsAssistantOpen,
+        openAssistant,
+        closeAssistant,
+        assistantInitialPrompt,
         currentUser,
         usersList,
         isAuthModalOpen,
@@ -749,7 +1135,16 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         mostAddedMedia,
         featuredMedia,
         myListEntries,
-        statusCounts
+        statusCounts,
+        isOnline,
+        offlineSyncQueue,
+        lastSyncTime,
+        isSyncing,
+        syncOfflineQueue,
+        exportLocalBackup,
+        importLocalBackup,
+        enableGuestOfflineMode,
+        clearLocalData
       }}
     >
       {children}

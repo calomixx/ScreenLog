@@ -25,12 +25,15 @@ import {
   LogIn,
   UserPlus,
   Tv,
-  Check
+  Check,
+  HardDrive
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { WatchStatus, MediaType, UserReview } from '../types';
 import { RatingStars } from './RatingStars';
 import { MediaCard } from './MediaCard';
+import { UserStatsPanel } from './UserStatsPanel';
+import { OfflinePersistenceIndicator } from './OfflinePersistenceIndicator';
 
 export const MyListView: React.FC = () => {
   const { 
@@ -42,7 +45,8 @@ export const MyListView: React.FC = () => {
     setActiveTab,
     statusCounts,
     currentUser,
-    openAuthModal
+    openAuthModal,
+    enableGuestOfflineMode
   } = useMedia();
 
   const [statusFilter, setStatusFilter] = useState<'todas' | WatchStatus>('todas');
@@ -92,6 +96,15 @@ export const MyListView: React.FC = () => {
           >
             <UserPlus className="w-4 h-4 text-rose-400" />
             Crear Cuenta Gratis
+          </button>
+          <button
+            id="auth-gate-offline-btn"
+            onClick={enableGuestOfflineMode}
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-sm border border-amber-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+            title="Accede a tus listas locales sin necesidad de conexión"
+          >
+            <HardDrive className="w-4 h-4 text-amber-400" />
+            Modo Local / Sin Conexión
           </button>
         </div>
 
@@ -221,168 +234,192 @@ export const MyListView: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Summary Bento Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="p-4 rounded-2xl bg-[#161618] border border-white/10 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total en Lista</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-black font-display text-white">{statusCounts.all}</span>
-            <span className="text-xs text-slate-400">títulos</span>
+      {/* Offline Status & Local Persistence Indicator */}
+      <OfflinePersistenceIndicator />
+
+      {/* Stats Summary Bento Row: Compact default with hover enlargement */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-white/10 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-rose-500/40 hover:shadow-lg hover:shadow-rose-950/20 cursor-default group">
+          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 uppercase tracking-wider transition-colors">Total en Lista</span>
+          <div className="flex items-baseline gap-1.5 mt-1.5">
+            <span className="text-xl sm:text-2xl font-black font-display text-white">{statusCounts.all}</span>
+            <span className="text-[11px] text-slate-400">títulos</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#161618] border border-emerald-500/20 shadow-sm flex flex-col justify-between">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-emerald-500/20 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-950/20 cursor-default group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Terminadas</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Terminadas</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-black font-display text-emerald-400">{statusCounts.terminada}</span>
-            <span className="text-xs text-slate-400">reseñadas</span>
+          <div className="flex items-baseline gap-1.5 mt-1.5">
+            <span className="text-xl sm:text-2xl font-black font-display text-emerald-400">{statusCounts.terminada}</span>
+            <span className="text-[11px] text-slate-400">vistas</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#161618] border border-amber-500/20 shadow-sm flex flex-col justify-between">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-amber-500/20 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-950/20 cursor-default group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">En Proceso</span>
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">En Proceso</span>
+            <Clock className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-black font-display text-amber-400">{statusCounts.en_proceso}</span>
-            <span className="text-xs text-slate-400">viendo ahora</span>
+          <div className="flex items-baseline gap-1.5 mt-1.5">
+            <span className="text-xl sm:text-2xl font-black font-display text-amber-400">{statusCounts.en_proceso}</span>
+            <span className="text-[11px] text-slate-400">viendo</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#161618] border border-sky-500/20 shadow-sm flex flex-col justify-between">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-sky-500/20 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-950/20 cursor-default group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">Por Ver</span>
-            <Bookmark className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Por Ver</span>
+            <Bookmark className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-black font-display text-sky-400">{statusCounts.pendiente}</span>
-            <span className="text-xs text-slate-400">en cola</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#161618] border border-white/10 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Promedio 5★</span>
-          <div className="flex items-center gap-1.5 mt-2">
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <span className="text-2xl font-black font-display text-amber-400">{avgStars}</span>
+          <div className="flex items-baseline gap-1.5 mt-1.5">
+            <span className="text-xl sm:text-2xl font-black font-display text-sky-400">{statusCounts.pendiente}</span>
+            <span className="text-[11px] text-slate-400">en cola</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#161618] border border-white/10 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Plataforma Top</span>
-          <div className="mt-2 truncate">
-            <span className="text-base font-bold text-white truncate block">{topPlatform}</span>
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-white/10 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-950/20 cursor-default group">
+          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 uppercase tracking-wider transition-colors">Promedio 5★</span>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400 group-hover:rotate-12 transition-transform" />
+            <span className="text-xl sm:text-2xl font-black font-display text-amber-400">{avgStars}</span>
+          </div>
+        </div>
+
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#161618]/90 border border-white/10 shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 hover:border-rose-500/40 hover:shadow-lg hover:shadow-rose-950/20 cursor-default group">
+          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 uppercase tracking-wider transition-colors">Plataforma Top</span>
+          <div className="mt-1.5 truncate">
+            <span className="text-sm sm:text-base font-bold text-white truncate block group-hover:text-rose-400 transition-colors">{topPlatform}</span>
           </div>
         </div>
       </div>
 
-      {/* Control Bar: Status Tabs, View Switcher & Filters */}
-      <div className="p-4 rounded-2xl bg-[#161618] border border-white/10 space-y-4">
+      {/* User Genre Statistics Bar Chart Panel (Recharts with compact default & hover enlargement) */}
+      <UserStatsPanel />
+
+      {/* Control Bar: Status Tabs, View Switcher & Filters (Refined, intuitive & pleasing) */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-b from-[#18181b]/95 via-[#161619]/95 to-[#121214]/95 border border-white/10 shadow-2xl space-y-4">
         
         {/* Main Status Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setStatusFilter('todas')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
                 statusFilter === 'todas'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-1 ring-rose-400/40 scale-102'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              Todas ({statusCounts.all})
+              <span>Todas</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${statusFilter === 'todas' ? 'bg-black/30 text-white' : 'bg-white/10 text-slate-400'}`}>
+                {statusCounts.all}
+              </span>
             </button>
 
             <button
               onClick={() => setStatusFilter('terminada')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
                 statusFilter === 'terminada'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-300/40 font-extrabold scale-102'
+                  : 'bg-white/5 text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-300'
               }`}
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Terminadas ({statusCounts.terminada})
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Terminadas</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${statusFilter === 'terminada' ? 'bg-slate-950/30 text-slate-950' : 'bg-white/10 text-emerald-400'}`}>
+                {statusCounts.terminada}
+              </span>
             </button>
 
             <button
               onClick={() => setStatusFilter('en_proceso')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
                 statusFilter === 'en_proceso'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                  ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-950/40 ring-1 ring-amber-300/40 font-extrabold scale-102'
+                  : 'bg-white/5 text-slate-300 hover:bg-amber-500/10 hover:text-amber-300'
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
-              En proceso ({statusCounts.en_proceso})
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>En proceso</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${statusFilter === 'en_proceso' ? 'bg-slate-950/30 text-slate-950' : 'bg-white/10 text-amber-400'}`}>
+                {statusCounts.en_proceso}
+              </span>
             </button>
 
             <button
               onClick={() => setStatusFilter('pendiente')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
                 statusFilter === 'pendiente'
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                  ? 'bg-sky-500 text-slate-950 shadow-lg shadow-sky-950/40 ring-1 ring-sky-300/40 font-extrabold scale-102'
+                  : 'bg-white/5 text-slate-300 hover:bg-sky-500/10 hover:text-sky-300'
               }`}
             >
-              <Bookmark className="w-3.5 h-3.5" />
-              Por ver ({statusCounts.pendiente})
+              <Bookmark className="w-3.5 h-3.5 text-sky-400" />
+              <span>Pendiente</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${statusFilter === 'pendiente' ? 'bg-slate-950/30 text-slate-950' : 'bg-white/10 text-sky-400'}`}>
+                {statusCounts.pendiente}
+              </span>
             </button>
           </div>
 
-          {/* View mode toggle */}
-          <div className="flex items-center gap-1 bg-[#0A0A0B] p-1 rounded-xl border border-white/10">
+          {/* View mode toggle with clear icons */}
+          <div className="flex items-center gap-1 bg-[#0A0A0B] p-1.5 rounded-2xl border border-white/10 shadow-inner">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors ${
-                viewMode === 'grid' ? 'bg-rose-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
               title="Vista en Cuadrícula"
             >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline">Tarjetas</span>
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Tarjetas</span>
             </button>
 
             <button
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors ${
-                viewMode === 'table' ? 'bg-rose-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all ${
+                viewMode === 'table'
+                  ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
               title="Vista en Tabla con todos los campos"
             >
-              <TableIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">Tabla</span>
+              <TableIcon className="w-3.5 h-3.5" />
+              <span>Tabla</span>
             </button>
 
             <button
               onClick={() => setViewMode('journal')}
-              className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors ${
-                viewMode === 'journal' ? 'bg-rose-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all ${
+                viewMode === 'journal'
+                  ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
               title="Vista Cuaderno de Críticas"
             >
-              <BookOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Diario</span>
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Diario</span>
             </button>
           </div>
         </div>
 
         {/* Secondary Filters: Type, Search & Sort */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Type filters */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {(['todos', 'pelicula', 'serie', 'anime', 'documental'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTypeFilter(t)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition-all ${
                   typeFilter === t
-                    ? 'bg-rose-600 text-white font-bold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                    ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
+                    : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {t === 'todos' ? 'Todos los tipos' : t}
@@ -391,22 +428,22 @@ export const MyListView: React.FC = () => {
           </div>
 
           {/* Search and Sort within list */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 ml-auto">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar en mi lista..."
-                className="bg-[#0A0A0B] border border-white/10 text-xs text-white placeholder-slate-400 pl-8 pr-3 py-1.5 rounded-xl focus:border-rose-500 focus:outline-none w-36 sm:w-52"
+                className="bg-[#0A0A0B] border border-white/10 text-xs text-white placeholder-slate-400 pl-9 pr-3 py-2 rounded-xl focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 transition-all w-36 sm:w-56"
               />
             </div>
 
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-[#0A0A0B] border border-white/10 text-xs text-slate-200 px-3 py-1.5 rounded-xl focus:border-rose-500 focus:outline-none"
+              className="bg-[#0A0A0B] border border-white/10 text-xs text-slate-200 px-3 py-2 rounded-xl focus:border-rose-500 focus:outline-none cursor-pointer"
             >
               <option value="recientes">Recientes</option>
               <option value="estrellas">Mayor Calificación</option>
@@ -514,7 +551,7 @@ export const MyListView: React.FC = () => {
                     )}
                     {review.status === 'pendiente' && (
                       <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-semibold text-[10px] whitespace-nowrap">
-                        📌 Por ver
+                        📌 Pendiente
                       </span>
                     )}
                   </td>

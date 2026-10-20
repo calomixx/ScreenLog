@@ -1,17 +1,20 @@
 import React from 'react';
 import { MediaProvider, useMedia } from './context/MediaContext';
 import { Navbar } from './components/Navbar';
-import { HomeView } from './components/HomeView';
+import { LandingPublicView } from './components/LandingPublicView';
+import { SystemDashboardView } from './components/SystemDashboardView';
 import { CatalogView } from './components/CatalogView';
 import { MyListView } from './components/MyListView';
+import { UserStatsPanel } from './components/UserStatsPanel';
 import { DetailModal } from './components/DetailModal';
 import { AddMediaModal } from './components/AddMediaModal';
 import { TrailerModal } from './components/TrailerModal';
 import { AuthModal } from './components/AuthModal';
-import { Film, Clapperboard, Sparkles, Heart, Bookmark, Star, Plus } from 'lucide-react';
+import { AIAssistantModal } from './components/AIAssistantModal';
+import { Clapperboard, Twitter, Instagram, Github, Linkedin } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, setActiveTab, setIsAddModalOpen, mediaList, myListEntries } = useMedia();
+  const { activeTab, setActiveTab, setIsAddModalOpen, mediaList, myListEntries, currentUser } = useMedia();
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
@@ -20,16 +23,38 @@ const MainAppContent: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'inicio' && <HomeView />}
-        {activeTab === 'explorar' && <CatalogView />}
-        {activeTab === 'mi_lista' && <MyListView />}
+        {/* Public Landing View (¿Qué ofrecemos?, ¿Cómo lo hacemos?, Opiniones, Contáctanos) */}
+        {(activeTab === 'landing' || activeTab === 'inicio' || activeTab === 'opiniones' || activeTab === 'contacto') && (
+          <LandingPublicView />
+        )}
+
+        {/* Authenticated / Inside the System View (Hero Slider, Top Rated, Tendencias, Títulos Propios, DB Banner) */}
+        {activeTab === 'sistema' && (
+          <SystemDashboardView />
+        )}
+
+        {/* Catalog Exploration */}
+        {activeTab === 'explorar' && (
+          <CatalogView />
+        )}
+
+        {/* Personal Watchlist & Log */}
+        {activeTab === 'mi_lista' && (
+          <MyListView />
+        )}
+
+        {/* User Statistics Panel */}
+        {activeTab === 'estadisticas' && (
+          <UserStatsPanel standalone />
+        )}
       </main>
 
-      {/* Modals */}
+      {/* Modals & AI Assistant */}
       <DetailModal />
       <AddMediaModal />
       <TrailerModal />
       <AuthModal />
+      <AIAssistantModal />
 
       {/* Cinematic Footer */}
       <footer className="border-t border-white/5 bg-[#161618]/90 text-slate-400 py-10 mt-auto">
@@ -45,43 +70,48 @@ const MainAppContent: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
-            <button onClick={() => setActiveTab('inicio')} className="hover:text-rose-400 transition-colors">
-              Inicio
-            </button>
-            <button onClick={() => setActiveTab('explorar')} className="hover:text-rose-400 transition-colors">
-              Catálogo
-            </button>
-            {myListEntries.length > 0 && (
-              <button onClick={() => setActiveTab('mi_lista')} className="hover:text-rose-400 transition-colors">
-                Mi Lista ({myListEntries.length})
-              </button>
-            )}
-            <button 
-              onClick={() => {
-                setActiveTab('inicio');
-                setTimeout(() => {
-                  document.getElementById('user-testimonials-section')?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }} 
-              className="hover:text-rose-400 transition-colors"
+          {/* Social Media Links */}
+          <div className="flex items-center gap-2.5">
+            <a
+              href="https://twitter.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Twitter / X"
+              title="Síguenos en Twitter / X"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-sky-400 hover:border-sky-500/40 hover:bg-sky-500/10 transition-all duration-200 active:scale-95"
             >
-              Opiniones de la Web
-            </button>
-            <button 
-              onClick={() => {
-                setActiveTab('inicio');
-                setTimeout(() => {
-                  document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }} 
-              className="hover:text-rose-400 transition-colors"
+              <Twitter className="w-4 h-4" />
+            </a>
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              title="Síguenos en Instagram"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-pink-400 hover:border-pink-500/40 hover:bg-pink-500/10 transition-all duration-200 active:scale-95"
             >
-              Contáctanos & Soporte
-            </button>
-            <button onClick={() => setIsAddModalOpen(true)} className="hover:text-rose-400 transition-colors">
-              + Añadir Película
-            </button>
+              <Instagram className="w-4 h-4" />
+            </a>
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+              title="Repositorio en GitHub"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/40 hover:bg-white/10 transition-all duration-200 active:scale-95"
+            >
+              <Github className="w-4 h-4" />
+            </a>
+            <a
+              href="https://linkedin.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LinkedIn"
+              title="Conéctate en LinkedIn"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-500/40 hover:bg-blue-500/10 transition-all duration-200 active:scale-95"
+            >
+              <Linkedin className="w-4 h-4" />
+            </a>
           </div>
 
           <div className="text-xs text-slate-400 text-center md:text-right">

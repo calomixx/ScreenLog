@@ -51,6 +51,30 @@ export const INITIAL_MEDIA_LIST: MediaItem[] = [
         date: '2024-02-10',
         likes: 89
       }
+    ],
+    watchProviders: [
+      // España
+      { name: 'SkyShowtime', type: 'suscripcion', quality: '4K', url: 'https://www.skyshowtime.com', region: 'ES' },
+      { name: 'Movistar Plus+', type: 'suscripcion', quality: '4K', url: 'https://www.movistarplus.es', region: 'ES' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '3,99 €', url: 'https://www.primevideo.com', region: 'ES' },
+      { name: 'Apple TV', type: 'compra', quality: '4K', price: '13,99 €', url: 'https://tv.apple.com', region: 'ES' },
+      { name: 'Rakuten TV', type: 'alquiler', quality: 'HD', price: '3,99 €', url: 'https://rakuten.tv', region: 'ES' },
+      // México
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'MX' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '$59 MXN', url: 'https://www.primevideo.com', region: 'MX' },
+      { name: 'Apple TV', type: 'compra', quality: '4K', price: '$199 MXN', url: 'https://tv.apple.com', region: 'MX' },
+      // Argentina
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'AR' },
+      { name: 'Prime Video', type: 'alquiler', quality: 'HD', price: '$4.900 ARS', url: 'https://www.primevideo.com', region: 'AR' },
+      // Colombia
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'CO' },
+      { name: 'Apple TV', type: 'compra', quality: '4K', price: '$44.900 COP', url: 'https://tv.apple.com', region: 'CO' },
+      // Chile
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'CL' },
+      // Estados Unidos
+      { name: 'Peacock', type: 'suscripcion', quality: '4K', url: 'https://www.peacocktv.com', region: 'US' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '$5.99', url: 'https://www.amazon.com/v', region: 'US' },
+      { name: 'Apple TV', type: 'compra', quality: '4K', price: '$14.99', url: 'https://tv.apple.com', region: 'US' }
     ]
   },
   {
@@ -94,6 +118,27 @@ export const INITIAL_MEDIA_LIST: MediaItem[] = [
         date: '2024-03-12',
         likes: 215
       }
+    ],
+    watchProviders: [
+      // España
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'ES' },
+      { name: 'Movistar Plus+', type: 'suscripcion', quality: '4K', url: 'https://www.movistarplus.es', region: 'ES' },
+      { name: 'Kinépolis / Cines Yelmo', type: 'cines', quality: '4K', price: 'Sesiones IMAX', url: 'https://www.kinepolis.es', region: 'ES' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '4,99 €', url: 'https://www.primevideo.com', region: 'ES' },
+      { name: 'Apple TV', type: 'compra', quality: '4K', price: '14,99 €', url: 'https://tv.apple.com', region: 'ES' },
+      // México
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'MX' },
+      { name: 'Cinépolis', type: 'cines', quality: '4K', price: 'Funciones Especiales', url: 'https://cinepolis.com', region: 'MX' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '$69 MXN', url: 'https://www.primevideo.com', region: 'MX' },
+      // Colombia
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'CO' },
+      { name: 'Cine Colombia', type: 'cines', quality: '4K', price: 'Temporada de Festivales', url: 'https://www.cinecolombia.com', region: 'CO' },
+      // Argentina
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'AR' },
+      { name: 'Apple TV', type: 'alquiler', quality: '4K', price: '$5.500 ARS', url: 'https://tv.apple.com', region: 'AR' },
+      // Estados Unidos
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'US' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '$5.99', url: 'https://www.amazon.com/v', region: 'US' }
     ]
   },
   {
@@ -137,6 +182,14 @@ export const INITIAL_MEDIA_LIST: MediaItem[] = [
         date: '2024-04-02',
         likes: 310
       }
+    ],
+    watchProviders: [
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 y 2', url: 'https://www.netflix.com', region: 'ES' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 y 2', url: 'https://www.netflix.com', region: 'MX' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 y 2', url: 'https://www.netflix.com', region: 'AR' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 y 2', url: 'https://www.netflix.com', region: 'CO' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 y 2', url: 'https://www.netflix.com', region: 'CL' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Seasons 1 & 2', url: 'https://www.netflix.com', region: 'US' }
     ]
   },
   {
@@ -180,6 +233,16 @@ export const INITIAL_MEDIA_LIST: MediaItem[] = [
         date: '2024-05-18',
         likes: 420
       }
+    ],
+    watchProviders: [
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 a 5', url: 'https://www.netflix.com', region: 'ES' },
+      { name: 'Apple TV', type: 'compra', quality: 'HD', price: '12,99 € / temporada', url: 'https://tv.apple.com', region: 'ES' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 a 5', url: 'https://www.netflix.com', region: 'MX' },
+      { name: 'Claro Video', type: 'compra', quality: 'HD', price: '$149 MXN', url: 'https://www.clarovideo.com', region: 'MX' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 a 5', url: 'https://www.netflix.com', region: 'AR' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Temporadas 1 a 5', url: 'https://www.netflix.com', region: 'CO' },
+      { name: 'Netflix', type: 'suscripcion', quality: '4K', seasons: 'Complete Series', url: 'https://www.netflix.com', region: 'US' },
+      { name: 'Prime Video', type: 'compra', quality: '4K', price: '$19.99 / season', url: 'https://www.amazon.com/v', region: 'US' }
     ]
   },
   {
@@ -223,6 +286,20 @@ export const INITIAL_MEDIA_LIST: MediaItem[] = [
         date: '2024-06-01',
         likes: 275
       }
+    ],
+    watchProviders: [
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'ES' },
+      { name: 'Prime Video', type: 'suscripcion', quality: '4K', url: 'https://www.primevideo.com', region: 'ES' },
+      { name: 'Rakuten TV', type: 'gratis', quality: 'HD', price: 'Gratis con anuncios', url: 'https://rakuten.tv', region: 'ES' },
+      { name: 'Apple TV', type: 'alquiler', quality: '4K', price: '3,99 €', url: 'https://tv.apple.com', region: 'ES' },
+      // México
+      { name: 'Max', type: 'suscripcion', quality: '4K', url: 'https://www.max.com', region: 'MX' },
+      { name: 'Prime Video', type: 'suscripcion', quality: '4K', url: 'https://www.primevideo.com', region: 'MX' },
+      { name: 'Pluto TV', type: 'gratis', quality: 'HD', price: 'Transmisión libre con publicidad', url: 'https://pluto.tv', region: 'MX' },
+      // Estados Unidos
+      { name: 'Paramount+', type: 'suscripcion', quality: '4K', url: 'https://www.paramountplus.com', region: 'US' },
+      { name: 'Pluto TV', type: 'gratis', quality: 'HD', price: 'Free with ads', url: 'https://pluto.tv', region: 'US' },
+      { name: 'Prime Video', type: 'alquiler', quality: '4K', price: '$3.99', url: 'https://www.amazon.com/v', region: 'US' }
     ]
   },
   {
@@ -415,12 +492,55 @@ export const INITIAL_USER_REVIEWS: Record<string, UserReview> = {
     favoriteMoment: 'La prueba Trinity en silencio sepulcral hasta la onda expansiva.',
     updatedAt: new Date().toISOString()
   },
+  'interstellar-2014': {
+    mediaId: 'interstellar-2014',
+    status: 'terminada',
+    stars: 5,
+    year: 2014,
+    genres: ['Ciencia Ficción', 'Drama', 'Aventura'],
+    evaluation: 'Obra Maestra (10/10)',
+    critique: 'Un viaje emocional e intelectual inigualable. La secuencia del acoplamiento y el teseracto siguen siendo cine puro.',
+    director: 'Christopher Nolan',
+    watchedDate: '2024-03-05',
+    platform: 'Prime Video',
+    wouldRewatch: 'si_totalmente',
+    favoriteMoment: 'Los 23 años de mensajes acumulados tras el planeta de Miller.',
+    updatedAt: new Date().toISOString()
+  },
+  'spider-man-across-spider-verse': {
+    mediaId: 'spider-man-across-spider-verse',
+    status: 'terminada',
+    stars: 4.5,
+    year: 2023,
+    genres: ['Animación', 'Acción', 'Aventura', 'Ciencia Ficción'],
+    evaluation: 'Excelente (9/10)',
+    critique: 'Revolución visual absoluta en la animación contemporánea. Cada universo tiene su propia identidad gráfica.',
+    director: 'Joaquim Dos Santos, Kemp Powers, Justin K. Thompson',
+    watchedDate: '2024-04-12',
+    platform: 'Max (HBO)',
+    wouldRewatch: 'si_totalmente',
+    updatedAt: new Date().toISOString()
+  },
+  'spirited-away-2001': {
+    mediaId: 'spirited-away-2001',
+    status: 'terminada',
+    stars: 5,
+    year: 2001,
+    genres: ['Animación', 'Fantasía', 'Aventura'],
+    evaluation: 'Obra Maestra (10/10)',
+    critique: 'Fábula inolvidable llena de imaginación, espiritualidad y empatía.',
+    director: 'Hayao Miyazaki',
+    watchedDate: '2024-01-22',
+    platform: 'Netflix',
+    wouldRewatch: 'si_totalmente',
+    updatedAt: new Date().toISOString()
+  },
   'dune-part-two-2024': {
     mediaId: 'dune-part-two-2024',
     status: 'en_proceso',
     stars: 4.5,
     year: 2024,
-    genres: ['Ciencia Ficción', 'Aventura'],
+    genres: ['Ciencia Ficción', 'Aventura', 'Drama'],
     evaluation: 'Excelente (9/10)',
     critique: '',
     director: 'Denis Villeneuve',
@@ -444,3 +564,4 @@ export const INITIAL_USER_REVIEWS: Record<string, UserReview> = {
     updatedAt: new Date().toISOString()
   }
 };
+

@@ -22,7 +22,7 @@ export const mediaItems = pgTable('media_items', {
   type: text('type').notNull().default('pelicula'), // 'pelicula' | 'serie' | 'documental' | 'anime'
   genres: jsonb('genres').$type<string[]>().notNull(),
   director: text('director'),
-  cast: jsonb('cast').$type<string[]>().default([]),
+  cast: jsonb('cast_members').$type<string[]>().default([]),
   synopsis: text('synopsis').notNull(),
   posterUrl: text('poster_url').notNull(),
   backdropUrl: text('backdrop_url'),

@@ -273,11 +273,12 @@ export const AuthModal: React.FC = () => {
               <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
                 <span className="flex items-center gap-1.5 font-medium">
                   <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                  Perfil: <strong>{selectedDemoUser.name}</strong> • Clave demo: <code className="bg-black/40 px-1.5 py-0.5 rounded text-white font-mono text-[11px]">123456</code>
+                  Perfil: <strong>{selectedDemoUser.name}</strong>
                 </span>
                 <button
                   type="button"
                   onClick={() => {
+                    setLoginEmail(selectedDemoUser.email);
                     setLoginPassword('123456');
                     passwordInputRef.current?.focus();
                   }}
@@ -301,16 +302,16 @@ export const AuthModal: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                  Correo Electrónico
+                  Correo o Usuario
                 </label>
                 <div className="relative flex items-center">
                   <Mail className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
                     id="login-email-input"
-                    type="email"
+                    type="text"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ej: miguel@screenlog.app"
+                    placeholder="ej: miguel@screenlog.app o demon"
                     required
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
                   />
@@ -332,7 +333,7 @@ export const AuthModal: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Ingresa tu contraseña (Demo: 123456)"
+                    placeholder="Ingresa tu contraseña"
                     required
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
                   />
@@ -351,16 +352,6 @@ export const AuthModal: React.FC = () => {
                   <input type="checkbox" defaultChecked className="rounded accent-rose-600" />
                   <span>Recordar mi sesión</span>
                 </label>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setLoginPassword('123456');
-                    setLoginError('');
-                  }}
-                  className="text-rose-400 hover:underline"
-                >
-                  ¿Usar clave demo (123456)?
-                </button>
               </div>
 
               <button

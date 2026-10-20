@@ -251,7 +251,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
                         onClick={() => handleStatusSelect('pendiente')}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-200 hover:bg-white/10 flex items-center justify-between"
                       >
-                        <span>📌 Por ver / Vistas</span>
+                        <span>📌 Pendiente</span>
                         {userReview?.status === 'pendiente' && <Check className="w-3.5 h-3.5 text-rose-400" />}
                       </button>
                       <button
@@ -278,47 +278,80 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
         {/* Bottom Filmstrip Thumbnails & Progress bar */}
         <div className="pt-6 border-t border-white/10 mt-6">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-3.5 sm:p-4 rounded-2xl bg-[#161618]/80 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60">
             
-            {/* Filmstrip thumbnails */}
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 max-w-full">
-              {items.slice(0, 5).map((item, idx) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`relative flex-shrink-0 rounded-xl overflow-hidden transition-all duration-300 ${
-                    idx === currentIndex
-                      ? 'ring-2 ring-rose-500 scale-105 shadow-lg shadow-rose-900/30'
-                      : 'opacity-50 hover:opacity-90'
-                  }`}
-                >
-                  <img
-                    src={item.posterUrl}
-                    alt={item.title}
-                    className="w-14 h-20 sm:w-16 sm:h-24 object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-1">
-                    <span className="text-[10px] font-bold text-white truncate w-full text-left">
-                      {item.title}
-                    </span>
-                  </div>
-                </button>
-              ))}
+            {/* Filmstrip thumbnails with generous padding so active scale-105 pops out smoothly */}
+            <div className="flex items-center gap-3 overflow-x-auto py-2 px-1.5 max-w-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+              {items.slice(0, 5).map((item, idx) => {
+                const isActive = idx === currentIndex;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`group relative flex-shrink-0 rounded-xl overflow-hidden transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
+                      isActive
+                        ? 'ring-2 ring-rose-500 scale-105 shadow-xl shadow-rose-950/80 -translate-y-1 z-10'
+                        : 'opacity-60 hover:opacity-100 hover:scale-102 hover:-translate-y-0.5 border border-white/10'
+                    }`}
+                  >
+                    <img
+                      src={item.posterUrl}
+                      alt={item.title}
+                      className="w-14 h-20 sm:w-16 sm:h-24 object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex items-end p-1.5">
+                      <span className={`text-[10px] font-bold truncate w-full text-left transition-colors ${
+                        isActive ? 'text-rose-300' : 'text-slate-300 group-hover:text-white'
+                      }`}>
+                        {item.title}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Slide indicators */}
-            <div className="hidden sm:flex items-center gap-1.5">
-              {items.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  className={`h-1.5 rounded-full transition-all duration-500 ${
-                    i === currentIndex ? 'w-8 bg-rose-500' : 'w-2 bg-slate-700'
-                  }`}
-                  aria-label={`Slide ${i + 1}`}
-                />
-              ))}
+            {/* Slide Dot Indicators (visible on all screens, showing active element & count) */}
+            <div 
+              id="hero-slider-dots-container"
+              className="flex-shrink-0 flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-xl"
+              role="tablist"
+              aria-label="Indicadores de películas destacadas"
+            >
+              {/* Numeric indicator: current / total */}
+              <span className="text-[11px] font-mono font-bold text-slate-300 pr-1 select-none flex items-center gap-0.5">
+                <span className="text-rose-400">{currentIndex + 1}</span>
+                <span className="text-slate-600">/</span>
+                <span className="text-slate-400">{items.length}</span>
+              </span>
+
+              {/* Dot Indicators */}
+              <div className="flex items-center gap-1.5">
+                {items.map((item, i) => {
+                  const isActive = i === currentIndex;
+                  return (
+                    <button
+                      key={item.id || i}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-label={`Diapositiva ${i + 1} de ${items.length}: ${item.title}`}
+                      title={`${i + 1}. ${item.title}`}
+                      onClick={() => setCurrentIndex(i)}
+                      className={`relative rounded-full transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0A0A0B] ${
+                        isActive
+                          ? 'w-7 h-2.5 bg-gradient-to-r from-rose-500 via-rose-400 to-amber-400 shadow-md shadow-rose-500/50 scale-105'
+                          : 'w-2.5 h-2.5 bg-white/25 hover:bg-white/60 hover:scale-125'
+                      }`}
+                    >
+                      <span className="sr-only">
+                        {item.title} {isActive ? '(Activo)' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
           </div>

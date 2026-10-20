@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Star, 
   Plus, 
@@ -9,7 +9,7 @@ import {
   Bookmark, 
   Trash2, 
   Eye,
-  Edit3
+  Film
 } from 'lucide-react';
 import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -18,9 +18,10 @@ import { RatingStars } from './RatingStars';
 interface MediaCardProps {
   media: MediaItem;
   layout?: 'grid' | 'compact' | 'detailed';
+  parallax?: boolean;
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) => {
+export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', parallax = false }) => {
   const { 
     setSelectedMediaId, 
     userReviews, 
@@ -29,8 +30,60 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
     openTrailer
   } = useMedia();
 
+  const cardRef = useRef<HTMLDivElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [tiltStyle, setTiltStyle] = useState({
+    transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+    glareX: 50,
+    glareY: 50,
+    glareOpacity: 0,
+    posterShiftX: 0,
+    posterShiftY: 0
+  });
+
   const userReview = userReviews[media.id];
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!parallax || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // Smooth tilt: up to 10 degrees along X and Y axes
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 10;
+
+    setTiltStyle({
+      transform: `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.04, 1.04, 1.04)`,
+      glareX: (x / rect.width) * 100,
+      glareY: (y / rect.height) * 100,
+      glareOpacity: 0.2,
+      posterShiftX: rotateY * 0.45,
+      posterShiftY: -rotateX * 0.45
+    });
+  };
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setIsMenuOpen(false);
+    if (parallax) {
+      setTiltStyle({
+        transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+        glareX: 50,
+        glareY: 50,
+        glareOpacity: 0,
+        posterShiftX: 0,
+        posterShiftY: 0
+      });
+    }
+  };
 
   const handleStatusChange = (e: React.MouseEvent, status: WatchStatus) => {
     e.stopPropagation();
@@ -65,7 +118,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[11px] font-bold backdrop-blur-md">
             <Bookmark className="w-3 h-3" />
-            Por ver
+            Pendiente
           </span>
         );
     }
@@ -73,25 +126,54 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
 
   return (
     <div
+      ref={cardRef}
       id={`media-card-${media.id}`}
       onClick={() => setSelectedMediaId(media.id)}
-      className="group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-900/20 transition-all duration-300 flex flex-col cursor-pointer transform hover:-translate-y-1.5"
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transform: parallax ? tiltStyle.transform : undefined,
+        transformStyle: 'preserve-3d',
+        transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
+      }}
+      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
+        !parallax ? 'transform hover:-translate-y-1.5' : ''
+      }`}
     >
-      {/* Poster Media Box */}
+      {/* Specular glare dynamic light reflection */}
+      {parallax && isHovered && (
+        <div 
+          className="pointer-events-none absolute inset-0 rounded-2xl z-40 transition-opacity duration-200"
+          style={{
+            background: `radial-gradient(circle 240px at ${tiltStyle.glareX}% ${tiltStyle.glareY}%, rgba(255, 255, 255, ${tiltStyle.glareOpacity}), rgba(244, 63, 94, 0.1), transparent 70%)`
+          }}
+        />
+      )}
+
+      {/* Poster Media Box with 3D Depth */}
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/50">
         <img
           src={media.posterUrl}
           alt={media.title}
           loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{
+            transform: parallax && isHovered 
+              ? `scale(1.08) translate3d(${tiltStyle.posterShiftX}px, ${tiltStyle.posterShiftY}px, 0)` 
+              : 'scale(1)',
+            transition: 'transform 0.3s ease-out'
+          }}
+          className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
 
         {/* Gradient shadow */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#161618] via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#161618] via-black/20 to-transparent opacity-80 group-hover:opacity-40 transition-opacity" />
 
-        {/* Top Badges */}
-        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10">
+        {/* Top Badges (visible when not hovered) */}
+        <div className={`absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10 transition-opacity duration-200 ${
+          isHovered ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}>
           <span className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white backdrop-blur-md text-[10px] font-bold uppercase tracking-wider shadow">
             {media.type}
           </span>
@@ -101,9 +183,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
           </div>
         </div>
 
-        {/* Quick Hover Overlay Actions */}
-        <div className="absolute inset-0 bg-black/75 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-3 z-20">
-          <div className="flex justify-end">
+        {/* Cinematic Parallax Overlay: Full Movie Synopsis & Quick Actions */}
+        <div className={`absolute inset-0 z-20 flex flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-xs transition-all duration-300 ${
+          isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+        }`}>
+          {/* Top of hover overlay: Platform / Category & Menu */}
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider shadow">
+              {media.type} • {media.year}
+            </span>
+
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -113,7 +202,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
                 className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
                 title="Opciones de estado"
               >
-                <MoreVertical className="w-4 h-4" />
+                <MoreVertical className="w-3.5 h-3.5" />
               </button>
 
               {/* Status Dropdown Menu */}
@@ -130,7 +219,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
                     className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
                   >
                     <Bookmark className="w-3.5 h-3.5 text-sky-400" />
-                    Por ver / Lista
+                    Pendiente
                   </button>
                   <button
                     onClick={(e) => handleStatusChange(e, 'en_proceso')}
@@ -163,41 +252,62 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid' }) 
             </div>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs text-slate-200 line-clamp-3 leading-relaxed">
-              {media.synopsis}
+          {/* Center of hover overlay: Full & Clear Movie Synopsis */}
+          <div className="my-auto py-1 space-y-1.5 text-left">
+            <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold">
+              <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span>{media.communityRating.toFixed(1)}</span>
+              <span className="text-[11px] text-slate-400 font-normal">({media.communityVotesCount} votos)</span>
+            </div>
+
+            <p className="text-[11px] text-slate-300">
+              <span className="text-rose-400 font-semibold">Director:</span> {media.director}
             </p>
 
-            <div className="flex items-center gap-2 pt-1">
-              {media.trailerYoutubeId && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openTrailer(media.trailerYoutubeId);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white hover:bg-rose-600 text-black hover:text-white font-bold text-xs shadow-md transition-colors"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  Tráiler
-                </button>
-              )}
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                Descripción / Sinopsis:
+              </span>
+              <p className="text-xs text-slate-200 leading-relaxed line-clamp-4 font-normal overflow-y-auto max-h-[88px] pr-1 scrollbar-thin scrollbar-thumb-white/20">
+                {media.synopsis || 'Sin descripción registrada para este título.'}
+              </p>
+            </div>
+          </div>
 
+          {/* Bottom actions: Trailer & Ficha */}
+          <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+            {media.trailerYoutubeId && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedMediaId(media.id);
+                  openTrailer(media.trailerYoutubeId);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/15 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                title="Ver Tráiler"
               >
-                <Eye className="w-3.5 h-3.5 text-rose-400" />
-                Ficha
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Tráiler</span>
               </button>
-            </div>
+            )}
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedMediaId(media.id);
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/15 transition-all active:scale-95"
+              title="Ver Ficha y Evaluaciones"
+            >
+              <Eye className="w-3.5 h-3.5 text-rose-400" />
+              <span>Ficha</span>
+            </button>
           </div>
         </div>
 
-        {/* Bottom Poster Info Overlay */}
-        <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+        {/* Bottom Poster Info Overlay (when not hovered) */}
+        <div className={`absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between pointer-events-none transition-opacity duration-200 ${
+          isHovered ? 'opacity-0' : 'opacity-100'
+        }`}>
           <span className="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[11px] text-slate-300 font-medium border border-white/10">
             {media.defaultPlatform}
           </span>

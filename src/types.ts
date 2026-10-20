@@ -66,6 +66,20 @@ export interface DetailedCommunityVotes {
   ratingDistribution: Record<number, number>; // 1: count, 2: count, etc.
 }
 
+export type WatchProviderType = 'suscripcion' | 'alquiler' | 'compra' | 'gratis' | 'cines';
+export type WatchProviderQuality = 'SD' | 'HD' | '4K';
+
+export interface WatchProvider {
+  name: string; // "Netflix", "Max", "Prime Video", "Disney+", "Apple TV+", "Cine", "YouTube Movies"...
+  logoUrl?: string;
+  type: WatchProviderType;
+  quality?: WatchProviderQuality;
+  price?: string; // "3,99 €", "$59 MXN", etc.
+  url: string; // enlace oficial
+  region: string; // "ES", "MX", "AR", "CO", "CL", "US"...
+  seasons?: string; // e.g. "Temporadas 1-4" o "Temporada 1"
+}
+
 export interface MediaItem {
   id: string;
   title: string;
@@ -91,4 +105,20 @@ export interface MediaItem {
   isTopClassified?: boolean;
   createdAt: string;
   isCustomUserCreated?: boolean;
+  watchProviders?: WatchProvider[];
+}
+
+export interface OfflineSyncAction {
+  id: string;
+  type: 'save_list_entry' | 'delete_list_entry' | 'create_media' | 'create_review';
+  payload: any;
+  timestamp: string;
+}
+
+export interface LocalBackupData {
+  version: string;
+  exportedAt: string;
+  currentUser?: UserProfile | null;
+  mediaList: MediaItem[];
+  userReviews: Record<string, UserReview>;
 }

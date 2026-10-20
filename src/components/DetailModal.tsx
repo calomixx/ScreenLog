@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -26,6 +26,7 @@ import {
 import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
+import { WatchProvidersTab } from './WatchProvidersTab';
 
 const PLATFORM_OPTIONS = [
   'Netflix',
@@ -61,6 +62,40 @@ const REWATCH_OPTIONS: { value: RewatchChoice; label: string; icon: string }[] =
   { value: 'jamas', label: 'Jamás', icon: '🙅‍♂️' }
 ];
 
+const STATUS_OPTIONS: {
+  id: WatchStatus;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  activeClass: string;
+  activeBorder: string;
+  hoverColor: string;
+}[] = [
+  {
+    id: 'pendiente',
+    label: 'Pendiente',
+    icon: Bookmark,
+    activeClass: 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/25 font-bold',
+    activeBorder: 'border-sky-400',
+    hoverColor: 'hover:text-sky-300 hover:border-sky-500/40 hover:bg-sky-500/10'
+  },
+  {
+    id: 'en_proceso',
+    label: 'En proceso',
+    icon: Clock,
+    activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/25 font-bold',
+    activeBorder: 'border-amber-400',
+    hoverColor: 'hover:text-amber-300 hover:border-amber-500/40 hover:bg-amber-500/10'
+  },
+  {
+    id: 'terminada',
+    label: 'Terminada',
+    icon: Check,
+    activeClass: 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/25 font-bold',
+    activeBorder: 'border-emerald-400',
+    hoverColor: 'hover:text-emerald-300 hover:border-emerald-500/40 hover:bg-emerald-500/10'
+  }
+];
+
 export const DetailModal: React.FC = () => {
   const { 
     selectedMedia, 
@@ -75,10 +110,20 @@ export const DetailModal: React.FC = () => {
     openTrailer 
   } = useMedia();
 
-  const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    if (top > 25) {
+      if (!isScrolled) setIsScrolled(true);
+    } else if (top < 10) {
+      if (isScrolled) setIsScrolled(false);
+    }
+  };
 
   // Community detailed vote state
   const [userDetailedVote, setUserDetailedVote] = useState({
@@ -92,6 +137,8 @@ export const DetailModal: React.FC = () => {
 
   // Personal Review Form State
   const currentReview = selectedMedia ? userReviews[selectedMedia.id] : undefined;
+  const [isCustomPlatform, setIsCustomPlatform] = useState(false);
+  const [customPlatformValue, setCustomPlatformValue] = useState('');
 
   const [reviewForm, setReviewForm] = useState<UserReview>({
     mediaId: '',
@@ -114,6 +161,17 @@ export const DetailModal: React.FC = () => {
   useEffect(() => {
     if (selectedMedia) {
       const existing = userReviews[selectedMedia.id];
+      const initialPlatform = existing?.platform || selectedMedia.defaultPlatform || 'Netflix';
+      const isPredefined = PLATFORM_OPTIONS.slice(0, -1).includes(initialPlatform);
+
+      if (!isPredefined && initialPlatform) {
+        setIsCustomPlatform(true);
+        setCustomPlatformValue(initialPlatform === 'Otra' ? '' : initialPlatform);
+      } else {
+        setIsCustomPlatform(false);
+        setCustomPlatformValue('');
+      }
+
       if (existing) {
         setReviewForm({
           ...existing,
@@ -133,7 +191,7 @@ export const DetailModal: React.FC = () => {
           critique: '',
           director: selectedMedia.director,
           watchedDate: new Date().toISOString().split('T')[0],
-          platform: selectedMedia.defaultPlatform,
+          platform: selectedMedia.defaultPlatform || 'Netflix',
           wouldRewatch: 'si_totalmente',
           favoriteMoment: '',
           updatedAt: new Date().toISOString()
@@ -141,12 +199,18 @@ export const DetailModal: React.FC = () => {
       }
       setActiveTab('info');
       setHasVotedDetailed(false);
+      setIsScrolled(false);
     }
   }, [selectedMedia, userReviews]);
 
   if (!selectedMedia) return null;
 
   const handleStatusClick = (status: WatchStatus) => {
+    if (currentReview?.status === status) {
+      removeFromMyList(selectedMedia.id);
+      setReviewForm((prev) => ({ ...prev, status: 'pendiente' }));
+      return;
+    }
     updateMediaStatus(selectedMedia.id, status);
     setReviewForm((prev) => ({ ...prev, status }));
     if (status === 'terminada') {
@@ -156,8 +220,13 @@ export const DetailModal: React.FC = () => {
 
   const handleSaveReview = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalPlatform = isCustomPlatform && customPlatformValue.trim()
+      ? customPlatformValue.trim()
+      : (reviewForm.platform || 'Otra');
+
     updateUserReview({
       ...reviewForm,
+      platform: finalPlatform,
       mediaId: selectedMedia.id
     });
     setSaveSuccessMsg(true);
@@ -185,173 +254,246 @@ export const DetailModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
       <div 
         id="detail-modal-container"
-        className="relative w-full max-w-4xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 my-auto text-slate-100 flex flex-col h-[94vh] md:h-[88vh]"
       >
-        {/* Modal Header with Backdrop Image */}
-        <div className="relative h-64 sm:h-80 w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B]">
+        {/* Modal Header with Backdrop Image - Contracts smoothly on scroll */}
+        <div 
+          className={`relative w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B] transition-all duration-300 ease-in-out ${
+            isScrolled ? 'h-24 sm:h-28' : 'h-52 sm:h-60 md:h-64'
+          }`}
+        >
           <img
             src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
             alt={selectedMedia.title}
-            className="w-full h-full object-cover filter brightness-65"
+            className={`w-full h-full object-cover filter transition-all duration-500 ease-out hover:scale-105 ${
+              isScrolled ? 'brightness-40' : 'brightness-60'
+            }`}
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#161618] via-[#161618]/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/90 via-[#161618]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/75 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/95 via-[#141416]/50 to-transparent pointer-events-none" />
 
           {/* Close & Share Buttons */}
-          <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
             <button
               onClick={handleShare}
-              className="p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
               title="Copiar enlace"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
             {copiedLink && (
-              <span className="absolute top-12 right-0 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded shadow">
+              <span className="absolute top-10 sm:top-12 right-0 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded shadow">
                 ¡Copiado!
               </span>
             )}
             <button
               id="detail-modal-close-btn"
               onClick={() => setSelectedMediaId(null)}
-              className="p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
+              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 backdrop-blur-md transition-colors"
               title="Cerrar ventana"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
           {/* Banner Details (Poster + Title + Basic Info) */}
-          <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-4 sm:gap-6 z-10">
+          <div className={`absolute left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-3.5 sm:gap-5 z-10 transition-all duration-300 ${
+            isScrolled ? 'bottom-2 sm:bottom-2.5' : 'bottom-4 sm:bottom-5'
+          }`}>
             <img
               src={selectedMedia.posterUrl}
               alt={selectedMedia.title}
-              className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50"
+              className={`aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 transition-all duration-300 ease-out hover:scale-105 hover:shadow-2xl hover:shadow-rose-950/80 hover:border-rose-500/50 cursor-pointer ${
+                isScrolled ? 'w-12 sm:w-16' : 'w-20 sm:w-28 md:w-32'
+              }`}
               referrerPolicy="no-referrer"
             />
-            <div className="flex-1 min-w-0 pb-1">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
-                  {selectedMedia.type}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 text-xs font-medium border border-white/10">
-                  {selectedMedia.defaultPlatform}
-                </span>
-                <span className="text-xs text-slate-300 font-semibold">{selectedMedia.year}</span>
-                {selectedMedia.duration && (
-                  <span className="text-xs text-slate-400">• {selectedMedia.duration}</span>
-                )}
-              </div>
+            <div className="flex-1 min-w-0 pb-0.5">
+              {!isScrolled && (
+                <div className="flex flex-wrap items-center gap-2 mb-1.5 overflow-hidden transition-all duration-200">
+                  <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
+                    {selectedMedia.type}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 text-xs font-medium border border-white/10">
+                    {selectedMedia.defaultPlatform}
+                  </span>
+                  <span className="text-xs text-slate-300 font-semibold">{selectedMedia.year}</span>
+                  {selectedMedia.duration && (
+                    <span className="text-xs text-slate-400">• {selectedMedia.duration}</span>
+                  )}
+                </div>
+              )}
 
-              <h2 className="text-xl sm:text-3xl font-display font-extrabold text-white truncate leading-tight">
+              <h2 className={`font-display font-extrabold text-white truncate transition-all duration-200 leading-tight ${
+                isScrolled ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl md:text-3xl'
+              }`}>
                 {selectedMedia.title}
               </h2>
 
-              <div className="flex items-center gap-3 mt-1 text-xs text-slate-300">
-                <span>Dir: <strong className="text-white">{selectedMedia.director}</strong></span>
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-300 flex-wrap">
+                <span className="whitespace-nowrap overflow-hidden">
+                  Dir: <strong className="text-white">{selectedMedia.director}</strong>
+                </span>
                 <div className="flex items-center gap-1 text-amber-400 font-bold">
                   <Star className="w-3.5 h-3.5 fill-amber-400" />
                   <span>{selectedMedia.communityRating.toFixed(1)}</span>
-                  <span className="text-slate-400 text-[11px]">({selectedMedia.communityVotesCount.toLocaleString()} votos)</span>
+                  {!isScrolled && (
+                    <span className="text-slate-400 text-[11px] overflow-hidden whitespace-nowrap hidden sm:inline">
+                      ({selectedMedia.communityVotesCount.toLocaleString()} votos)
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {!isScrolled && (
+                /* Status Action Selector integrated into movie header */
+                <div 
+                  id="detail-modal-status-selector"
+                  className="mt-3 flex items-center gap-1.5 group/status transition-all duration-200"
+                >
+                  <span className="text-xs font-semibold text-slate-300 mr-1 hidden sm:inline select-none drop-shadow">
+                    Tu estado:
+                  </span>
+                  {STATUS_OPTIONS.map((item) => {
+                    const isSelected = currentReview?.status === item.id;
+                    const hasSelected = Boolean(currentReview?.status);
+                    const isShrunk = hasSelected && !isSelected;
+                    const Icon = item.icon;
+                    const displayLabel = isSelected && item.id === 'terminada' ? 'Terminada' : item.label;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleStatusClick(item.id)}
+                        title={
+                          isSelected 
+                            ? `${item.label} (activo • clic para desmarcar)` 
+                            : `Marcar como ${item.label}`
+                        }
+                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-all duration-300 ease-out backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
+                          isSelected
+                            ? `${item.activeClass} px-3 py-1.5 scale-100 z-10 border ${item.activeBorder}`
+                            : isShrunk
+                              ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} group-hover/status:px-3 hover:px-3 group-hover/status:bg-black/80 hover:bg-black/80`
+                              : `px-3 py-1.5 text-slate-200 bg-black/60 border border-white/15 ${item.hoverColor} hover:bg-black/80`
+                        }`}
+                      >
+                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`} />
+                        <span
+                          className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+                            isSelected
+                              ? 'max-w-[140px] opacity-100 ml-1.5'
+                            : isShrunk
+                              ? 'max-w-0 opacity-0 group-hover/status:max-w-[120px] group-hover/status:opacity-100 group-hover/status:ml-1.5 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
+                              : 'max-w-[120px] opacity-100 ml-1.5'
+                          }`}
+                        >
+                          {displayLabel}
+                        </span>
+                        {isSelected && (
+                          <span 
+                            className="ml-1.5 text-[10px] opacity-70 group-hover/status:opacity-100 hover:text-black font-bold hidden sm:inline"
+                            title="Desmarcar"
+                          >
+                            ×
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
             </div>
           </div>
         </div>
 
-        {/* Status Action Strip & Modal Navigation Tabs */}
-        <div className="border-b border-white/10 bg-[#0A0A0B] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-          
-          {/* Quick List Status Buttons */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Tu estado:</span>
-            
-            <button
-              onClick={() => handleStatusClick('pendiente')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                currentReview?.status === 'pendiente'
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
-              }`}
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              Por ver
-            </button>
+        {/* Dedicated Modal Navigation Tabs Menu - 100% visible, clean, unobstructed */}
+        <div 
+          id="detail-modal-tabs-menu"
+          className="border-b border-white/10 bg-[#0E0E10] px-4 sm:px-6 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar select-none"
+        >
+          <button
+            onClick={() => setActiveTab('info')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'info' 
+                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Film className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>Sinopsis</span>
+          </button>
 
-            <button
-              onClick={() => handleStatusClick('en_proceso')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                currentReview?.status === 'en_proceso'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              En proceso
-            </button>
+          <button
+            onClick={() => setActiveTab('resena')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'resena' 
+                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Edit3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>Mi Reseña</span>
+            {currentReview?.status === 'terminada' && (
+              <span className="text-amber-400 text-xs">⭐</span>
+            )}
+          </button>
 
-            <button
-              onClick={() => handleStatusClick('terminada')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                currentReview?.status === 'terminada'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
-              }`}
-            >
-              <Check className="w-3.5 h-3.5" />
-              Terminada (Calificar)
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab('votaciones')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'votaciones' 
+                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-sky-400 flex-shrink-0" />
+            <span>Votación Detallada</span>
+          </button>
 
-          {/* Navigation Tabs within modal */}
-          <div className="flex items-center gap-1 border-l border-white/10 pl-3">
-            <button
-              onClick={() => setActiveTab('info')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                activeTab === 'info' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Sinopsis
-            </button>
+          <button
+            id="watch-tab-btn"
+            onClick={() => setActiveTab('donde_ver')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'donde_ver' 
+                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Tv className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>Dónde Ver</span>
+            {selectedMedia.watchProviders && selectedMedia.watchProviders.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+            )}
+          </button>
 
-            <button
-              onClick={() => setActiveTab('resena')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
-                activeTab === 'resena' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Mi Reseña {currentReview?.status === 'terminada' && '⭐'}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('votaciones')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                activeTab === 'votaciones' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Votación Detallada
-            </button>
-
-            <button
-              onClick={() => setActiveTab('comentarios')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
-                activeTab === 'comentarios' ? 'bg-white/10 text-rose-400 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Comentarios ({selectedMedia.comments.length})
-            </button>
-          </div>
-
+          <button
+            onClick={() => setActiveTab('comentarios')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'comentarios' 
+                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-purple-400 flex-shrink-0" />
+            <span>Comentarios</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-white/10 text-slate-300 font-bold">
+              {selectedMedia.comments.length}
+            </span>
+          </button>
         </div>
 
-        {/* Tab Body Content Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 divide-y divide-white/5">
+        {/* Tab Body Content Area (Selector 2) */}
+        <div 
+          id="detail-modal-body-content"
+          className="p-5 sm:p-7 overflow-y-auto flex-1 bg-[#141416] relative text-slate-100"
+          onScroll={handleScroll}
+        >
           
           {/* TAB 1: SINOPSIS & FICHA TÉCNICA */}
           {activeTab === 'info' && (
@@ -478,7 +620,7 @@ export const DetailModal: React.FC = () => {
                       onChange={(e) => setReviewForm({ ...reviewForm, status: e.target.value as WatchStatus })}
                       className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
                     >
-                      <option value="pendiente">📌 Por ver / Pendiente</option>
+                      <option value="pendiente">📌 Pendiente</option>
                       <option value="en_proceso">⏳ En proceso</option>
                       <option value="terminada">⭐ Terminada</option>
                     </select>
@@ -538,6 +680,74 @@ export const DetailModal: React.FC = () => {
                   />
                 </div>
 
+                {/* Submit user breakdown vote (Moved from Votaciones to Reseña) */}
+                <div className="p-5 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase">
+                      Desglose Técnico y Calificación Detallada
+                    </h4>
+                    {hasVotedDetailed && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> ¡Voto registrado!
+                        </span>
+                        <button 
+                          type="button"
+                          onClick={() => setHasVotedDetailed(false)}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {[
+                      { key: 'script', label: 'Guión (1-10)' },
+                      { key: 'acting', label: 'Actuaciones (1-10)' },
+                      { key: 'soundtrack', label: 'Banda Sonora (1-10)' },
+                      { key: 'visuals', label: 'Visuales (1-10)' },
+                      { key: 'direction', label: 'Dirección (1-10)' }
+                    ].map((field) => (
+                      <div key={field.key} className="flex items-center justify-between gap-2">
+                        <span className="text-slate-300">{field.label}</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          step="0.5"
+                          disabled={hasVotedDetailed}
+                          value={userDetailedVote[field.key as keyof typeof userDetailedVote]}
+                          onChange={(e) =>
+                            setUserDetailedVote({
+                              ...userDetailedVote,
+                              [field.key]: parseFloat(e.target.value)
+                            })
+                          }
+                          className="w-32 accent-rose-500"
+                        />
+                        <span className="w-6 text-right font-bold text-rose-400">
+                          {userDetailedVote[field.key as keyof typeof userDetailedVote]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={hasVotedDetailed}
+                    onClick={handleSendDetailedVote}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all ${
+                      hasVotedDetailed
+                        ? 'bg-white/10 text-slate-500 cursor-not-allowed'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/30'
+                    }`}
+                  >
+                    {hasVotedDetailed ? 'Voto Detallado Enviado' : 'Enviar Calificación Detallada'}
+                  </button>
+                </div>
+
                 {/* Metadata Row: Año, Director, Fecha en que la vi */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
@@ -580,13 +790,28 @@ export const DetailModal: React.FC = () => {
                 {/* Dónde la vi (Plataforma) & ¿La volvería a ver? */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                      Dónde la vi (Plataforma)
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center justify-between">
+                      <span>Dónde la vi (Plataforma)</span>
+                      {isCustomPlatform && (
+                        <span className="text-[10px] text-rose-400 font-semibold lowercase">Sitio personalizado</span>
+                      )}
                     </label>
                     <select
-                      value={reviewForm.platform}
-                      onChange={(e) => setReviewForm({ ...reviewForm, platform: e.target.value })}
-                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                      value={isCustomPlatform ? 'Otra' : reviewForm.platform}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Otra') {
+                          setIsCustomPlatform(true);
+                          setReviewForm((prev) => ({ 
+                            ...prev, 
+                            platform: customPlatformValue.trim() || 'Otra' 
+                          }));
+                        } else {
+                          setIsCustomPlatform(false);
+                          setReviewForm((prev) => ({ ...prev, platform: val }));
+                        }
+                      }}
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none transition-colors"
                     >
                       {PLATFORM_OPTIONS.map((plat) => (
                         <option key={plat} value={plat}>
@@ -594,6 +819,33 @@ export const DetailModal: React.FC = () => {
                         </option>
                       ))}
                     </select>
+
+                    {/* Casilla para especificar el sitio cuando la respuesta es "Otra" */}
+                    {isCustomPlatform && (
+                      <div className="mt-2.5 space-y-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <label className="block text-[11px] font-semibold text-rose-300">
+                          Especifica el sitio o plataforma donde la viste:
+                        </label>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={customPlatformValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomPlatformValue(val);
+                            setReviewForm((prev) => ({ 
+                              ...prev, 
+                              platform: val.trim() || 'Otra' 
+                            }));
+                          }}
+                          placeholder="Ej. Cine Renoir, Filmin, MUBI, Blu-ray prestado, etc."
+                          className="w-full bg-[#0A0A0B] border border-rose-500/60 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:outline-none transition-all shadow-inner"
+                        />
+                        <p className="text-[11px] text-slate-400 leading-tight">
+                          Este sitio quedará registrado en tu reseña y en los filtros de tu lista personal.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -711,65 +963,6 @@ export const DetailModal: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Submit user breakdown vote */}
-              <div className="p-5 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase">
-                    Emite tu Voto Detallado
-                  </h4>
-                  {hasVotedDetailed && (
-                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> ¡Voto registrado!
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {[
-                    { key: 'script', label: 'Guión (1-10)' },
-                    { key: 'acting', label: 'Actuaciones (1-10)' },
-                    { key: 'soundtrack', label: 'Banda Sonora (1-10)' },
-                    { key: 'visuals', label: 'Visuales (1-10)' },
-                    { key: 'direction', label: 'Dirección (1-10)' }
-                  ].map((field) => (
-                    <div key={field.key} className="flex items-center justify-between gap-2">
-                      <span className="text-slate-300">{field.label}</span>
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        step="0.5"
-                        disabled={hasVotedDetailed}
-                        value={userDetailedVote[field.key as keyof typeof userDetailedVote]}
-                        onChange={(e) =>
-                          setUserDetailedVote({
-                            ...userDetailedVote,
-                            [field.key]: parseFloat(e.target.value)
-                          })
-                        }
-                        className="w-32 accent-rose-500"
-                      />
-                      <span className="w-6 text-right font-bold text-rose-400">
-                        {userDetailedVote[field.key as keyof typeof userDetailedVote]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={hasVotedDetailed}
-                  onClick={handleSendDetailedVote}
-                  className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all ${
-                    hasVotedDetailed
-                      ? 'bg-white/10 text-slate-500 cursor-not-allowed'
-                      : 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/30'
-                  }`}
-                >
-                  {hasVotedDetailed ? 'Voto Enviado' : 'Enviar Calificación Detallada'}
-                </button>
-              </div>
             </div>
           )}
 
@@ -862,6 +1055,11 @@ export const DetailModal: React.FC = () => {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* TAB 5: DÓNDE VER (PLATAFORMAS LEGALES & OFICIALES) */}
+          {activeTab === 'donde_ver' && (
+            <WatchProvidersTab media={selectedMedia} />
           )}
 
         </div>
