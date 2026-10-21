@@ -258,9 +258,15 @@ export const LandingPublicView: React.FC = () => {
                   </div>
 
                   {/* Rating Badge */}
-                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-amber-400/25 text-amber-400 text-xs font-bold shadow-md">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" aria-hidden="true" />
-                    <span>{item.communityRating.toFixed(1)}</span>
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-white/15 text-slate-300 text-[10px] font-semibold shadow-md">
+                    {item.communityVotesCount > 0 ? (
+                      <>
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                        <span className="text-amber-400 font-bold">{item.communityRating.toFixed(1)}</span>
+                      </>
+                    ) : (
+                      <span>Sin valoraciones</span>
+                    )}
                   </div>
 
                   {/* Play Trailer Quick Action Button */}
@@ -339,7 +345,7 @@ export const LandingPublicView: React.FC = () => {
             ¿Listo para Transformar tu Experiencia Cinéfila?
           </h3>
           <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
-            Únete a cientos de cinéfilos que ya clasifican, guardan y debaten sus películas y series favoritas en ScreenLog.
+            Organiza tus películas y series favoritas, guarda tus valoraciones y comparte tu pasión por el cine en ScreenLog.
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-3">
             <button

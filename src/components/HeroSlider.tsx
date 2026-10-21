@@ -159,9 +159,15 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
               {/* Meta row */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
                 <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  <span className="font-bold text-amber-400">{activeMedia.communityRating.toFixed(1)}</span>
-                  <span className="text-xs text-slate-400">({activeMedia.communityVotesCount.toLocaleString()} votos)</span>
+                  {activeMedia.communityVotesCount > 0 ? (
+                    <>
+                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span className="font-bold text-amber-400">{activeMedia.communityRating.toFixed(1)}</span>
+                      <span className="text-xs text-slate-400">({activeMedia.communityVotesCount.toLocaleString()} votos)</span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400">Sin valoraciones</span>
+                  )}
                 </div>
 
                 <span className="font-medium text-slate-300">{activeMedia.year}</span>

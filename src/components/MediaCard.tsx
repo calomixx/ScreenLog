@@ -286,11 +286,15 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
           {/* Center of hover overlay: Full & Clear Movie Synopsis */}
           <div className="my-auto py-1 space-y-1.5 text-left">
-            <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold">
-              <Star className="w-3.5 h-3.5 fill-amber-400" />
-              <span>{media.communityRating.toFixed(1)}</span>
-              <span className="text-[11px] text-slate-400 font-normal">({media.communityVotesCount} votos)</span>
-            </div>
+            {media.communityVotesCount > 0 ? (
+              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold">
+                <Star className="w-3.5 h-3.5 fill-amber-400" />
+                <span>{media.communityRating.toFixed(1)}</span>
+                <span className="text-[11px] text-slate-400 font-normal">({media.communityVotesCount} votos)</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium">Sin valoraciones</span>
+            )}
 
             <p className="text-[11px] text-slate-300">
               <span className="text-rose-400 font-semibold">Director:</span> {media.director}

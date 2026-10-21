@@ -23,7 +23,6 @@ import {
   Bookmark
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
-import { OfflinePersistenceIndicator } from './OfflinePersistenceIndicator';
 
 interface GenreStatItem {
   genre: string;
@@ -261,11 +260,6 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
         </div>
       )}
 
-      {/* Standalone Offline Indicator */}
-      {standalone && (
-        <OfflinePersistenceIndicator />
-      )}
-
       {/* Standalone Cinephile Profile Card */}
       {standalone && currentUser && (
         <div className="rounded-3xl bg-[#161618] border border-white/10 p-5 sm:p-6 shadow-xl space-y-4">
@@ -290,7 +284,7 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-xl font-bold text-white">{userName}</h3>
                   <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300 border border-rose-500/30">
-                    {currentUser.role === 'admin' ? 'Admin & Crítico' : currentUser.role === 'critic' ? 'Crítica' : 'Cinéfilo'}
+                    {currentUser.role === 'owner' ? 'Owner' : currentUser.role === 'admin' ? 'Administrador' : 'Cinéfilo'}
                   </span>
                 </div>
                 {currentUser.username && (
@@ -358,7 +352,6 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
                 <h2 className="text-base sm:text-lg font-display font-extrabold text-white tracking-tight">
                   Películas Vistas por Género
                 </h2>
-                <OfflinePersistenceIndicator compact />
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-400 group-hover:border-rose-500/40 group-hover:text-rose-300 transition-colors">
                   <Sparkles className="w-3 h-3 text-amber-400" />
                   Pasa el cursor para ampliar

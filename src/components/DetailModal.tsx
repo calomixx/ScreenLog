@@ -405,15 +405,19 @@ export const DetailModal: React.FC = () => {
                 <span className="whitespace-nowrap overflow-hidden">
                   Dir: <strong className="text-white">{selectedMedia.director}</strong>
                 </span>
-                <div className="flex items-center gap-1 text-amber-400 font-bold">
-                  <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  <span>{selectedMedia.communityRating.toFixed(1)}</span>
-                  {!isScrolled && (
-                    <span className="text-slate-400 text-[11px] overflow-hidden whitespace-nowrap hidden sm:inline">
-                      ({selectedMedia.communityVotesCount.toLocaleString()} votos)
-                    </span>
-                  )}
-                </div>
+                {selectedMedia.communityVotesCount > 0 ? (
+                  <div className="flex items-center gap-1 text-amber-400 font-bold">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" />
+                    <span>{selectedMedia.communityRating.toFixed(1)}</span>
+                    {!isScrolled && (
+                      <span className="text-slate-400 text-[11px] overflow-hidden whitespace-nowrap hidden sm:inline">
+                        ({selectedMedia.communityVotesCount.toLocaleString()} votos)
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-slate-400 text-[11px] font-medium">Sin valoraciones</span>
+                )}
               </div>
 
               {!isScrolled && (
@@ -964,40 +968,51 @@ export const DetailModal: React.FC = () => {
           {/* TAB 3: VOTACIONES DETALLADAS DE LA COMUNIDAD */}
           {activeTab === 'votaciones' && (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[#0A0A0B] border border-white/10">
-                <div className="text-center sm:text-left">
-                  <span className="text-xs text-slate-400 uppercase font-semibold">Promedio Global</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-4xl font-display font-black text-rose-500">
-                      {selectedMedia.communityRating.toFixed(1)}
-                    </span>
-                    <RatingStars rating={selectedMedia.communityRating} size="lg" showNumber={false} />
+              {selectedMedia.communityVotesCount > 0 ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[#0A0A0B] border border-white/10">
+                  <div className="text-center sm:text-left">
+                    <span className="text-xs text-slate-400 uppercase font-semibold">Promedio Global</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-4xl font-display font-black text-rose-500">
+                        {selectedMedia.communityRating.toFixed(1)}
+                      </span>
+                      <RatingStars rating={selectedMedia.communityRating} size="lg" showNumber={false} />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Basado en {selectedMedia.communityVotesCount.toLocaleString()} votos de la comunidad
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Basado en {selectedMedia.communityVotesCount.toLocaleString()} votos de la comunidad
+
+                  {/* Rating bars */}
+                  <div className="w-full sm:w-64 space-y-1.5">
+                    {[5, 4, 3, 2, 1].map((starVal) => {
+                      const count = selectedMedia.detailedVotes.ratingDistribution[starVal] || 0;
+                      const percent = Math.min(100, Math.round((count / selectedMedia.communityVotesCount) * 100));
+                      return (
+                        <div key={starVal} className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="w-3 text-right">{starVal}</span>
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full" style={{ width: `${percent}%` }} />
+                          </div>
+                          <span className="w-8 text-right text-[11px]">{percent}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-[#0A0A0B] p-8 text-center space-y-2">
+                  <Star className="w-8 h-8 mx-auto text-slate-600" />
+                  <h4 className="text-sm font-bold text-white">Sin valoraciones todavía</h4>
+                  <p className="text-xs text-slate-400">
+                    Sé la primera persona en puntuar este título y compartir tu análisis.
                   </p>
                 </div>
-
-                {/* Rating bars */}
-                <div className="w-full sm:w-64 space-y-1.5">
-                  {[5, 4, 3, 2, 1].map((starVal) => {
-                    const count = selectedMedia.detailedVotes.ratingDistribution[starVal] || 0;
-                    const percent = Math.min(100, Math.round((count / (selectedMedia.communityVotesCount || 1)) * 100));
-                    return (
-                      <div key={starVal} className="flex items-center gap-2 text-xs text-slate-400">
-                        <span className="w-3 text-right">{starVal}</span>
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full" style={{ width: `${percent}%` }} />
-                        </div>
-                        <span className="w-8 text-right text-[11px]">{percent}%</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
 
               {/* Detailed Breakdown Dimensions */}
+              {selectedMedia.communityVotesCount > 0 && (
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
                   Desglose Técnico de la Comunidad (Escala 1 - 10)
@@ -1030,6 +1045,7 @@ export const DetailModal: React.FC = () => {
                   ))}
                 </div>
               </div>
+              )}
             </div>
           )}
 

@@ -3,53 +3,7 @@ import { users, mediaItems } from './src/db/schema';
 import { INITIAL_MEDIA_LIST } from './src/data/initialMedia';
 
 export async function seedDb() {
-  console.log('Seeding DB...');
-  const DEMO_USERS = [
-    {
-      id: 'user-0',
-      name: 'demon',
-      email: 'demon@screenlog.app',
-      password: '123456',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-      role: 'admin',
-      favoriteGenres: ['Acción', 'Sci-Fi'],
-      bio: 'Super administrador.'
-    },
-    {
-      id: 'user-1',
-      name: 'Miguel Torrealba',
-      email: 'miguel@screenlog.app',
-      password: '123456',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: 'admin',
-      favoriteGenres: ['Ciencia Ficción', 'Drama', 'Thriller'],
-      bio: 'Cinéfilo empedernido. Amante del cine de autor, Nolan, Villeneuve y clásicos de culto.'
-    },
-    {
-      id: 'user-2',
-      name: 'Elena Vega',
-      email: 'elena@screenlog.app',
-      password: '123456',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-      role: 'critic',
-      favoriteGenres: ['Drama', 'Terror / Suspense', 'Animación'],
-      bio: 'Crítica de cine independiente y redactora. Analizando guiones y cinematografía.'
-    },
-    {
-      id: 'user-3',
-      name: 'Carlos Ruiz',
-      email: 'carlos@screenlog.app',
-      password: '123456',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-      role: 'user',
-      favoriteGenres: ['Acción', 'Aventura', 'Ciencia Ficción'],
-      bio: 'Maratoneando series los fines de semana y buscando siempre la siguiente joya oculta.'
-    }
-  ];
-
-  for (const user of DEMO_USERS) {
-    await db.insert(users).values(user).onConflictDoNothing({ target: users.id });
-  }
+  await db.delete(users).catch(() => undefined);
 
   for (const m of INITIAL_MEDIA_LIST) {
     const newItem = {
@@ -69,14 +23,35 @@ export async function seedDb() {
       seasons: null,
       episodes: null,
       streamingPlatforms: [m.defaultPlatform],
-      rating: m.communityRating || 5,
-      ratingCount: m.communityVotesCount || 1,
+      rating: 0,
+      ratingCount: 0,
       featured: Boolean(m.isFeatured),
       trending: Boolean(m.isTrending),
       topRated: Boolean(m.isTopClassified),
-      createdByUserId: null
+      createdByUserId: null,
     };
-    await db.insert(mediaItems).values(newItem).onConflictDoNothing({ target: mediaItems.id });
+    await db.insert(mediaItems).values(newItem).onConflictDoUpdate({
+      target: mediaItems.id,
+      set: {
+        title: newItem.title,
+        originalTitle: newItem.originalTitle,
+        year: newItem.year,
+        type: newItem.type,
+        genres: newItem.genres,
+        director: newItem.director,
+        cast: newItem.cast,
+        synopsis: newItem.synopsis,
+        posterUrl: newItem.posterUrl,
+        backdropUrl: newItem.backdropUrl,
+        trailerUrl: newItem.trailerUrl,
+        duration: newItem.duration,
+        streamingPlatforms: newItem.streamingPlatforms,
+        rating: 0,
+        ratingCount: 0,
+        featured: newItem.featured,
+        trending: newItem.trending,
+        topRated: newItem.topRated,
+      },
+    });
   }
-  console.log('Seeding completed.');
 }

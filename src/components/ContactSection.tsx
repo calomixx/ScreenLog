@@ -42,50 +42,53 @@ export const ContactSection: React.FC = () => {
     { value: 'reportar_error', label: '🛠️ Reportar un Error, Carátula o Enlace' },
     { value: 'feedback_funcion', label: '💡 Sugerencia de Nueva Función o Mejora' },
     { value: 'cuenta_soporte', label: '👤 Asistencia con Mi Cuenta o Mi Lista' },
-    { value: 'prensa_colab', label: '🤝 Colaboraciones, Críticos y Alianzas' }
+    { value: 'prensa_colab', label: '🤝 Colaboraciones y Alianzas' }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !email.trim()) return;
 
     setIsSending(true);
 
-    const ticketNumber = `SL-${Math.floor(10000 + Math.random() * 90000)}`;
     const subjectName = subjectOptions.find(o => o.value === subject)?.label || 'Consulta General';
+    let ticketNumber = `SL-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    // Persist ticket to PostgreSQL
-    fetch('/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser?.id,
-        name: name.trim(),
-        email: email.trim(),
-        subject: subjectName,
-        message: message.trim(),
-        urgency
-      })
-    }).catch(() => {});
-
-    setTimeout(() => {
-      setIsSending(false);
-      setSubmittedTicket({
-        id: ticketNumber,
-        email: email.trim(),
-        subjectName
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser?.id,
+          name: name.trim(),
+          email: email.trim(),
+          subject: subjectName,
+          message: message.trim(),
+          urgency
+        })
       });
+      const payload = await response.json().catch(() => null);
+      if (payload?.data?.ticketCode) ticketNumber = payload.data.ticketCode;
+    } catch {
+      // El comprobante local se muestra igualmente.
+    }
 
-      try {
-        confetti({
-          particleCount: 40,
-          spread: 60,
-          origin: { y: 0.6 }
-        });
-      } catch {
-        // ignore
-      }
-    }, 400);
+    setIsSending(false);
+    setSubmittedTicket({
+      id: ticketNumber,
+      email: email.trim(),
+      subjectName
+    });
+
+    try {
+      confetti({
+        particleCount: 40,
+        spread: 60,
+        origin: { y: 0.6 }
+      });
+    } catch {
+      // ignore
+    }
   };
 
   const handleReset = () => {
@@ -254,14 +257,11 @@ export const ContactSection: React.FC = () => {
                 <Mail className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Canal de Correo Oficial</h4>
+                <h4 className="text-sm font-bold text-white">Canal de Soporte Integrado</h4>
                 <p className="text-xs text-slate-400">Atención personalizada y sugerencias</p>
               </div>
             </div>
-            <div className="p-3 rounded-xl bg-[#0A0A0B] border border-white/5 font-mono text-xs text-rose-300 flex items-center justify-between">
-              <span>contacto@screenlog.app</span>
-              <span className="text-[10px] text-slate-400 font-sans">Oficial</span>
-            </div>
+            <p className="text-xs text-slate-300 leading-relaxed font-light">Cada mensaje se registra en el servidor con un número de ticket para que el equipo pueda revisarlo y responderte.</p>
           </div>
 
           {/* Card 2: Cinema Community & Suggestions */}

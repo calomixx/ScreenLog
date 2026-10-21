@@ -4,14 +4,15 @@ export interface CustomUserField {
   value: string;
 }
 
+export type Role = 'owner' | 'admin' | 'user';
+
 export interface UserProfile {
   id: string;
   name: string;
   username?: string;
   email: string;
-  password?: string;
   avatar: string;
-  role: 'user' | 'critic' | 'admin';
+  role: Role;
   favoriteGenres?: string[];
   bio?: string;
   city?: string;
@@ -22,6 +23,10 @@ export interface UserProfile {
     twitter?: string;
   };
   customFields?: CustomUserField[];
+  blocked?: boolean;
+  mustChangePassword?: boolean;
+  createdAt?: string;
+  lastLoginAt?: string | null;
   joinedDate: string;
 }
 

@@ -3,31 +3,9 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { createApiRouter, requireCatalogEditor, requireSessionUser } from './server/routes';
 
 dotenv.config();
-
-// Lazy imports to avoid hard crashes if deps have native issues
-let db: any = null;
-let schema: any = {};
-let eq: any = () => { };
-let desc: any = (x: any) => x;
-let and: any = (...args: any[]) => args;
-let seedDb: any = async () => { console.log('DB seeding skipped (optional)'); };
-
-try {
-  const dbModule = await import('./src/db/index');
-  db = dbModule.db;
-  const schemaModule = await import('./src/db/schema');
-  schema = schemaModule;
-  const drizzle = await import('drizzle-orm');
-  eq = drizzle.eq;
-  desc = drizzle.desc;
-  and = drizzle.and;
-  const seed = await import('./seed');
-  seedDb = seed.seedDb;
-} catch (e: any) {
-  console.warn('DB/drizzle modules not fully available, running in limited mode:', e?.message);
-}
 
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 let ai: any = null;
@@ -48,101 +26,15 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-  if (db && seedDb) {
-    await seedDb().catch((err: any) => console.error('Seed error (ignored):', err?.message));
-  } else {
-    console.log('Skipping DB seed - no database connection');
-  }
+  app.use(express.json({ limit: '2mb' }));
+  app.use('/api', createApiRouter());
 
-  app.use(express.json());
-
-  // 1. Database Health & Status Endpoint
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), database: 'PostgreSQL (Cloud SQL)' });
-  });
-
-  app.get('/api/db-status', async (req, res) => {
-    try {
-      const allUsers = await db.select().from(users);
-      const allMedia = await db.select().from(mediaItems);
-      const allList = await db.select().from(userListEntries);
-      const allReviews = await db.select().from(mediaReviews);
-      const allTestimonials = await db.select().from(siteTestimonials);
-      const allTickets = await db.select().from(contactTickets);
-
-      res.json({
-        success: true,
-        database: 'PostgreSQL (Cloud SQL)',
-        counts: {
-          users: allUsers.length,
-          media: allMedia.length,
-          myListEntries: allList.length,
-          reviews: allReviews.length,
-          testimonials: allTestimonials.length,
-          tickets: allTickets.length,
-        },
-      });
-    } catch (error: any) {
-      console.error('Error fetching db status:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 2. Media Items (Movies / Series) Endpoints
-  app.get('/api/media', async (req, res) => {
-    try {
-      const items = await db.select().from(mediaItems).orderBy(desc(mediaItems.createdAt));
-      res.json({ success: true, data: items });
-    } catch (error: any) {
-      console.error('Error fetching media:', error);
-      res.status(500).json({ success: false, error: 'Error querying media from database' });
-    }
-  });
-
-  app.post('/api/media', async (req, res) => {
-    try {
-      const body = req.body;
-      const id = body.id || `media-${Date.now()}`;
-      
-      const newItem = {
-        id,
-        title: body.title,
-        originalTitle: body.originalTitle || body.title,
-        year: Number(body.year) || new Date().getFullYear(),
-        type: body.type || 'pelicula',
-        genres: body.genres || ['Drama'],
-        director: body.director || 'Desconocido',
-        cast: body.cast || [],
-        synopsis: body.synopsis || '',
-        posterUrl: body.posterUrl || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80',
-        backdropUrl: body.backdropUrl || body.posterUrl,
-        trailerUrl: body.trailerYoutubeId || body.trailerUrl,
-        duration: body.duration || '2h 00m',
-        seasons: body.seasons,
-        episodes: body.episodes,
-        streamingPlatforms: body.streamingPlatforms || body.platforms || ['Max (HBO)'],
-        rating: Number(body.communityRating || body.rating || 5.0),
-        ratingCount: 1,
-        featured: Boolean(body.isFeatured),
-        trending: Boolean(body.isTrending),
-        topRated: Boolean(body.isTopClassified),
-        createdByUserId: body.createdByUserId || null,
-      };
-
-      await db.insert(mediaItems).values(newItem).onConflictDoUpdate({
-        target: mediaItems.id,
-        set: newItem,
-      });
-
-      res.json({ success: true, data: newItem });
-    } catch (error: any) {
-      console.error('Error inserting media item:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), storage: 'json' });
   });
 
   // AI Media Autofill Endpoint via Gemini 2.5 Flash
-  app.post('/api/autofill', async (req, res) => {
+  app.post('/api/autofill', requireCatalogEditor, async (req, res) => {
     try {
       const { title } = req.body;
       if (!title || typeof title !== 'string' || title.trim().length < 2) {
@@ -267,228 +159,8 @@ REGLAS ESTRICTAS:
     }
   });
 
-  // 3. Users Endpoints
-  app.get('/api/users', async (req, res) => {
-    try {
-      const allUsers = await db.select().from(users);
-      res.json({ success: true, data: allUsers });
-    } catch (error: any) {
-      console.error('Error fetching users:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.post('/api/users/login', async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      const user = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
-      
-      if (!user || user.length === 0) {
-        return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      }
-
-      if (password && user[0].password !== password) {
-        return res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
-      }
-
-      res.json({ success: true, user: user[0] });
-    } catch (error: any) {
-      console.error('Error logging in:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.post('/api/users/register', async (req, res) => {
-    try {
-      const { name, email, password, avatar, role, favoriteGenres, bio } = req.body;
-      const id = `user-${Date.now()}`;
-      
-      const newUser = {
-        id,
-        name: name || 'Cinéfilo',
-        email: email.toLowerCase().trim(),
-        password: password || '123456',
-        avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        role: role || 'user',
-        bio: bio || 'Apasionado del cine.',
-        favoriteGenres: favoriteGenres || ['Drama', 'Ciencia Ficción'],
-      };
-
-      await db.insert(users).values(newUser).onConflictDoUpdate({
-        target: users.email,
-        set: { name: newUser.name, avatar: newUser.avatar, bio: newUser.bio },
-      });
-
-      res.json({ success: true, user: newUser });
-    } catch (error: any) {
-      console.error('Error registering user:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 4. User List (MyList & Journal) Endpoints
-  app.get('/api/list/:userId', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const entries = await db.select().from(userListEntries).where(eq(userListEntries.userId, userId));
-      res.json({ success: true, data: entries });
-    } catch (error: any) {
-      console.error('Error fetching user list:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.post('/api/list', async (req, res) => {
-    try {
-      const body = req.body;
-      const id = body.id || `entry-${body.userId}-${body.mediaId}`;
-
-      const entry = {
-        id,
-        userId: body.userId,
-        mediaId: body.mediaId,
-        status: body.status || 'por_ver',
-        rating: Number(body.rating || 0),
-        userNotes: body.userNotes || '',
-        platformWatched: body.platformWatched || null,
-        dateWatched: body.dateWatched || null,
-        rewatch: Boolean(body.rewatch),
-        scriptScore: body.scriptScore ? Number(body.scriptScore) : null,
-        actingScore: body.actingScore ? Number(body.actingScore) : null,
-        directionScore: body.directionScore ? Number(body.directionScore) : null,
-        emotionalTag: body.emotionalTag || null,
-      };
-
-      await db.insert(userListEntries).values(entry).onConflictDoUpdate({
-        target: userListEntries.id,
-        set: entry,
-      });
-
-      res.json({ success: true, data: entry });
-    } catch (error: any) {
-      console.error('Error saving user list entry:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.delete('/api/list/:userId/:mediaId', async (req, res) => {
-    try {
-      const { userId, mediaId } = req.params;
-      await db.delete(userListEntries).where(
-        and(eq(userListEntries.userId, userId), eq(userListEntries.mediaId, mediaId))
-      );
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error('Error deleting user list entry:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 5. Media Reviews Endpoints
-  app.get('/api/reviews/:mediaId', async (req, res) => {
-    try {
-      const { mediaId } = req.params;
-      const reviews = await db.select().from(mediaReviews).where(eq(mediaReviews.mediaId, mediaId)).orderBy(desc(mediaReviews.createdAt));
-      res.json({ success: true, data: reviews });
-    } catch (error: any) {
-      console.error('Error fetching media reviews:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.post('/api/reviews', async (req, res) => {
-    try {
-      const body = req.body;
-      const id = `rev-${Date.now()}`;
-      
-      const newReview = {
-        id,
-        mediaId: body.mediaId,
-        userId: body.userId || null,
-        userName: body.userName || 'Cinéfilo Anónimo',
-        userAvatar: body.userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        userRole: body.userRole || 'user',
-        rating: Number(body.rating || 5),
-        comment: body.comment,
-        platformWatched: body.platformWatched || null,
-        dateStr: body.dateStr || 'Hoy',
-        likes: 0,
-      };
-
-      await db.insert(mediaReviews).values(newReview);
-      res.json({ success: true, data: newReview });
-    } catch (error: any) {
-      console.error('Error saving review:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 6. Testimonials Endpoints
-  app.get('/api/testimonials', async (req, res) => {
-    try {
-      const items = await db.select().from(siteTestimonials).orderBy(desc(siteTestimonials.likes));
-      res.json({ success: true, data: items });
-    } catch (error: any) {
-      console.error('Error fetching testimonials:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  app.post('/api/testimonials', async (req, res) => {
-    try {
-      const body = req.body;
-      const id = `testimonial-${Date.now()}`;
-
-      const newTestimonial = {
-        id,
-        userId: body.userId || null,
-        userName: body.userName || 'Cinéfilo',
-        userAvatar: body.userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        userRole: body.userRole || 'user',
-        rating: Number(body.rating || 5),
-        highlightFeature: body.highlightFeature || 'General',
-        content: body.content,
-        dateStr: body.dateStr || 'Hoy',
-        likes: 1,
-      };
-
-      await db.insert(siteTestimonials).values(newTestimonial);
-      res.json({ success: true, data: newTestimonial });
-    } catch (error: any) {
-      console.error('Error saving testimonial:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 7. Contact Tickets Endpoints
-  app.post('/api/contact', async (req, res) => {
-    try {
-      const body = req.body;
-      const id = `ticket-${Date.now()}`;
-      const ticketCode = `SL-${Math.floor(10000 + Math.random() * 90000)}`;
-
-      const newTicket = {
-        id,
-        ticketCode,
-        userId: body.userId || null,
-        name: body.name,
-        email: body.email,
-        subject: body.subject,
-        message: body.message,
-        urgency: body.urgency || 'normal',
-        status: 'open',
-      };
-
-      await db.insert(contactTickets).values(newTicket);
-      res.json({ success: true, data: newTicket });
-    } catch (error: any) {
-      console.error('Error creating contact ticket:', error);
-      res.status(500).json({ success: false, error: error.message, detail: error.cause ? String(error.cause) : String(error) });
-    }
-  });
-
-  // 8. ScreenLog AI Assistant Endpoint (Gemini API)
-  app.post('/api/assistant', async (req, res) => {
+  // ScreenLog AI Assistant Endpoint (Gemini API)
+  app.post('/api/assistant', requireSessionUser, async (req, res) => {
     try {
       const { message, history = [], context = {} } = req.body;
 
@@ -512,7 +184,7 @@ Contexto actual del usuario:
 Funcionalidades de ScreenLog Pro que debes conocer y enseñar a usar:
 1. Inicio / Sistema:
    - Carrusel de películas destacadas con reproducción directa de trailers de YouTube en modal cinemático.
-   - Estado de la base de datos PostgreSQL activa en tiempo real.
+   - Panel con el catálogo y la actividad de la comunidad.
    - Listados de "Más Clasificadas por la Comunidad" y "Más Añadidas a Listas".
    - Títulos propios creados por usuarios.
 2. Explorar Catálogo:
@@ -537,11 +209,11 @@ Funcionalidades de ScreenLog Pro que debes conocer y enseñar a usar:
    - Tooltips con estrellas promedio y títulos incluidos.
    - Filtros de alcance (Vistas/Terminadas, Solo Películas, Toda Mi Lista).
    - Desglose interactivo al hacer clic en cualquier barra o botón de género.
-5. Añadir Películas y Series:
+5. Añadir Películas y Series (solo Owner/Admin):
    - Botón "+ Añadir Título" disponible en la barra de navegación superior, pie de página y dentro del catálogo.
    - Permite subir títulos propios con póster (URL), tráiler de YouTube, género, director, sinopsis y plataforma.
 6. Cuenta y Perfiles:
-   - Inicio de sesión y registro rápido con avatares y roles (Cinéfilo, Crítico, Administrador) y cambio rápido de cuenta.
+   - Inicio de sesión, registro y cuentas con roles (Usuario, Administrador y Owner). Solo Owner y Administrador pueden editar el catálogo.
 
 Directrices de respuesta:
 - Responde siempre en español, con un tono amable, claro, entusiasta y cinéfilo.
@@ -593,9 +265,9 @@ Directrices de respuesta:
       } else if (q.includes('estadistica') || q.includes('grafico') || q.includes('barras') || q.includes('recharts')) {
         fallbackReply = `📊 **Panel de Estadísticas con Gráfico de Barras:**\n\n¡ScreenLog incluye un panel analítico completo hecho con **Recharts**!\n\n- **Dónde encontrarlo**: Haz clic en **Estadísticas** en la barra superior o ve a **Mi Lista**.\n- **Qué muestra**: Un gráfico de barras interactivo con la cantidad de películas vistas agrupadas por género.\n- **Filtros de análisis**: Puedes cambiar entre *Vistas/Terminadas*, *Solo Películas* o *Toda Mi Lista*.\n- **Interactividad**: Al pasar el ratón verás el promedio de estrellas de ese género, y al hacer clic en cualquier barra se desglosan las películas correspondientes.`;
       } else if (q.includes('recomiend') || q.includes('sugier') || q.includes('que ver') || q.includes('pelicula')) {
-        fallbackReply = `🍿 **Recomendaciones destacadas del catálogo de ScreenLog:**\n\n1. **Oppenheimer (2023)** — *Drama / Historia* (4.8★): La aclamada obra de Christopher Nolan sobre el Proyecto Manhattan. Disponible en Max.\n2. **Dune: Parte Dos (2024)** — *Ciencia Ficción / Aventura* (4.9★): Espectacular epopeya visual de Denis Villeneuve con Timothée Chalamet y Zendaya.\n3. **Spider-Man: A Través del Spider-Verso (2023)** — *Animación / Acción* (4.8★): Una revolución visual en el cine de animación.\n4. **Interestelar (2014)** — *Ciencia Ficción* (4.9★): Un emotivo viaje al espacio profundo con la icónica música de Hans Zimmer.\n5. **El Viaje de Chihiro (2001)** — *Anime / Fantasía* (4.9★): Clásico inmortal de Hayao Miyazaki y Studio Ghibli.\n\n¿Buscas algún género en específico (terror, comedia, anime)? ¡Dímelo y te recomiendo más!`;
+        fallbackReply = `🍿 **Recomendaciones destacadas del catálogo de ScreenLog:**\n\n1. **Oppenheimer (2023)** — *Drama / Historia* : La aclamada obra de Christopher Nolan sobre el Proyecto Manhattan. Disponible en Max.\n2. **Dune: Parte Dos (2024)** — *Ciencia Ficción / Aventura* : Espectacular epopeya visual de Denis Villeneuve con Timothée Chalamet y Zendaya.\n3. **Spider-Man: A Través del Spider-Verso (2023)** — *Animación / Acción* : Una revolución visual en el cine de animación.\n4. **Interestelar (2014)** — *Ciencia Ficción* : Un emotivo viaje al espacio profundo con la icónica música de Hans Zimmer.\n5. **El Viaje de Chihiro (2001)** — *Anime / Fantasía* : Clásico inmortal de Hayao Miyazaki y Studio Ghibli.\n\n¿Buscas algún género en específico (terror, comedia, anime)? ¡Dímelo y te recomiendo más!`;
       } else if (q.includes('nueva') || q.includes('crear') || q.includes('subir') || q.includes('añadir')) {
-        fallbackReply = `✨ **Cómo registrar una nueva película o serie en la app:**\n\n1. Pulsa el botón rojo **"+ Añadir Título"** ubicado en la esquina superior derecha de la barra de navegación.\n2. Completa los datos en el modal:\n   - Título y año de estreno.\n   - Tipo (Película, Serie, Anime o Documental).\n   - Géneros (puedes seleccionar varios).\n   - Director y reparto.\n   - URL de la carátula / póster y fondo.\n   - ID o enlace de YouTube para el tráiler.\n   - Plataforma de streaming.\n3. Haz clic en **"Guardar en la Base de Datos"** y tu título quedará catalogado de inmediato con soporte en PostgreSQL.`;
+        fallbackReply = `✨ **Cómo registrar una nueva película o serie en la app:**\n\n1. Pulsa el botón rojo **"+ Añadir Título"** ubicado en la esquina superior derecha de la barra de navegación.\n2. Completa los datos en el modal:\n   - Título y año de estreno.\n   - Tipo (Película, Serie, Anime o Documental).\n   - Géneros (puedes seleccionar varios).\n   - Director y reparto.\n   - URL de la carátula / póster y fondo.\n   - ID o enlace de YouTube para el tráiler.\n   - Plataforma de streaming.\n3. Haz clic en **"Guardar en la Base de Datos"** y el título quedará guardado en el catálogo del servidor.`;
       } else {
         fallbackReply = `👋 ¡Hola! Soy **ScreenLog AI**, tu asistente para guiarte en ScreenLog Pro.\n\nPuedo ayudarte con cualquiera de estas opciones:\n\n- 🎬 **¿Cómo agregar películas a Mi Lista?** Te enseño a clasificar entre pendientes, en proceso y terminadas.\n- 🔍 **¿Cómo usar los filtros del Catálogo?** Aprende a filtrar por género, año y estrellas mínimas.\n- 📊 **¿Dónde ver mis Estadísticas?** Descubre tu gráfico de barras por géneros.\n- 🍿 **Recomendaciones**: Pídeme títulos según tus gustos.\n- ➕ **Añadir títulos**: Aprende a subir nuevas películas a la base de datos.\n\n¿En qué te gustaría que te oriente hoy?`;
       }
@@ -623,7 +295,7 @@ Directrices de respuesta:
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ScreenLog Server with Cloud SQL PostgreSQL running on http://0.0.0.0:${PORT}`);
+    console.log(`ScreenLog Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

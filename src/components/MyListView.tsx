@@ -25,15 +25,13 @@ import {
   LogIn,
   UserPlus,
   Tv,
-  Check,
-  HardDrive
+  Check
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { WatchStatus, MediaType, UserReview } from '../types';
 import { RatingStars } from './RatingStars';
 import { MediaCard } from './MediaCard';
 import { UserStatsPanel } from './UserStatsPanel';
-import { OfflinePersistenceIndicator } from './OfflinePersistenceIndicator';
 
 export const MyListView: React.FC = () => {
   const { 
@@ -45,8 +43,7 @@ export const MyListView: React.FC = () => {
     setActiveTab,
     statusCounts,
     currentUser,
-    openAuthModal,
-    enableGuestOfflineMode
+    openAuthModal
   } = useMedia();
 
   const [statusFilter, setStatusFilter] = useState<'todas' | WatchStatus>('todas');
@@ -96,15 +93,6 @@ export const MyListView: React.FC = () => {
           >
             <UserPlus className="w-4 h-4 text-rose-400" />
             Únete gratis
-          </button>
-          <button
-            id="auth-gate-offline-btn"
-            onClick={enableGuestOfflineMode}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-sm border border-amber-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
-            title="Accede a tus listas locales sin necesidad de conexión"
-          >
-            <HardDrive className="w-4 h-4 text-amber-400" />
-            Modo Local / Sin Conexión
           </button>
         </div>
 
@@ -233,9 +221,6 @@ export const MyListView: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* Offline Status & Local Persistence Indicator */}
-      <OfflinePersistenceIndicator />
 
       {/* Stats Summary Bento Row: Compact default with hover enlargement */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">

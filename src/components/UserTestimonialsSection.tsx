@@ -5,86 +5,24 @@ import {
   Star, 
   Sparkles, 
   Send, 
-  ThumbsUp, 
   CheckCircle2, 
-  UserCheck, 
-  Filter, 
-  Film, 
-  Tv, 
-  SlidersHorizontal,
-  Flame,
-  Award,
-  ShieldCheck
+  UserCheck,
+  Filter
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useMedia } from '../context/MediaContext';
+import { apiRequest } from '../lib/api';
 
 export interface SiteComment {
   id: string;
   userName: string;
-  userEmail?: string;
   userAvatar: string;
-  userRole: 'user' | 'critic' | 'admin' | 'guest';
+  userRole: 'owner' | 'admin' | 'user' | 'guest';
   rating: number;
   highlightFeature: string;
   content: string;
   date: string;
-  likes: number;
-  likedByMe?: boolean;
 }
-
-const STORAGE_COMMENTS_KEY = 'screenlog_site_testimonials_v1';
-
-const INITIAL_SITE_COMMENTS: SiteComment[] = [
-  {
-    id: 'site-comm-1',
-    userName: 'Elena Vega',
-    userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-    userRole: 'critic',
-    rating: 5,
-    highlightFeature: '🎼 Votación Técnica y Guión',
-    content: '¡ScreenLog es exactamente lo que la comunidad cinéfila necesitaba! El desglose para evaluar guión, actuaciones y dirección por separado le da una profundidad crítica que otras páginas no tienen. La interfaz oscura es una maravilla visual.',
-    date: 'Hace 2 horas',
-    likes: 24,
-    likedByMe: true
-  },
-  {
-    id: 'site-comm-2',
-    userName: 'Carlos Ruiz',
-    userAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-    userRole: 'user',
-    rating: 5,
-    highlightFeature: '📺 Registro de Plataformas de Streaming',
-    content: 'Lo que más me encanta de esta web es poder anotar en qué plataforma (Netflix, HBO, Apple TV o Cine) vi cada película y filtrar mi lista de pendientes. Es súper rápido y no tiene nada de anuncios molestos.',
-    date: 'Ayer',
-    likes: 18,
-    likedByMe: false
-  },
-  {
-    id: 'site-comm-3',
-    userName: 'Sofía Tarantino',
-    userAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-    userRole: 'critic',
-    rating: 5,
-    highlightFeature: '🎯 Mi Lista y Cuaderno Personal',
-    content: 'El cuaderno de notas personales donde puedo escribir mi análisis antes de publicarlo es mi función favorita. Además el tráiler integrado en modal y las carátulas en alta definición hacen que navegar sea un deleite.',
-    date: 'Hace 3 días',
-    likes: 15,
-    likedByMe: false
-  },
-  {
-    id: 'site-comm-4',
-    userName: 'Alejandro Morales',
-    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    userRole: 'user',
-    rating: 5,
-    highlightFeature: '➕ Añadir Títulos Propios',
-    content: 'Pude subir películas clásicas y documentales independientes que no encontraba en otros lados, asignándoles carátula y puntuación. ¡10/10 esta página!',
-    date: 'Hace 5 días',
-    likes: 12,
-    likedByMe: false
-  }
-];
 
 const FEATURE_TAGS = [
   '🎯 Mi Lista y Seguimiento',
@@ -98,101 +36,77 @@ const FEATURE_TAGS = [
 export const UserTestimonialsSection: React.FC = () => {
   const { currentUser, openAuthModal } = useMedia();
 
-  const [comments, setComments] = useState<SiteComment[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_COMMENTS_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch {
-      // fallback
-    }
-    return INITIAL_SITE_COMMENTS;
-  });
+  const [comments, setComments] = useState<SiteComment[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<{ success: boolean; data: any[] }>('/api/testimonials')
+      .then((response) => {
+        if (cancelled || !Array.isArray(response.data)) return;
+        setComments(
+          response.data.map((item) => ({
+            id: String(item.id),
+            userName: item.userName || 'Usuario',
+            userAvatar: item.userAvatar || '',
+            userRole: ['owner', 'admin', 'user'].includes(item.userRole) ? item.userRole : 'guest',
+            rating: Number(item.rating) || 0,
+            highlightFeature: item.highlightFeature || 'General',
+            content: item.content || '',
+            date: item.dateStr || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('es-ES') : ''),
+          })),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [filterTag, setFilterTag] = useState<string>('todos');
-  const [sortOrder, setSortOrder] = useState<'top' | 'recientes'>('top');
 
-  // Form states
-  const [authorName, setAuthorName] = useState('');
-  const [selectedRating, setSelectedRating] = useState<number>(5);
+  const [selectedRating, setSelectedRating] = useState<number>(0);
   const [selectedFeature, setSelectedFeature] = useState<string>(FEATURE_TAGS[0]);
   const [commentText, setCommentText] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync author name with current user
-  useEffect(() => {
-    if (currentUser) {
-      setAuthorName(currentUser.name);
-    }
-  }, [currentUser]);
-
-  // Persist comments
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(comments));
-    } catch {
-      // ignore
-    }
-  }, [comments]);
-
-  const handleLike = (commentId: string) => {
-    setComments(prev => 
-      prev.map(c => {
-        if (c.id === commentId) {
-          const wasLiked = c.likedByMe;
-          return {
-            ...c,
-            likes: wasLiked ? c.likes - 1 : c.likes + 1,
-            likedByMe: !wasLiked
-          };
-        }
-        return c;
-      })
-    );
-  };
-
-  const handleSubmitComment = (e: React.FormEvent) => {
+  const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!currentUser) {
+      openAuthModal('login');
+      return;
+    }
+    if (!commentText.trim() || !selectedRating) return;
 
     setIsSubmitting(true);
+    setFormError('');
 
-    const newComment: SiteComment = {
-      id: `site-comm-${Date.now()}`,
-      userName: currentUser?.name || authorName.trim() || 'Cinéfilo Entusiasta',
-      userEmail: currentUser?.email,
-      userAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      userRole: currentUser?.role || 'user',
-      rating: selectedRating,
-      highlightFeature: selectedFeature,
-      content: commentText.trim(),
-      date: 'Justo ahora',
-      likes: 1,
-      likedByMe: true
-    };
+    try {
+      const response = await apiRequest<{ success: boolean; data: any }>('/api/testimonials', {
+        method: 'POST',
+        body: JSON.stringify({
+          rating: selectedRating,
+          highlightFeature: selectedFeature,
+          content: commentText.trim(),
+        }),
+      });
 
-    // Persist to PostgreSQL backend
-    fetch('/api/testimonials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser?.id,
-        userName: newComment.userName,
-        userAvatar: newComment.userAvatar,
-        userRole: newComment.userRole,
-        rating: newComment.rating,
-        highlightFeature: newComment.highlightFeature,
-        content: newComment.content,
-        dateStr: 'Hoy'
-      })
-    }).catch(() => {});
+      const item = response.data;
+      const newComment: SiteComment = {
+        id: String(item.id),
+        userName: item.userName || currentUser.name,
+        userAvatar: item.userAvatar || currentUser.avatar,
+        userRole: item.userRole || currentUser.role,
+        rating: Number(item.rating) || selectedRating,
+        highlightFeature: item.highlightFeature || selectedFeature,
+        content: item.content || commentText.trim(),
+        date: 'Hoy',
+      };
 
-    setTimeout(() => {
       setComments(prev => [newComment, ...prev]);
       setCommentText('');
-      setIsSubmitting(false);
+      setSelectedRating(0);
       setShowSuccessToast(true);
 
       try {
@@ -206,20 +120,18 @@ export const UserTestimonialsSection: React.FC = () => {
       }
 
       setTimeout(() => setShowSuccessToast(false), 4000);
-    }, 200);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'No se pudo publicar tu opinión.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Filter & sort
-  const filteredComments = comments
-    .filter(c => filterTag === 'todos' ? true : c.highlightFeature === filterTag)
-    .sort((a, b) => {
-      if (sortOrder === 'top') {
-        return b.likes - a.likes;
-      }
-      return 0; // retain natural order
-    });
+  const filteredComments = comments.filter(c => filterTag === 'todos' ? true : c.highlightFeature === filterTag);
 
-  const averageRating = (comments.reduce((acc, c) => acc + c.rating, 0) / (comments.length || 1)).toFixed(1);
+  const averageRating = comments.length
+    ? (comments.reduce((acc, c) => acc + c.rating, 0) / comments.length).toFixed(1)
+    : null;
 
   return (
     <section id="user-testimonials-section" className="space-y-8 pt-4">
@@ -235,7 +147,7 @@ export const UserTestimonialsSection: React.FC = () => {
             ¿Qué le ha gustado a los usuarios de ScreenLog?
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 max-w-2xl font-light">
-            Descubre las opiniones de espectadores, críticos y miembros de nuestra comunidad sobre las herramientas de seguimiento, calificación y catálogo.
+            Descubre las opiniones de los miembros de la comunidad sobre las herramientas de seguimiento, calificación y catálogo.
           </p>
         </div>
 
@@ -243,18 +155,20 @@ export const UserTestimonialsSection: React.FC = () => {
         <div className="flex items-center gap-3 bg-[#161618] border border-white/10 p-3 rounded-2xl shadow-lg flex-shrink-0">
           <div className="text-center px-2 border-r border-white/10">
             <span className="text-2xl font-display font-black text-amber-400 block leading-none">
-              {averageRating}
+              {averageRating ?? '—'}
             </span>
-            <span className="text-[10px] text-slate-400 font-bold uppercase">de 5.0</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase">
+              {averageRating ? 'de 5.0' : 'sin valoraciones'}
+            </span>
           </div>
           <div className="space-y-0.5">
-            <div className="flex items-center text-amber-400">
+            <div className={`flex items-center ${averageRating ? 'text-amber-400' : 'text-slate-600'}`}>
               {[1, 2, 3, 4, 5].map((s) => (
-                <Star key={s} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <Star key={s} className={`w-3.5 h-3.5 ${averageRating ? 'fill-amber-400 text-amber-400' : 'text-slate-600'}`} />
               ))}
             </div>
             <p className="text-[11px] text-slate-300 font-medium">
-              <strong className="text-rose-400">{comments.length}</strong> opiniones de la web
+              <strong className="text-rose-400">{comments.length}</strong> {comments.length === 1 ? 'opinión' : 'opiniones'} de la web
             </p>
           </div>
         </div>
@@ -287,10 +201,8 @@ export const UserTestimonialsSection: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmitComment} className="space-y-4">
-              
-              {/* User info banner */}
-              {currentUser ? (
+            {currentUser ? (
+              <form onSubmit={handleSubmitComment} className="space-y-4">
                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
                   <img 
                     src={currentUser.avatar} 
@@ -300,32 +212,9 @@ export const UserTestimonialsSection: React.FC = () => {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-rose-400 uppercase font-semibold">{currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'critic' ? 'Crítico Fílmico' : 'Cinéfilo Registrado'}</p>
+                    <p className="text-[10px] text-rose-400 uppercase font-semibold">{currentUser.role === 'owner' ? 'Owner' : currentUser.role === 'admin' ? 'Administrador' : 'Cinéfilo Registrado'}</p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-300 uppercase">
-                      Tu Nombre o Alias
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => openAuthModal('login')}
-                      className="text-[11px] text-rose-400 hover:underline font-semibold"
-                    >
-                      ¿Iniciar sesión?
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={authorName}
-                    onChange={(e) => setAuthorName(e.target.value)}
-                    placeholder="ej: Mateo Cinefilo, Valen..."
-                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
-                  />
-                </div>
-              )}
 
               {/* Star Rating for the platform */}
               <div className="space-y-1.5">
@@ -350,7 +239,7 @@ export const UserTestimonialsSection: React.FC = () => {
                     </button>
                   ))}
                   <span className="text-xs font-bold text-amber-400 ml-2">
-                    {selectedRating === 5 ? '¡Excelente (5/5)!' : `${selectedRating} / 5`}
+                    {selectedRating === 5 ? '¡Excelente (5/5)!' : selectedRating > 0 ? `${selectedRating} / 5` : 'Selecciona una calificación'}
                   </span>
                 </div>
               </div>
@@ -388,16 +277,37 @@ export const UserTestimonialsSection: React.FC = () => {
                 />
               </div>
 
+              {formError && (
+                <p className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-300">
+                  {formError}
+                </p>
+              )}
+
               <button
                 id="submit-site-comment-btn"
                 type="submit"
-                disabled={isSubmitting || !commentText.trim()}
+                disabled={isSubmitting || !commentText.trim() || !selectedRating}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs sm:text-sm shadow-xl shadow-rose-900/40 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
-                Publicar Comentario en la Web
+                {isSubmitting ? 'Publicando...' : 'Publicar Comentario en la Web'}
               </button>
             </form>
+            ) : (
+              <div className="space-y-4 p-4 rounded-2xl bg-white/5 border border-white/10 text-center">
+                <UserCheck className="w-8 h-8 mx-auto text-rose-400" />
+                <p className="text-sm text-slate-300">
+                  Inicia sesión para compartir tu opinión. Las opiniones se publican con tu cuenta real.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold transition-colors"
+                >
+                  Iniciar sesión
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -421,44 +331,37 @@ export const UserTestimonialsSection: React.FC = () => {
               >
                 Todos ({comments.length})
               </button>
-              {FEATURE_TAGS.slice(0, 3).map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setFilterTag(tag)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-                    filterTag === tag
-                      ? 'bg-rose-600 text-white shadow'
-                      : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  {tag.split(' ')[1] || tag}
-                </button>
-              ))}
+              {['Mi Lista', 'Votación', 'Plataformas'].map((label, index) => {
+                const tag = FEATURE_TAGS[index];
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => setFilterTag(tag)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                      filterTag === tag
+                        ? 'bg-rose-600 text-white shadow'
+                        : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <button
-                onClick={() => setSortOrder('top')}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                  sortOrder === 'top' ? 'text-rose-400 font-bold bg-rose-600/15 border border-rose-500/20' : 'hover:text-white'
-                }`}
-              >
-                Más valorados
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => setSortOrder('recientes')}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                  sortOrder === 'recientes' ? 'text-rose-400 font-bold bg-rose-600/15 border border-rose-500/20' : 'hover:text-white'
-                }`}
-              >
-                Recientes
-              </button>
-            </div>
           </div>
 
           {/* Comments List */}
           <div className="space-y-3.5">
+            {filteredComments.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-white/10 bg-[#161618]/60 p-8 text-center space-y-2">
+                <MessageSquare className="w-8 h-8 mx-auto text-slate-600" />
+                <h4 className="text-sm font-bold text-white">Todavía no hay opiniones</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Sé la primera persona en compartir su experiencia con ScreenLog usando el formulario.
+                </p>
+              </div>
+            )}
             {filteredComments.map((comment) => (
               <div
                 key={comment.id}
@@ -467,20 +370,26 @@ export const UserTestimonialsSection: React.FC = () => {
                 {/* Author row & rating */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={comment.userAvatar} 
-                      alt={comment.userName} 
-                      className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10 group-hover:ring-rose-500/40 transition-all"
-                      referrerPolicy="no-referrer"
-                    />
+                    {comment.userAvatar ? (
+                      <img
+                        src={comment.userAvatar}
+                        alt={comment.userName}
+                        className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10 group-hover:ring-rose-500/40 transition-all"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-rose-600/20 text-rose-300 ring-2 ring-white/10 flex items-center justify-center font-bold">
+                        {comment.userName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-bold text-white">
                           {comment.userName}
                         </h4>
-                        {comment.userRole === 'critic' && (
-                          <span className="text-[9px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-purple-600/20 text-purple-400 border border-purple-500/30">
-                            Crítico
+                        {comment.userRole === 'owner' && (
+                          <span className="text-[9px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-amber-600/20 text-amber-400 border border-amber-500/30">
+                            Owner
                           </span>
                         )}
                         {comment.userRole === 'admin' && (
@@ -498,7 +407,7 @@ export const UserTestimonialsSection: React.FC = () => {
                   {/* Stars */}
                   <div className="flex items-center gap-0.5 text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">
                     <Star className="w-3.5 h-3.5 fill-amber-400" />
-                    <span className="text-xs font-bold">{comment.rating}.0</span>
+                    <span className="text-xs font-bold">{comment.rating.toFixed(1)}</span>
                   </div>
                 </div>
 
@@ -514,24 +423,6 @@ export const UserTestimonialsSection: React.FC = () => {
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-light">
                   "{comment.content}"
                 </p>
-
-                {/* Footer with Like Button */}
-                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-slate-400">
-                  <span className="text-[11px]">¿Te resulta útil esta opinión?</span>
-                  
-                  <button
-                    onClick={() => handleLike(comment.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                      comment.likedByMe
-                        ? 'bg-rose-600/20 text-rose-400 border-rose-500/40 font-bold shadow-sm'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border-white/5'
-                    }`}
-                  >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${comment.likedByMe ? 'fill-rose-400' : ''}`} />
-                    <span>{comment.likes}</span>
-                    <span className="hidden sm:inline">Útil</span>
-                  </button>
-                </div>
 
               </div>
             ))}
