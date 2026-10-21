@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { MediaType } from '../types';
+import { apiRequest } from '../lib/api';
 
 const SAMPLE_POSTER_PRESETS = [
   { name: 'Cyberpunk Neon', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80' },
@@ -28,7 +29,7 @@ const SAMPLE_POSTER_PRESETS = [
 ];
 
 const AVAILABLE_GENRES = [
-  'Acción', 'Aventura', 'Animación', 'Ciencia Ficción', 'Comedia', 
+  'Acción', 'Aventura', 'Animación', 'Anime', 'Shonen', 'Seinen', 'Mecha', 'Ciencia Ficción', 'Comedia', 
   'Crimen', 'Documental', 'Drama', 'Fantasía', 'Historia', 
   'Misterio', 'Romance', 'Suspense', 'Terror', 'Biografía'
 ];
@@ -63,6 +64,7 @@ export const AddMediaModal: React.FC = () => {
   const [autofillWarning, setAutofillWarning] = useState<string | null>(null);
   const [autofillError, setAutofillError] = useState<string | null>(null);
   const [hasAutofilled, setHasAutofilled] = useState(false);
+  const [animeInfo, setAnimeInfo] = useState<{ format?: string; episodes?: string } | null>(null);
 
   const handleAutofill = async () => {
     const trimmedTitle = title.trim();
@@ -74,19 +76,10 @@ export const AddMediaModal: React.FC = () => {
     setAutofillSuccess(null);
 
     try {
-      const response = await fetch('/api/autofill', {
+      const result = await apiRequest<{ success: boolean; data: any }>('/api/autofill', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ title: trimmedTitle }),
       });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error || 'No se pudo obtener la información de la obra cinematográfica.');
-      }
 
       const data = result.data;
 
@@ -125,10 +118,27 @@ export const AddMediaModal: React.FC = () => {
         setSelectedGenres(data.genres);
       }
 
+      const isAnime = data.type === 'anime' || (data.genres && data.genres.includes('Animación') && data.originalTitle?.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/));
+      const isOva = data.animeFormat === 'OVA' || (typeof data.duration === 'string' && data.duration.toLowerCase().includes('ova'));
+      
+      if (isAnime) {
+        setType('anime');
+        setAnimeInfo({
+          format: isOva ? 'OVA' : data.animeFormat || 'Anime',
+          episodes: data.episodesCount && data.episodesCount !== 'No aplica' ? data.episodesCount : undefined
+        });
+      } else {
+        setAnimeInfo(null);
+      }
+
       setHasAutofilled(true);
 
       const confidence = typeof data.confidence === 'number' ? data.confidence : 1.0;
-      if (confidence < 0.5) {
+      if (isAnime) {
+        const episodeText = data.episodesCount && data.episodesCount !== 'No aplica' ? ` • ${data.episodesCount}` : '';
+        const badgeText = isOva ? `🎬 ¡Anime OVA detectado! (${data.duration || 'OVA'}${episodeText})` : `🎌 ¡Anime detectado! (${data.animeFormat || 'Serie'}${episodeText})`;
+        setAutofillSuccess(`${badgeText}. Datos técnicos y capítulos completados con éxito.`);
+      } else if (confidence < 0.5) {
         setAutofillWarning(`Se completaron los datos con baja confianza (${Math.round(confidence * 100)}%), por favor revisa los campos.`);
       } else {
         setAutofillSuccess(`¡Ficha autocompletada por Gemini! (${Math.round(confidence * 100)}% de confianza). Puedes editar cualquier campo.`);
@@ -260,7 +270,7 @@ export const AddMediaModal: React.FC = () => {
                   onClick={handleAutofill}
                   disabled={isAutofilling || title.trim().length < 2}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-rose-600/20 border border-amber-500/30 text-amber-300 hover:text-white hover:from-amber-500/30 hover:to-rose-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                  title="Rellenar ficha técnica automáticamente con Gemini 2.5 Flash"
+                  title="Rellenar ficha técnica automáticamente con IA Gemini"
                 >
                   {isAutofilling ? (
                     <>
@@ -286,7 +296,7 @@ export const AddMediaModal: React.FC = () => {
                     handleAutofill();
                   }
                 }}
-                placeholder="ej: Gladiador II, Oppenheimer, Arcane..."
+                placeholder="ej: Rurouni Kenshin Tsuiokuhen, FLCL, Hellsing..."
                 className={`w-full bg-[#0A0A0B] border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all ${
                   isAutofilling 
                     ? 'border-amber-500/60 ring-2 ring-amber-500/20 animate-pulse' 
@@ -305,7 +315,7 @@ export const AddMediaModal: React.FC = () => {
                 type="text"
                 value={originalTitle}
                 onChange={(e) => setOriginalTitle(e.target.value)}
-                placeholder="ej: Gladiator II"
+                placeholder="ej: るろうに剣心 追憶編"
                 className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
               />
             </div>
@@ -316,7 +326,7 @@ export const AddMediaModal: React.FC = () => {
             <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin text-amber-400 flex-shrink-0" />
               <div className="flex-1">
-                <span className="font-bold">Gemini 2.5 Flash:</span> Analizando ficha técnica, director, reparto, duración, géneros y plataforma oficial para "{title.trim()}"...
+                <span className="font-bold">Gemini AI:</span> Analizando ficha técnica, formato (OVA/Serie/Película), capítulos, director/estudio, duración y géneros para "{title.trim()}"...
               </div>
             </div>
           )}
@@ -432,17 +442,37 @@ export const AddMediaModal: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                Duración
+                Duración / Episodios
               </label>
               <input
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="2h 15m / 3 Temporadas"
+                placeholder={type === 'anime' ? 'ej: OVA (6 eps) o 1 Temporada (12 eps)' : type === 'serie' ? 'ej: 3 Temporadas (24 eps)' : 'ej: 2h 15m'}
                 className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
               />
             </div>
           </div>
+
+          {/* Anime Format and Episode Detection Banner */}
+          {type === 'anime' && (
+            <div className="flex items-center flex-wrap gap-2 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300 animate-in fade-in duration-150">
+              <span className="font-bold flex items-center gap-1.5">
+                🎌 Formato Anime:
+              </span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-200 font-bold text-[11px] border border-purple-500/30">
+                {animeInfo?.format || (duration.toLowerCase().includes('ova') ? 'OVA (Original Video Animation)' : 'Serie TV / Película')}
+              </span>
+              {animeInfo?.episodes && (
+                <span className="px-2.5 py-0.5 rounded-lg bg-white/5 border border-white/10 text-slate-200 font-semibold text-[11px]">
+                  Capítulos: {animeInfo.episodes}
+                </span>
+              )}
+              <span className="text-[11px] text-purple-300/80">
+                • Detectado automáticamente (OVA, capítulos y estudio)
+              </span>
+            </div>
+          )}
 
           {/* Director and Cast */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

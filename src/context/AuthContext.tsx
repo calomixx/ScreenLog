@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { UserProfile, Role } from '../types';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, setStoredAuthToken } from '../lib/api';
 
 export type { Role };
 
@@ -116,6 +116,7 @@ interface StatusResponse {
     needsSetup: boolean;
     user: UserAccount | null;
     session: SessionInfo | null;
+    token?: string | null;
     settings: PublicSettings;
   };
 }
@@ -132,6 +133,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNeedsSetup(data.needsSetup);
     setCurrentUser(data.user);
     setSessionInfo(data.session);
+    if (data.token) {
+      setStoredAuthToken(data.token);
+    } else if (!data.user) {
+      setStoredAuthToken(null);
+    }
     setSettings({ ...defaultSettings, ...data.settings });
     if (data.user) setIsGuest(false);
   }, []);
@@ -141,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiRequest<StatusResponse>('/api/auth/status');
       applyStatus(response.data);
     } catch {
+      setStoredAuthToken(null);
       setCurrentUser(null);
       setSessionInfo(null);
     }
@@ -156,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!cancelled) {
           setNeedsSetup(false);
           setCurrentUser(null);
+          setStoredAuthToken(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -168,10 +176,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (email: string, password: string, remember = false): Promise<AuthResult> => {
     try {
-      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo } }>(
+      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/login',
         { method: 'POST', body: JSON.stringify({ email, password, remember }) },
       );
+      if (response.data.token) {
+        setStoredAuthToken(response.data.token);
+      }
+      try {
+        localStorage.setItem('sl_last_email', email);
+      } catch {
+        // ignore
+      }
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -187,10 +203,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = useCallback(async (data: { name: string; email: string; password: string; avatar?: string }): Promise<AuthResult> => {
     try {
-      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo } }>(
+      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/register',
         { method: 'POST', body: JSON.stringify(data) },
       );
+      if (response.data.token) {
+        setStoredAuthToken(response.data.token);
+      }
+      try {
+        localStorage.setItem('sl_last_email', data.email);
+      } catch {
+        // ignore
+      }
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -205,10 +229,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setupOwner = useCallback(async (data: { name: string; email: string; password: string }): Promise<AuthResult> => {
     try {
-      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo } }>(
+      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/setup',
         { method: 'POST', body: JSON.stringify(data) },
       );
+      if (response.data.token) {
+        setStoredAuthToken(response.data.token);
+      }
+      try {
+        localStorage.setItem('sl_last_email', data.email);
+      } catch {
+        // ignore
+      }
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setNeedsSetup(false);
@@ -228,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // local state is cleared regardless
     }
+    setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
     setIsGuest(false);
@@ -239,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // local state is cleared regardless
     }
+    setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
     setIsGuest(false);
@@ -277,6 +311,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const requestLogin = useCallback(() => {
+    setCurrentUser(null);
+    setSessionInfo(null);
     setIsGuest(false);
   }, []);
 

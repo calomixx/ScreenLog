@@ -40,7 +40,13 @@ export const AuthScreen: React.FC = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmail, setLoginEmail] = useState(() => {
+    try {
+      return localStorage.getItem('sl_last_email') || '';
+    } catch {
+      return '';
+    }
+  });
   const [loginPassword, setLoginPassword] = useState('');
   const [remember, setRemember] = useState(true);
 

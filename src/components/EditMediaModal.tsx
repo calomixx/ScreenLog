@@ -18,7 +18,10 @@ import {
   Tag,
   History,
   ShieldCheck,
-  Undo2
+  Undo2,
+  Crown,
+  Link as LinkIcon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { MediaItem, MediaType, CustomUserField } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -90,6 +93,9 @@ export const EditMediaModal: React.FC = () => {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const [imageInputMethod, setImageInputMethod] = useState<'url' | 'file'>('url');
+
+  const isSuperOrAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
   // Populate from mediaToEdit
   useEffect(() => {
@@ -365,12 +371,37 @@ export const EditMediaModal: React.FC = () => {
           
           {/* Section 1: Portada y Datos Principales */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Poster Upload Box */}
+            {/* Poster and Image Management Column */}
             <div className="space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                Póster / Carátula Oficial
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Póster / Carátula
+                </label>
+                <div className="flex items-center gap-1 bg-[#0A0A0B] p-0.5 rounded-lg border border-white/10 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setImageInputMethod('url')}
+                    className={`px-2 py-0.5 rounded-md font-bold transition-all flex items-center gap-1 ${
+                      imageInputMethod === 'url' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <LinkIcon className="w-2.5 h-2.5" />
+                    Por URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageInputMethod('file')}
+                    className={`px-2 py-0.5 rounded-md font-bold transition-all flex items-center gap-1 ${
+                      imageInputMethod === 'file' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Upload className="w-2.5 h-2.5" />
+                    Archivo
+                  </button>
+                </div>
+              </div>
 
+              {/* Poster Preview Box */}
               <div 
                 onDragOver={(e) => { e.preventDefault(); setIsDraggingPhoto(true); }}
                 onDragLeave={() => setIsDraggingPhoto(false)}
@@ -394,15 +425,26 @@ export const EditMediaModal: React.FC = () => {
                       alt={title || 'Póster'}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3">
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setImageInputMethod('url')}
                         className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
                       >
+                        <LinkIcon className="w-3.5 h-3.5" />
+                        <span>Editar por URL</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                      >
                         <Camera className="w-3.5 h-3.5" />
-                        <span>Cambiar portada</span>
+                        <span>Subir archivo</span>
                       </button>
                       <button
                         type="button"
@@ -419,17 +461,23 @@ export const EditMediaModal: React.FC = () => {
                 ) : (
                   <div className="p-4 text-center space-y-2">
                     <div className="w-12 h-12 mx-auto rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400">
-                      <Upload className="w-6 h-6" />
+                      {imageInputMethod === 'url' ? <LinkIcon className="w-6 h-6 text-rose-400" /> : <Upload className="w-6 h-6 text-slate-400" />}
                     </div>
-                    <p className="text-xs font-semibold text-white">Arrastra una imagen aquí</p>
-                    <p className="text-[11px] text-slate-400">JPG, PNG o WebP (máx. 2 MB)</p>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-bold transition-colors"
-                    >
-                      Subir archivo
-                    </button>
+                    <p className="text-xs font-semibold text-white">
+                      {imageInputMethod === 'url' ? 'Pega la URL de la imagen abajo' : 'Arrastra una imagen aquí'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {imageInputMethod === 'url' ? 'TMDb, IMDb, Crunchyroll, etc.' : 'JPG, PNG o WebP (máx. 2 MB)'}
+                    </p>
+                    {imageInputMethod === 'file' && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-bold transition-colors"
+                      >
+                        Subir archivo
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -446,9 +494,116 @@ export const EditMediaModal: React.FC = () => {
                 />
               </div>
 
-              <p className="text-[11px] text-slate-400 text-center">
-                Se redimensiona a 400x600 para que cargue ultra rápido en todo el catálogo.
-              </p>
+              {/* Apartado Especial para Administrador / Super User: Configurar Imagen por URL */}
+              {imageInputMethod === 'url' ? (
+                <div className="p-3.5 rounded-2xl bg-[#0A0A0B] border border-rose-500/30 shadow-lg shadow-rose-950/20 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-white">
+                      <LinkIcon className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Apartado de Imágenes por URL</span>
+                    </div>
+                    {isSuperOrAdmin && (
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <Crown className="w-2.5 h-2.5" /> Super User
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Campo URL Póster */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                      <span>URL del Póster (Vertical):</span>
+                      {posterUrl ? (
+                        <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> Conectada
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-amber-400 font-semibold">Requerida</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={posterUrl}
+                        onChange={(e) => {
+                          setPosterUrl(e.target.value);
+                          setIsDirty(true);
+                        }}
+                        placeholder="https://image.tmdb.org/... o enlace de carátula"
+                        className="w-full bg-[#141416] border border-white/10 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none pr-8 transition-all"
+                      />
+                      {posterUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPosterUrl('');
+                            setIsDirty(true);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                          title="Limpiar enlace"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Campo URL Fondo Cinemático */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                      <span>URL Fondo Cinemático / Backdrop:</span>
+                      {backdropUrl && (
+                        <span className="text-[10px] text-sky-400 font-semibold flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> Conectado
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={backdropUrl}
+                        onChange={(e) => {
+                          setBackdropUrl(e.target.value);
+                          setIsDirty(true);
+                        }}
+                        placeholder="https://... imagen horizontal para fondo"
+                        className="w-full bg-[#141416] border border-white/10 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none pr-8 transition-all"
+                      />
+                      {backdropUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBackdropUrl('');
+                            setIsDirty(true);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                          title="Limpiar enlace"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Como Super User / Administrador puedes pegar enlaces directos de TMDb, IMDb, Crunchyroll, MyAnimeList o FilmAffinity para actualizar la carátula sin descargar archivos.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-2">
+                  <p className="text-[11px] text-slate-400 text-center">
+                    Arrastra una imagen o pulsa para subir archivo desde tu ordenador.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setImageInputMethod('url')}
+                    className="w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-rose-400 text-xs font-semibold border border-white/10 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <LinkIcon className="w-3 h-3" />
+                    Cambiar al apartado de URL
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Main Metadata Fields */}

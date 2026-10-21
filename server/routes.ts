@@ -59,8 +59,8 @@ function setSessionCookie(res: Response, token: string, remember: boolean): void
   const maxAge = (remember ? SESSION_DAYS_REMEMBER : SESSION_DAYS_DEFAULT) * 24 * 60 * 60 * 1000;
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     path: '/',
     maxAge,
   });
@@ -69,8 +69,8 @@ function setSessionCookie(res: Response, token: string, remember: boolean): void
 function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     path: '/',
   });
 }
@@ -174,7 +174,7 @@ async function createSession(
   store: StoreData,
   user: StoredUser,
   remember: boolean,
-): Promise<SessionRecord> {
+): Promise<{ session: SessionRecord; token: string }> {
   const token = generateSessionToken();
   const now = new Date().toISOString();
   const session: SessionRecord = {
@@ -192,7 +192,7 @@ async function createSession(
     (s) => !isSessionExpired(s) && findUserById(store, s.userId),
   );
   setSessionCookie(res, token, remember);
-  return session;
+  return { session, token };
 }
 
 function detachSessionsForUser(store: StoreData, userId: string): void {
@@ -325,46 +325,61 @@ function buildMediaFromBody(body: any, existing?: MediaItem): MediaItem {
   };
 }
 
-export function createApiRouter(): Router {
-  const router = Router();
-  let lastSessionPersist = 0;
+let lastSessionPersist = 0;
 
-  router.use(asyncRoute(async (req, res, next) => {
+export const resolveSession = asyncRoute(async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  let token: string | undefined;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  }
+  if (!token && typeof req.headers['x-session-token'] === 'string') {
+    token = req.headers['x-session-token'];
+  }
+  if (!token) {
     const cookies = parseCookies(req.headers.cookie);
-    const token = cookies[SESSION_COOKIE];
-    if (!token) {
-      next();
-      return;
-    }
-    const store = await getStore();
-    const tokenHash = hashToken(token);
-    const session = store.sessions.find((s) => s.tokenHash === tokenHash);
-    if (!session || isSessionExpired(session)) {
-      if (session) {
-        store.sessions = store.sessions.filter((s) => s.id !== session.id);
-        await saveStore();
-      }
-      clearSessionCookie(res);
-      next();
-      return;
-    }
-    const user = findUserById(store, session.userId);
-    if (!user || user.blocked) {
+    token = cookies[SESSION_COOKIE];
+  }
+
+  if (!token) {
+    next();
+    return;
+  }
+  const store = await getStore();
+  const tokenHash = hashToken(token);
+  const session = store.sessions.find((s) => s.tokenHash === tokenHash);
+  if (!session || isSessionExpired(session)) {
+    if (session) {
       store.sessions = store.sessions.filter((s) => s.id !== session.id);
       await saveStore();
-      clearSessionCookie(res);
-      next();
-      return;
     }
-    session.lastActivityAt = new Date().toISOString();
-    req.authUser = user;
-    req.authSession = session;
-    if (Date.now() - lastSessionPersist > 60000) {
-      lastSessionPersist = Date.now();
-      saveStore().catch(() => undefined);
-    }
+    clearSessionCookie(res);
     next();
-  }));
+    return;
+  }
+  const user = findUserById(store, session.userId);
+  if (!user || user.blocked) {
+    store.sessions = store.sessions.filter((s) => s.id !== session.id);
+    await saveStore();
+    clearSessionCookie(res);
+    next();
+    return;
+  }
+  session.lastActivityAt = new Date().toISOString();
+  req.authUser = user;
+  req.authSession = session;
+  (req as any).authToken = token;
+  if (Date.now() - lastSessionPersist > 60000) {
+    lastSessionPersist = Date.now();
+    saveStore().catch(() => undefined);
+  }
+  next();
+});
+
+export function createApiRouter(): Router {
+  const router = Router();
+  router.use(resolveSession);
 
   router.use((req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -410,6 +425,7 @@ export function createApiRouter(): Router {
         needsSetup: !ownerExists(store),
         user: req.authUser ? publicUser(req.authUser) : null,
         session: req.authSession ? safeSession(req.authSession) : null,
+        token: (req as any).authToken || null,
         settings: {
           portalName: store.settings.portalName,
           tagline: store.settings.tagline,
@@ -579,7 +595,7 @@ export function createApiRouter(): Router {
     store.users.push(user);
     store.settings.updatedAt = new Date().toISOString();
     store.settings.updatedBy = user.id;
-    const session = await createSession(req, res, store, user, true);
+    const { session, token } = await createSession(req, res, store, user, true);
     addLog(store, {
       level: 'security',
       category: 'auth',
@@ -598,7 +614,7 @@ export function createApiRouter(): Router {
       result: 'success',
     });
     await saveStore();
-    res.json({ success: true, data: { user: publicUser(user), session: safeSession(session) } });
+    res.json({ success: true, data: { user: publicUser(user), session: safeSession(session), token } });
   }));
 
   router.post('/auth/register', asyncRoute(async (req, res) => {
@@ -625,7 +641,7 @@ export function createApiRouter(): Router {
       avatar: typeof req.body?.avatar === 'string' ? req.body.avatar : undefined,
     });
     store.users.push(user);
-    const session = await createSession(req, res, store, user, false);
+    const { session, token } = await createSession(req, res, store, user, false);
     addLog(store, {
       level: 'info',
       category: 'auth',
@@ -635,7 +651,7 @@ export function createApiRouter(): Router {
       ip: getClientIp(req),
     });
     await saveStore();
-    res.json({ success: true, data: { user: publicUser(user), session: safeSession(session) } });
+    res.json({ success: true, data: { user: publicUser(user), session: safeSession(session), token } });
   }));
 
   router.post('/auth/login', asyncRoute(async (req, res) => {
@@ -714,7 +730,7 @@ export function createApiRouter(): Router {
     user.failedLoginCount = 0;
     user.lockedUntil = null;
     user.lastLoginAt = new Date().toISOString();
-    const session = await createSession(req, res, store, user, remember);
+    const { session, token } = await createSession(req, res, store, user, remember);
     addLog(store, {
       level: 'info',
       category: 'auth',
@@ -729,6 +745,7 @@ export function createApiRouter(): Router {
       data: {
         user: publicUser(user),
         session: safeSession(session),
+        token,
         mustChangePassword: user.mustChangePassword,
       },
     });

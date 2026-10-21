@@ -153,7 +153,7 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
 );
 
 export const AdminPanelView: React.FC = () => {
-  const { currentUser, refresh } = useAuth();
+  const { currentUser, refresh, requestLogin } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('summary');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -556,9 +556,26 @@ export const AdminPanelView: React.FC = () => {
       </header>
 
       {error && (
-        <div className="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
+        <div className="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-          <span className="flex-1">{error}</span>
+          <div className="flex-1 space-y-1.5">
+            <p>{error}</p>
+            {error.includes('iniciar sesión') && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={requestLogin}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition-colors shadow-sm"
+                >
+                  <Lock className="w-3 h-3" />
+                  Iniciar sesión ahora
+                </button>
+                <span className="text-[11px] text-rose-300/80">
+                  Para restaurar el token de autenticación permanente.
+                </span>
+              </div>
+            )}
+          </div>
           <button type="button" onClick={() => setError('')} aria-label="Cerrar error">
             <X className="w-4 h-4" />
           </button>
