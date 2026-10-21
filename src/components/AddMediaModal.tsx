@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Upload, 
@@ -14,11 +14,21 @@ import {
   Play,
   Loader2,
   AlertCircle,
-  Info
+  Info,
+  HelpCircle
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { MediaType } from '../types';
 import { apiRequest } from '../lib/api';
+
+const ANIME_FORMATS = [
+  { value: 'TV', label: 'TV (Serie de TV)' },
+  { value: 'OVA', label: 'OVA (Original Video Animation)' },
+  { value: 'ONA', label: 'ONA (Original Net Animation)' },
+  { value: 'Movie', label: 'Película' },
+  { value: 'Special', label: 'Especial' },
+  { value: 'Music', label: 'Video Musical' },
+];
 
 const SAMPLE_POSTER_PRESETS = [
   { name: 'Cyberpunk Neon', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80' },
@@ -58,6 +68,15 @@ export const AddMediaModal: React.FC = () => {
   const [trailerUrl, setTrailerUrl] = useState('');
   const [imageTab, setImageTab] = useState<'url' | 'upload' | 'presets'>('url');
 
+  // Series/Anime specific fields
+  const [seasonsCount, setSeasonsCount] = useState<number | ''>('');
+  const [episodesCount, setEpisodesCount] = useState<number | ''>('');
+  const [animeFormat, setAnimeFormat] = useState<string>('');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [country, setCountry] = useState('');
+  const [language, setLanguage] = useState('');
+  const [ageRating, setAgeRating] = useState('');
+
   // Gemini AI Autofill States
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
@@ -66,6 +85,7 @@ export const AddMediaModal: React.FC = () => {
   const [hasAutofilled, setHasAutofilled] = useState(false);
   const [animeInfo, setAnimeInfo] = useState<{ format?: string; episodes?: string } | null>(null);
 
+  // Update autofill to use /api/media/lookup
   const handleAutofill = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle || trimmedTitle.length < 2 || isAutofilling) return;
@@ -76,12 +96,17 @@ export const AddMediaModal: React.FC = () => {
     setAutofillSuccess(null);
 
     try {
-      const result = await apiRequest<{ success: boolean; data: any }>('/api/autofill', {
+      const result = await apiRequest<{ success: boolean; data: any }>('/api/media/lookup', {
         method: 'POST',
-        body: JSON.stringify({ title: trimmedTitle }),
+        body: JSON.stringify({ title: trimmedTitle, type }),
       });
 
       const data = result.data;
+
+      if (!data) {
+        setAutofillWarning('No se encontraron coincidencias. Completa la ficha manualmente.');
+        return;
+      }
 
       // Autocomplete all form fields
       if (data.title && typeof data.title === 'string') {
@@ -117,6 +142,27 @@ export const AddMediaModal: React.FC = () => {
       if (Array.isArray(data.genres) && data.genres.length > 0) {
         setSelectedGenres(data.genres);
       }
+      if (data.seasonsCount !== undefined && data.seasonsCount !== null) {
+        setSeasonsCount(Number(data.seasonsCount));
+      }
+      if (data.episodesCount !== undefined && data.episodesCount !== null) {
+        setEpisodesCount(Number(data.episodesCount));
+      }
+      if (data.animeFormat && typeof data.animeFormat === 'string') {
+        setAnimeFormat(data.animeFormat);
+      }
+      if (data.releaseDate && typeof data.releaseDate === 'string') {
+        setReleaseDate(data.releaseDate.split('T')[0]);
+      }
+      if (data.country && typeof data.country === 'string') {
+        setCountry(data.country);
+      }
+      if (data.language && typeof data.language === 'string') {
+        setLanguage(data.language);
+      }
+      if (data.ageRating && typeof data.ageRating === 'string') {
+        setAgeRating(data.ageRating);
+      }
 
       const isAnime = data.type === 'anime' || (data.genres && data.genres.includes('Animación') && data.originalTitle?.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/));
       const isOva = data.animeFormat === 'OVA' || (typeof data.duration === 'string' && data.duration.toLowerCase().includes('ova'));
@@ -141,7 +187,8 @@ export const AddMediaModal: React.FC = () => {
       } else if (confidence < 0.5) {
         setAutofillWarning(`Se completaron los datos con baja confianza (${Math.round(confidence * 100)}%), por favor revisa los campos.`);
       } else {
-        setAutofillSuccess(`¡Ficha autocompletada por Gemini! (${Math.round(confidence * 100)}% de confianza). Puedes editar cualquier campo.`);
+        const sourceLabel = data.source === 'tmdb' ? 'TMDB' : data.source === 'jikan' ? 'Jikan' : data.source === 'local' ? 'Base local' : 'IA';
+        setAutofillSuccess(`¡Ficha autocompletada desde ${sourceLabel}! (${Math.round(confidence * 100)}% confianza). Puedes editar cualquier campo.`);
       }
     } catch (err: any) {
       console.warn('Autofill error:', err);
@@ -218,7 +265,15 @@ export const AddMediaModal: React.FC = () => {
       genres: selectedGenres,
       posterUrl,
       backdropUrl: backdropUrl || posterUrl,
-      trailerYoutubeId: ytid
+      trailerYoutubeId: ytid,
+      seasonsCount: seasonsCount || undefined,
+      episodesCount: episodesCount || undefined,
+      animeFormat: animeFormat || undefined,
+      releaseDate: releaseDate || undefined,
+      country: country || undefined,
+      language: language || undefined,
+      ageRating: ageRating || undefined,
+      streamingPlatforms: [defaultPlatform],
     });
 
     setIsAddModalOpen(false);
@@ -471,6 +526,110 @@ export const AddMediaModal: React.FC = () => {
               <span className="text-[11px] text-purple-300/80">
                 • Detectado automáticamente (OVA, capítulos y estudio)
               </span>
+            </div>
+          )}
+
+          {/* Series/Anime Specific Fields */}
+          {(type === 'serie' || type === 'anime') && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-0">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  Temporadas
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={seasonsCount}
+                  onChange={(e) => setSeasonsCount(parseInt(e.target.value) || '')}
+                  placeholder="ej: 3"
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  Episodios Totales
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={episodesCount}
+                  onChange={(e) => setEpisodesCount(parseInt(e.target.value) || '')}
+                  placeholder="ej: 24"
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              {type === 'anime' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                    Formato Anime
+                  </label>
+                  <select
+                    value={animeFormat}
+                    onChange={(e) => setAnimeFormat(e.target.value)}
+                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                  >
+                    <option value="">Seleccionar formato</option>
+                    {ANIME_FORMATS.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  Fecha de Estreno
+                </label>
+                <input
+                  type="date"
+                  value={releaseDate}
+                  onChange={(e) => setReleaseDate(e.target.value)}
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  País
+                </label>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="ej: JP, US, ES"
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  Idioma
+                </label>
+                <input
+                  type="text"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  placeholder="ej: ja, es, en"
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                  Clasificación
+                </label>
+                <input
+                  type="text"
+                  value={ageRating}
+                  onChange={(e) => setAgeRating(e.target.value)}
+                  placeholder="ej: PG-13, R, TV-MA"
+                  className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
             </div>
           )}
 

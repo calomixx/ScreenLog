@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Sparkles, 
   Film, 
@@ -13,11 +13,15 @@ import {
   Trophy, 
   Share2, 
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   UserCheck,
   BarChart3,
-  ListPlus
+  ListPlus,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useMedia } from '../context/MediaContext';
 
 export const FeaturesShowcase: React.FC = () => {
@@ -91,6 +95,98 @@ export const FeaturesShowcase: React.FC = () => {
     }
   ];
 
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(true);
+  const [itemsPerView, setItemsPerView] = useState(1);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Calculate items per view based on screen width
+  useEffect(() => {
+    const updateItemsPerView = () => {
+      const width = window.innerWidth;
+      if (width >= 1024) setItemsPerView(3); // lg: 3 items
+      else if (width >= 768) setItemsPerView(2); // md: 2 items
+      else setItemsPerView(1); // mobile: 1 item
+    };
+    updateItemsPerView();
+    window.addEventListener('resize', updateItemsPerView);
+    return () => window.removeEventListener('resize', updateItemsPerView);
+  }, []);
+
+  // Auto-play logic
+  const startAutoPlay = useCallback(() => {
+    if (autoPlayRef.current) clearTimeout(autoPlayRef.current);
+    if (!autoPlay) return;
+    autoPlayRef.current = setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % offerings.length);
+    }, 6000);
+  }, [autoPlay]);
+
+  const stopAutoPlay = useCallback(() => {
+    if (autoPlayRef.current) clearTimeout(autoPlayRef.current);
+  }, []);
+
+  useEffect(() => {
+    startAutoPlay();
+    return stopAutoPlay;
+  }, [currentIndex, autoPlay, startAutoPlay, stopAutoPlay]);
+
+  // Pause auto-play on hover/focus/visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) stopAutoPlay();
+      else startAutoPlay();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [startAutoPlay, stopAutoPlay]);
+
+  const nextSlide = () => {
+    stopAutoPlay();
+    setCurrentIndex((prev) => (prev + 1) % offerings.length);
+    if (autoPlay) startAutoPlay();
+  };
+
+  const prevSlide = () => {
+    stopAutoPlay();
+    setCurrentIndex((prev) => (prev - 1 + offerings.length) % offerings.length);
+    if (autoPlay) startAutoPlay();
+  };
+
+  const goToSlide = (index: number) => {
+    stopAutoPlay();
+    setCurrentIndex(index);
+    if (autoPlay) startAutoPlay();
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlide();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [nextSlide, prevSlide]);
+
+  // Touch/swipe support
+  const touchStartRef = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartRef.current === null) return;
+    const diff = touchStartRef.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) nextSlide();
+      else prevSlide();
+    }
+    touchStartRef.current = null;
+  };
+
+  const maxIndex = offerings.length - 1;
+
   return (
     <div id="features-showcase-section" className="space-y-16 py-6">
       
@@ -109,41 +205,130 @@ export const FeaturesShowcase: React.FC = () => {
           </p>
         </div>
 
-        {/* Offerings Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {offerings.map((item, index) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={index}
-                className="group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/10 hover:border-white/20 rounded-3xl p-6 sm:p-7 shadow-xl transition-all duration-300 flex flex-col justify-between"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className={`p-3 rounded-2xl bg-gradient-to-br ${item.accent} border shadow-inner`}>
-                      <Icon className="w-6 h-6" />
+        {/* Offerings Carousel */}
+        <div 
+          id="offerings-carousel"
+          className="relative"
+          onMouseEnter={() => setAutoPlay(false)}
+          onMouseLeave={() => setAutoPlay(true)}
+          onFocus={() => setAutoPlay(false)}
+          onBlur={() => setAutoPlay(true)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div 
+            className="overflow-hidden"
+            role="region"
+            aria-roledescription="carrusel"
+            aria-label="Características de ScreenLog Pro"
+          >
+            <motion.div
+              className="flex gap-6"
+              style={{ 
+                transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)`,
+                transition: 'transform 0.5s ease-out'
+              }}
+              animate={{ x: -currentIndex * (100 / itemsPerView) }}
+              transition={{ type: 'spring', stiffness: 100, damping: 30 }}
+            >
+              {offerings.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <motion.div
+                    key={index}
+                    id={`offering-slide-${index}`}
+                    className="flex-shrink-0"
+                    style={{ width: `${100 / itemsPerView}%`, paddingRight: '1.5rem' }}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    role="group"
+                    aria-roledescription="diapositiva"
+                    aria-label={`${item.title}, diapositiva ${index + 1} de ${offerings.length}`}
+                    aria-current={index === currentIndex ? 'true' : 'false'}
+                  >
+                    <div className="group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/10 hover:border-white/20 rounded-3xl p-6 sm:p-7 shadow-xl transition-all duration-300 flex flex-col justify-between h-full">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className={`p-3 rounded-2xl bg-gradient-to-br ${item.accent} border shadow-inner`}>
+                            <Icon className="w-6 h-6" />
+                          </div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/5 text-slate-300 border border-white/10">
+                            {item.badge}
+                          </span>
+                        </div>
+
+                        <h3 className="text-lg font-display font-bold text-white group-hover:text-rose-400 transition-colors">
+                          {item.title}
+                        </h3>
+
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-light">
+                          {item.desc}
+                        </p>
+                      </div>
+
+                      <div className="pt-5 mt-4 border-t border-white/5 flex items-center gap-2 text-xs font-semibold text-slate-400 group-hover:text-white transition-colors">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Disponible para todos los usuarios</span>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/5 text-slate-300 border border-white/10">
-                      {item.badge}
-                    </span>
-                  </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </div>
 
-                  <h3 className="text-lg font-display font-bold text-white group-hover:text-rose-400 transition-colors">
-                    {item.title}
-                  </h3>
+          {/* Navigation Arrows */}
+          <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex items-center justify-between px-2 sm:px-4 -ml-2 -mr-2">
+            <button
+              onClick={prevSlide}
+              disabled={false}
+              aria-label="Diapositiva anterior"
+              className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={nextSlide}
+              disabled={false}
+              aria-label="Diapositiva siguiente"
+              className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
 
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-light">
-                    {item.desc}
-                  </p>
-                </div>
+          {/* Dots Indicators */}
+          <div className="flex items-center justify-center gap-2 mt-6" role="tablist" aria-label="Indicadores de diapositivas">
+            {offerings.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                role="tab"
+                aria-selected={index === currentIndex}
+                aria-label={`Ir a diapositiva ${index + 1}: ${offerings[index].title}`}
+                aria-current={index === currentIndex ? 'true' : 'false'}
+                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'bg-rose-400 w-8 shadow-md shadow-rose-500/30'
+                    : 'bg-white/20 hover:bg-white/30'
+                }`}
+              />
+            ))}
+          </div>
 
-                <div className="pt-5 mt-4 border-t border-white/5 flex items-center gap-2 text-xs font-semibold text-slate-400 group-hover:text-white transition-colors">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Disponible para todos los usuarios</span>
-                </div>
-              </div>
-            );
-          })}
+          {/* Auto-play toggle */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <label className="inline-flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoPlay}
+                onChange={(e) => setAutoPlay(e.target.checked)}
+                className="rounded accent-rose-600"
+              />
+              <span>Reproducción automática</span>
+            </label>
+          </div>
         </div>
       </section>
 

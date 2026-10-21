@@ -115,6 +115,7 @@ export interface MediaItem {
   backdropUrl: string;
   trailerYoutubeId?: string;
   defaultPlatform: string;
+  streamingPlatforms?: string[];
   communityRating: number; // 0 to 5 or 0 to 10
   communityVotesCount: number;
   addedToListCount: number;
@@ -125,6 +126,7 @@ export interface MediaItem {
   isTopClassified?: boolean;
   createdAt: string;
   isCustomUserCreated?: boolean;
+  createdByUserId?: string;
   watchProviders?: WatchProvider[];
   seasonsCount?: number;
   episodesCount?: number;

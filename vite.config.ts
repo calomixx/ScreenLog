@@ -16,10 +16,19 @@ export default defineConfig(() => {
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      watch: process.env.DISABLE_HMR === 'true' ? null : {
+        // Avoid full page reloads caused by server logs and JSON data writes.
+        ignored: [
+          '**/dev-server*.out',
+          '**/dev-server*.err',
+          '**/server/data/**',
+          '**/artifacts/**',
+          '**/dist/**',
+        ],
+      },
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'http://localhost:3000',
           changeOrigin: true,
         },
       },

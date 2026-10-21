@@ -109,7 +109,7 @@ const AppGate: React.FC = () => {
 
   if (loading) return <Splash />;
   if (needsSetup) return <SetupScreen />;
-  if (!currentUser && !isGuest) return <AuthScreen />;
+  if (!currentUser && !isGuest) return <AuthScreen initialMode="login" />;
   if (currentUser?.mustChangePassword) return <ForcedPasswordChange />;
   return <AuthenticatedApp />;
 };

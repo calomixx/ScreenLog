@@ -262,12 +262,23 @@ export const Navbar: React.FC = () => {
                 <Bot className="w-4 h-4" />
               </button>
 
-              {isStaffUser && (
+              {currentUser ? (
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(true)}
                   className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-rose-900/30 active:scale-95 transition-all"
                   title="Añadir título al catálogo"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span className="hidden 2xl:inline">Añadir Título</span>
+                  <span className="hidden xl:inline 2xl:hidden">Añadir</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-rose-600/20 text-rose-300 font-bold text-xs border border-rose-500/30 transition-colors"
+                  title="Inicia sesión para añadir títulos"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span className="hidden 2xl:inline">Añadir Título</span>

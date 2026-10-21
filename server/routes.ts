@@ -48,6 +48,7 @@ const SESSION_COOKIE = 'sl_session';
 const SESSION_DAYS_REMEMBER = 30;
 const SESSION_DAYS_DEFAULT = 7;
 const BCRYPT_MAX_PASSWORD = 200;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 function asyncRoute(handler: (req: AuthedRequest, res: Response, next: NextFunction) => Promise<unknown>) {
   return (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -59,8 +60,8 @@ function setSessionCookie(res: Response, token: string, remember: boolean): void
   const maxAge = (remember ? SESSION_DAYS_REMEMBER : SESSION_DAYS_DEFAULT) * 24 * 60 * 60 * 1000;
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
     path: '/',
     maxAge,
   });
@@ -69,8 +70,8 @@ function setSessionCookie(res: Response, token: string, remember: boolean): void
 function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
     path: '/',
   });
 }
@@ -465,7 +466,240 @@ export function createApiRouter(): Router {
     res.json({ success: true, data: item });
   }));
 
-  router.post('/media', requireCatalogEditor, asyncRoute(async (req, res) => {
+  // Media lookup / autofill with TMDB/Jikan fallback
+  async function fetchFromTMDB(title: string, type?: string, year?: number) {
+    const apiKey = process.env.TMDB_API_KEY;
+    const accessToken = process.env.TMDB_ACCESS_TOKEN;
+    if (!apiKey && !accessToken) return null;
+
+    const baseUrl = 'https://api.themoviedb.org/3';
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false${apiKey ? `&api_key=${apiKey}` : ''}`;
+      const searchRes = await fetch(searchUrl, { headers, signal: controller.signal });
+      if (!searchRes.ok) throw new Error('TMDB search failed');
+      const searchData = await searchRes.json();
+      const results = searchData.results || [];
+      if (results.length === 0) return null;
+
+      let bestMatch = results[0];
+      for (const r of results) {
+        if (type === 'anime' && r.media_type === 'tv' && r.origin_country?.includes('JP')) { bestMatch = r; break; }
+        if (type === 'serie' && r.media_type === 'tv' && !r.origin_country?.includes('JP')) { bestMatch = r; break; }
+        if (type === 'pelicula' && r.media_type === 'movie') { bestMatch = r; break; }
+      }
+
+      const mediaType = bestMatch.media_type === 'movie' ? 'movie' : 'tv';
+      const detailUrl = `${baseUrl}/${mediaType}/${bestMatch.id}?language=es-ES&append_to_response=credits,videos,watch/providers,external_ids${apiKey ? `&api_key=${apiKey}` : ''}`;
+      const detailRes = await fetch(detailUrl, { headers, signal: controller.signal });
+      if (!detailRes.ok) throw new Error('TMDB detail failed');
+      const detail = await detailRes.json();
+
+      const crew = detail.credits?.crew || [];
+      const director = crew.find((c: any) => c.job === 'Director')?.name ||
+        (mediaType === 'tv' ? detail.created_by?.[0]?.name : null) || 'Desconocido';
+      const cast = (detail.credits?.cast || []).slice(0, 6).map((c: any) => c.name);
+      const genres = (detail.genres || []).map((g: any) => g.name);
+      const videos = (detail.videos?.results || []).filter((v: any) => v.site === 'YouTube' && v.type === 'Trailer');
+      const trailerYoutubeId = videos[0]?.key || '';
+
+      const providers = detail['watch/providers']?.results?.ES?.flatrate || detail['watch/providers']?.results?.US?.flatrate || [];
+      const platformMap: Record<string, string> = {
+        'Netflix': 'Netflix', 'HBO Max': 'Max (HBO)', 'Max': 'Max (HBO)',
+        'Amazon Prime Video': 'Prime Video', 'Disney Plus': 'Disney+', 'Apple TV+': 'Apple TV+',
+        'Crunchyroll': 'Crunchyroll'
+      };
+      const defaultPlatform = providers.length > 0
+        ? (platformMap[providers[0].provider_name] || providers[0].provider_name) : 'Otra';
+
+      const isAnime = detail.origin_country?.includes('JP') && genres.some((g: string) => g.toLowerCase().includes('anim'));
+      const year = mediaType === 'movie'
+        ? (detail.release_date ? new Date(detail.release_date).getFullYear() : new Date().getFullYear())
+        : (detail.first_air_date ? new Date(detail.first_air_date).getFullYear() : new Date().getFullYear());
+
+      return {
+        title: mediaType === 'movie' ? detail.title : detail.name,
+        originalTitle: mediaType === 'movie' ? detail.original_title : detail.original_name,
+        type: isAnime ? 'anime' : (mediaType === 'movie' ? 'pelicula' : 'serie'),
+        year,
+        director,
+        cast,
+        genres: genres.length > 0 ? genres : ['Drama'],
+        synopsis: detail.overview || '',
+        duration: mediaType === 'movie'
+          ? `${Math.floor((detail.runtime || 120) / 60)}h ${(detail.runtime || 120) % 60}m`
+          : `${detail.number_of_seasons || 1} Temporadas (${detail.number_of_episodes || 0} eps)`,
+        defaultPlatform,
+        trailerYoutubeId,
+        posterUrl: detail.poster_path ? `https://image.tmdb.org/t/p/w780${detail.poster_path}` : '',
+        backdropUrl: detail.backdrop_path ? `https://image.tmdb.org/t/p/w1280${detail.backdrop_path}` : '',
+        seasonsCount: mediaType === 'tv' ? detail.number_of_seasons : 0,
+        episodesCount: mediaType === 'tv' ? detail.number_of_episodes : 0,
+        releaseDate: mediaType === 'movie' ? detail.release_date : detail.first_air_date,
+        country: detail.origin_country?.[0],
+        language: detail.original_language,
+        confidence: 0.9,
+        source: 'tmdb',
+        createdByUserId: undefined
+      };
+    } catch (e) {
+      console.warn('TMDB lookup failed:', e);
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function fetchFromJikan(title: string) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1&sfw=1`;
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const anime = data.data?.[0];
+      if (!anime) return null;
+
+      const genres = (anime.genres || []).map((g: any) => g.name);
+      const studios = (anime.studios || []).map((s: any) => s.name);
+
+      return {
+        title: anime.title,
+        originalTitle: anime.title_japanese || anime.title_english || anime.title,
+        type: 'anime' as const,
+        year: anime.year || new Date().getFullYear(),
+        director: studios[0] || 'Desconocido',
+        cast: (anime.characters || []).slice(0, 6).map((c: any) => c.character?.name || ''),
+        genres: genres.length > 0 ? genres : ['Animación', 'Anime'],
+        synopsis: anime.synopsis || '',
+        duration: anime.episodes ? `${anime.episodes} eps` : 'Desconocido',
+        defaultPlatform: 'Crunchyroll',
+        trailerYoutubeId: anime.trailer?.youtube_id || '',
+        posterUrl: anime.images?.jpg?.large_image_url || '',
+        backdropUrl: anime.images?.jpg?.large_image_url || '',
+        episodesCount: anime.episodes || 0,
+        seasonsCount: 1,
+        releaseDate: anime.aired?.from?.split('T')[0],
+        country: 'JP',
+        language: 'ja',
+        confidence: 0.85,
+        source: 'jikan',
+        createdByUserId: undefined
+      };
+    } catch (e) {
+      console.warn('Jikan lookup failed:', e);
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function localFallbackLookup(title: string) {
+    const { INITIAL_MEDIA_LIST } = require('../src/data/initialMedia');
+    const normalized = title.trim().toLowerCase();
+    for (const media of INITIAL_MEDIA_LIST) {
+      if (media.title.toLowerCase().includes(normalized) || normalized.includes(media.title.toLowerCase())) {
+        return { ...media, confidence: 0.3, source: 'local', partial: true, message: 'Coincidencia local (revisa los datos)' };
+      }
+    }
+    return null;
+  }
+
+  // POST /api/media/lookup - main lookup endpoint
+  router.post('/media/lookup', requireAuth, asyncRoute(async (req, res) => {
+    const { title, type, year } = req.body;
+    if (!title || typeof title !== 'string' || title.trim().length < 2) {
+      return safeError(res, 400, 'El título debe tener al menos 2 caracteres.', 'INVALID_TITLE');
+    }
+
+    let result = await fetchFromTMDB(title.trim(), type, year);
+    if ((!result || result.confidence < 0.7) && (type === 'anime' || !type)) {
+      const jikanResult = await fetchFromJikan(title.trim());
+      if (jikanResult && (!result || jikanResult.confidence > result.confidence)) result = jikanResult;
+    }
+    if (!result) result = localFallbackLookup(title.trim());
+
+    if (!result) {
+      return res.json({ success: true, data: null, message: 'No encontramos coincidencias. Completa la ficha manualmente.' });
+    }
+    res.json({ success: true, data: result });
+  }));
+
+  // POST /api/autofill - alias for compatibility
+  router.post('/autofill', requireAuth, asyncRoute(async (req, res) => {
+    const { title } = req.body;
+    if (!title || typeof title !== 'string' || title.trim().length < 2) {
+      return safeError(res, 400, 'El título debe tener al menos 2 caracteres para autocompletar.', 'INVALID_TITLE');
+    }
+    let result = await fetchFromTMDB(title.trim());
+    if (!result) result = await fetchFromJikan(title.trim());
+    if (!result) result = localFallbackLookup(title.trim());
+    if (!result) {
+      return res.json({ success: true, data: null, message: 'No encontramos coincidencias. Completa la ficha manualmente.' });
+    }
+    res.json({ success: true, data: result });
+  }));
+
+  // POST /api/assistant - AI Assistant (Gemini)
+  router.post('/assistant', requireAuth, asyncRoute(async (req, res) => {
+    const { message, history = [], context = {} } = req.body;
+    if (!message || typeof message !== 'string') {
+      return safeError(res, 400, 'Mensaje requerido.', 'INVALID_MESSAGE');
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return res.json({ success: true, reply: 'El asistente IA no está configurado (falta GEMINI_API_KEY). Puedo ayudarte con información básica sobre la app.' });
+    }
+
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
+      const systemInstruction = `Eres "ScreenLog AI", el asistente oficial de ScreenLog Pro. Ayuda a los usuarios a navegar la app, usar sus funciones y dar recomendaciones cinéfilas.
+Contexto: Usuario ${context.userName || 'Usuario'}, pestaña activa: ${context.activeTab || 'inicio'}, títulos en lista: ${context.listCount || 0}.
+Responde en español, tono amable y cinéfilo.`;
+
+      const contents = [
+        ...history.slice(-6).map((h: any) => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(h.text || h.content || '') }] })),
+        { role: 'user', parts: [{ text: message }] },
+      ];
+
+      const geminiResponse = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents,
+        config: { systemInstruction, temperature: 0.7 },
+      });
+
+      const replyText = geminiResponse.text || '';
+      if (replyText.trim()) return res.json({ success: true, reply: replyText });
+    } catch (e) {
+      console.warn('Gemini assistant error:', e);
+    }
+
+    const q = message.toLowerCase();
+    let fallbackReply = '👋 ¡Hola! Soy ScreenLog AI. Puedo ayudarte con la app. Pregúntame sobre cómo añadir títulos, usar filtros, ver estadísticas o recomendar películas.';
+
+    if (q.includes('lista') || q.includes('agregar') || q.includes('añadir')) {
+      fallbackReply = '🎬 **Cómo agregar a Mi Lista:**\n1. Ve a Explorar o Inicio y haz clic en cualquier título.\n2. Selecciona estado: Pendiente, En Proceso o Terminada.\n3. Si es Terminada, podrás calificar, añadir plataforma, fecha y escribir tu crítica.\n4. Pulsa "Mi Lista" en la navbar para ver tu colección.';
+    } else if (q.includes('filtro') || q.includes('catalogo') || q.includes('año') || q.includes('género')) {
+      fallbackReply = '🔍 **Filtros del Catálogo:**\n- Género: píldoras rápidas (Ciencia Ficción, Drama, etc.)\n- Año: décadas (2020s, 2010s) o año exacto\n- Calificación mínima: 3.0+, 4.0+, 4.5+, 4.8+\n- Plataforma: Netflix, Max, Prime, Disney+, etc.\n- Orden: por rating, popularidad, año, título\n- Botón "Restablecer" para limpiar filtros.';
+    } else if (q.includes('estadística') || q.includes('gráfico')) {
+      fallbackReply = '📊 **Panel de Estadísticas:**\n- Gráfico de barras (Recharts) con películas vistas por género\n- Filtros: Vistas/Terminadas, Solo Películas, Toda Mi Lista\n- Tooltips con estrellas promedio\n- Click en barra para desglose interactivo';
+    } else if (q.includes('recomiend') || q.includes('qué ver')) {
+      fallbackReply = '🍿 **Recomendaciones:**\n1. **Oppenheimer (2023)** - Drama/Historia 4.8★ (Max)\n2. **Dune: Parte Dos (2024)** - Ciencia Ficción 4.9★\n3. **Spider-Man: A Través del Spider-Verso (2023)** - Animación 4.8★\n4. **Interestelar (2014)** - Ciencia Ficción 4.9★\n5. **El Viaje de Chihiro (2001)** - Anime 4.9★\n¿Buscas algún género específico?';
+    }
+
+    res.json({ success: true, reply: fallbackReply });
+  }));
+
+  router.post('/media', requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
@@ -473,9 +707,19 @@ export function createApiRouter(): Router {
       return safeError(res, 400, 'El título es obligatorio.', 'INVALID_TITLE');
     }
     const item = buildMediaFromBody(req.body);
-    if (store.media.some((media) => media.id === item.id)) {
-      return safeError(res, 409, 'Ya existe un título con ese identificador.', 'MEDIA_EXISTS');
+    // Check for duplicate by title + year + type
+    const normalizedTitle = item.title.trim().toLowerCase();
+    const duplicate = store.media.find(
+      (media) =>
+        media.title.trim().toLowerCase() === normalizedTitle &&
+        media.year === item.year &&
+        media.type === item.type
+    );
+    if (duplicate) {
+      return safeError(res, 409, 'Ya existe ese título; búscalo en el catálogo.', 'MEDIA_DUPLICATE');
     }
+    item.createdByUserId = user.id;
+    item.isCustomUserCreated = true;
     item.lastEditedBy = user.id;
     store.media.unshift(item);
     addAudit(store, {

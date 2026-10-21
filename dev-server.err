@@ -1,21 +1,17 @@
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\node_modules\@google\genai\dist\node\index.mjs' imported from D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog\server.ts
-Did you mean to import "@google/genai/dist/node/index.cjs"?
-    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
-    at moduleResolve (node:internal/modules/esm/resolve:879:10)
-    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)
-    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)
-    at nextStep (node:internal/modules/customization_hooks:189:26)
-    at resolveBaseSync (file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:11092)
-    at resolveDirectorySync (file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:12398)
-    at resolveTsPathsSync (file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:13605)
-    at resolve (file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:16832) {
-  code: 'ERR_MODULE_NOT_FOUND',
-  url: 'file:///D:/Users/datin501/.local/share/opencode/worktree/54911b/lucky-knight/ScreenLog/node_modules/@google/genai/dist/node/index.mjs'
+API Error: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at parse (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog2\node_modules\body-parser\lib\types\json.js:96:19)
+    at D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog2\node_modules\body-parser\lib\read.js:128:18
+    at AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+    at invokeCallback (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog2\node_modules\raw-body\index.js:238:16)
+    at done (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog2\node_modules\raw-body\index.js:227:7)
+    at IncomingMessage.onEnd (D:\Users\datin501\.local\share\opencode\worktree\54911b\lucky-knight\ScreenLog2\node_modules\raw-body\index.js:287:7)
+    at IncomingMessage.emit (node:events:514:28)
+    at endReadableNT (node:internal/streams/readable:1757:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  expose: true,
+  statusCode: 400,
+  status: 400,
+  body: '{title:Dune: Parte Dos}',
+  type: 'entity.parse.failed'
 }
-
-Node.js v24.20.0

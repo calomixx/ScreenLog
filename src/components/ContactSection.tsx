@@ -13,10 +13,26 @@ import {
   Globe, 
   Headphones,
   FileQuestion,
-  Lightbulb
+  Lightbulb,
+  Instagram,
+  Youtube,
+  Github,
+  MessageCircle,
+  Twitter,
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useMedia } from '../context/MediaContext';
+
+const SITE_SOCIALS = [
+  { id: 'email', label: 'Email', href: 'mailto:contacto@screenlog.app', icon: Mail, visible: true },
+  { id: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/34XXXXXXXXX', icon: MessageCircle, visible: true },
+  { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/screenlog', icon: Instagram, visible: true },
+  { id: 'twitter', label: 'X / Twitter', href: 'https://x.com/screenlog', icon: Twitter, visible: true },
+  { id: 'youtube', label: 'YouTube', href: 'https://youtube.com/@screenlog', icon: Youtube, visible: true },
+  { id: 'github', label: 'GitHub', href: 'https://github.com/screenlog', icon: Github, visible: true },
+];
 
 export const ContactSection: React.FC = () => {
   const { currentUser } = useMedia();
@@ -53,6 +69,7 @@ export const ContactSection: React.FC = () => {
 
     const subjectName = subjectOptions.find(o => o.value === subject)?.label || 'Consulta General';
     let ticketNumber = `SL-${Math.floor(10000 + Math.random() * 90000)}`;
+    let submitError = '';
 
     try {
       const response = await fetch('/api/contact', {
@@ -68,12 +85,22 @@ export const ContactSection: React.FC = () => {
         })
       });
       const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Error ${response.status}: No se pudo enviar el mensaje.`);
+      }
       if (payload?.data?.ticketCode) ticketNumber = payload.data.ticketCode;
-    } catch {
-      // El comprobante local se muestra igualmente.
+    } catch (err) {
+      submitError = err instanceof Error ? err.message : 'No se pudo enviar el mensaje. Inténtalo de nuevo.';
+      console.error('Contact form error:', err);
     }
 
     setIsSending(false);
+
+    if (submitError) {
+      setError(submitError);
+      return;
+    }
+
     setSubmittedTicket({
       id: ticketNumber,
       email: email.trim(),
@@ -90,6 +117,8 @@ export const ContactSection: React.FC = () => {
       // ignore
     }
   };
+
+  const [error, setError] = useState('');
 
   const handleReset = () => {
     setMessage('');
@@ -160,6 +189,13 @@ export const ContactSection: React.FC = () => {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 
+                {error && (
+                  <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Name */}
                   <div className="space-y-1.5">
@@ -247,10 +283,34 @@ export const ContactSection: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Direct Info Cards & FAQ */}
+        {/* RIGHT COLUMN: Direct Info Cards, Social Links & FAQ */}
         <div className="lg:col-span-5 space-y-4">
           
-          {/* Card 1: Direct Support Email */}
+          {/* Social Links */}
+          <div className="bg-[#161618] border border-white/10 rounded-3xl p-6 shadow-lg space-y-4">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <Globe className="w-4 h-4 text-rose-400" />
+              Síguenos y contáctanos
+            </h4>
+            <p className="text-xs text-slate-400">Canales oficiales de ScreenLog Pro</p>
+            <div className="flex flex-wrap gap-3 pt-2">
+              {SITE_SOCIALS.filter(s => s.visible).map((social) => (
+                <a
+                  key={social.id}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  title={social.label}
+                  className="inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 hover:bg-rose-600/20 border border-white/10 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+                >
+                  <social.icon className="w-5 h-5" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Card 1: Direct Support Email - Now Actionable */}
           <div className="bg-[#161618] border border-white/10 rounded-3xl p-6 shadow-lg space-y-3">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-rose-600/15 text-rose-400 border border-rose-500/25">
@@ -262,6 +322,15 @@ export const ContactSection: React.FC = () => {
               </div>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed font-light">Cada mensaje se registra en el servidor con un número de ticket para que el equipo pueda revisarlo y responderte.</p>
+            <a
+              href="mailto:contacto@screenlog.app"
+              className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Escribir a contacto@screenlog.app
+            </a>
           </div>
 
           {/* Card 2: Cinema Community & Suggestions */}

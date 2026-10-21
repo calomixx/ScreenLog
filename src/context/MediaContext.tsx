@@ -325,9 +325,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [authUser?.id]);
 
-  const openAuthModal = useCallback(() => {
-    requestLogin();
-  }, [requestLogin]);
+  const openAuthModal = useCallback(
+    (mode: 'login' | 'register' = 'login') => {
+      requestLogin(mode);
+    },
+    [requestLogin],
+  );
 
   const closeAuthModal = useCallback(() => undefined, []);
 
@@ -348,11 +351,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return;
       }
       if (!authUser) {
-        requestLogin();
-        return;
-      }
-      if (!canEditCatalog(authUser.role)) {
-        showToast('Solo administradores y el Owner pueden añadir títulos.', 'warning');
+        requestLogin('login');
         return;
       }
       setIsAddModalOpenState(true);
@@ -702,11 +701,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addCustomMedia = useCallback(
     (item: Partial<MediaItem> & { title: string; type: MediaItem['type'] }): string => {
-      if (!authUser || !canEditCatalog(authUser.role)) {
-        showToast('Solo administradores y el Owner pueden añadir títulos.', 'warning');
+      if (!authUser) {
+        requestLogin('login');
         return '';
       }
       const newId = `custom-${Date.now()}-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+      const now = new Date().toISOString();
       const newMedia: MediaItem = {
         id: newId,
         title: item.title,
@@ -727,16 +727,24 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
         trailerYoutubeId: item.trailerYoutubeId || '',
         defaultPlatform: item.defaultPlatform || 'Netflix',
+        streamingPlatforms: item.streamingPlatforms || [item.defaultPlatform || 'Netflix'],
         communityRating: 0,
         communityVotesCount: 0,
         addedToListCount: 0,
         isFeatured: false,
         isTrending: true,
         isTopClassified: false,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         isCustomUserCreated: true,
+        createdByUserId: authUser.id,
         detailedVotes: emptyDetailedVotes(),
         comments: [],
+        seasonsCount: item.seasonsCount,
+        episodesCount: item.episodesCount,
+        releaseDate: item.releaseDate,
+        country: item.country,
+        language: item.language,
+        ageRating: item.ageRating,
       };
 
       setMediaList((prev) => [newMedia, ...prev]);
@@ -757,10 +765,16 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           backdropUrl: newMedia.backdropUrl,
           trailerUrl: newMedia.trailerYoutubeId,
           duration: newMedia.duration,
-          streamingPlatforms: [newMedia.defaultPlatform],
+          streamingPlatforms: newMedia.streamingPlatforms,
           rating: 0,
           ratingCount: 0,
           createdByUserId: authUser.id,
+          seasonsCount: newMedia.seasonsCount,
+          episodesCount: newMedia.episodesCount,
+          releaseDate: newMedia.releaseDate,
+          country: newMedia.country,
+          language: newMedia.language,
+          ageRating: newMedia.ageRating,
         }),
       })
         .then(() => showToast(`Título añadido: ${newMedia.title}.`, 'success'))

@@ -80,7 +80,28 @@ interface AuthResult {
   code?: string;
 }
 
-interface AuthContextType {
+interface StatusResponse {
+  success: boolean;
+  data: {
+    needsSetup: boolean;
+    user: UserAccount | null;
+    session: SessionInfo | null;
+    token?: string | null;
+    settings: PublicSettings;
+  };
+}
+
+const defaultSettings: PublicSettings = {
+  portalName: 'ScreenLog Pro',
+  tagline: 'Explora, clasifica y comparte tu pasión por el cine',
+  allowPublicRegistration: true,
+  logoUrl: '/favicon.svg',
+  communityCommentsEnabled: true,
+};
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export interface AuthContextType {
   loading: boolean;
   needsSetup: boolean;
   currentUser: UserAccount | null;
@@ -95,30 +116,9 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
   updateProfile: (data: Partial<UserProfile>) => Promise<AuthResult>;
   refresh: () => Promise<void>;
-  requestLogin: () => void;
+  requestLogin: (mode?: 'login' | 'register', pendingAction?: string) => void;
   continueAsGuest: () => void;
   clearErrorState: () => void;
-}
-
-const defaultSettings: PublicSettings = {
-  portalName: 'ScreenLog Pro',
-  tagline: 'Explora, clasifica y comparte tu pasión por el cine',
-  allowPublicRegistration: true,
-  logoUrl: '/favicon.svg',
-  communityCommentsEnabled: true,
-};
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-interface StatusResponse {
-  success: boolean;
-  data: {
-    needsSetup: boolean;
-    user: UserAccount | null;
-    session: SessionInfo | null;
-    token?: string | null;
-    settings: PublicSettings;
-  };
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -126,8 +126,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [needsSetup, setNeedsSetup] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
   const [settings, setSettings] = useState<PublicSettings>(defaultSettings);
+  const [pendingLoginMode, setPendingLoginMode] = useState<'login' | 'register'>('login');
 
   const applyStatus = useCallback((data: StatusResponse['data']) => {
     setNeedsSetup(data.needsSetup);
@@ -139,7 +140,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStoredAuthToken(null);
     }
     setSettings({ ...defaultSettings, ...data.settings });
-    if (data.user) setIsGuest(false);
+    if (data.user) {
+      setIsGuest(false);
+      try { sessionStorage.removeItem('screenlog_guest'); } catch {}
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -150,6 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStoredAuthToken(null);
       setCurrentUser(null);
       setSessionInfo(null);
+      setIsGuest(true);
+      try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
     }
   }, [applyStatus]);
 
@@ -164,14 +170,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setNeedsSetup(false);
           setCurrentUser(null);
           setStoredAuthToken(null);
+          setIsGuest(true);
+          try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [applyStatus]);
 
   const login = useCallback(async (email: string, password: string, remember = false): Promise<AuthResult> => {
@@ -192,6 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSessionInfo(response.data.session);
       setIsGuest(false);
       setNeedsSetup(false);
+      try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
     } catch (error) {
       if (error instanceof ApiError) {
@@ -218,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
+      try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
     } catch (error) {
       if (error instanceof ApiError) {
@@ -245,6 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSessionInfo(response.data.session);
       setNeedsSetup(false);
       setIsGuest(false);
+      try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
     } catch (error) {
       if (error instanceof ApiError) {
@@ -263,7 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
-    setIsGuest(false);
+    setIsGuest(true);
+    try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
   }, []);
 
   const logoutAll = useCallback(async () => {
@@ -275,7 +285,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
-    setIsGuest(false);
+    setIsGuest(true);
+    try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<AuthResult> => {
@@ -310,14 +321,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const requestLogin = useCallback(() => {
-    setCurrentUser(null);
-    setSessionInfo(null);
+  const requestLogin = useCallback((mode: 'login' | 'register' = 'login', _pendingAction?: string) => {
+    setPendingLoginMode(mode);
     setIsGuest(false);
   }, []);
 
   const continueAsGuest = useCallback(() => {
     setIsGuest(true);
+    setPendingLoginMode('login');
+    try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
   }, []);
 
   const clearErrorState = useCallback(() => undefined, []);

@@ -22,6 +22,10 @@ import { LogoLockup, LogoMark } from './Logo';
 
 type AuthMode = 'login' | 'register' | 'forgot';
 
+interface AuthScreenProps {
+  initialMode?: AuthMode;
+}
+
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
@@ -32,9 +36,9 @@ const AVATAR_PRESETS = [
 const inputClass =
   'w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 focus:outline-none transition-colors';
 
-export const AuthScreen: React.FC = () => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' }) => {
   const { login, register, settings, continueAsGuest } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -202,6 +206,16 @@ export const AuthScreen: React.FC = () => {
 
           <div className="bg-[#141416]/90 border border-white/10 rounded-3xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden">
             <div className="p-6 sm:p-8">
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={continueAsGuest}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Volver al inicio
+                </button>
+              </div>
               {mode !== 'forgot' ? (
                 <>
                   <div className="mb-6">
@@ -505,14 +519,16 @@ export const AuthScreen: React.FC = () => {
               )}
 
               <div className="mt-6 pt-5 border-t border-white/10 space-y-3">
-                <button
-                  type="button"
-                  onClick={continueAsGuest}
-                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <Clapperboard className="w-3.5 h-3.5" />
-                  Explorar como invitado
-                </button>
+                {mode !== 'forgot' && (
+                  <button
+                    type="button"
+                    onClick={continueAsGuest}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600/20 to-amber-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold transition-colors flex items-center justify-center gap-2 hover:bg-rose-600/30"
+                  >
+                    <Clapperboard className="w-3.5 h-3.5 text-amber-400" />
+                    Explorar como invitado
+                  </button>
+                )}
                 <p className="text-[10px] text-center text-slate-500 leading-relaxed">
                   Como invitado puedes consultar el catálogo. Para guardar tu lista y escribir reseñas necesitas una cuenta.
                 </p>
