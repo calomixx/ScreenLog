@@ -21,7 +21,10 @@ import {
   Film,
   Award,
   Layers,
-  Heart
+  Heart,
+  Trash2,
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react';
 import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -109,13 +112,18 @@ export const DetailModal: React.FC = () => {
     submitDetailedVote,
     openTrailer,
     currentUser,
-    openEditMediaModal 
+    openEditMediaModal,
+    deleteMediaItem
   } = useMedia();
 
   const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isCatalogAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
   // Tab scroll position preservation & body scroll-lock
   const contentContainerRef = useRef<HTMLDivElement>(null);
@@ -343,8 +351,30 @@ export const DetailModal: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/75 to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/95 via-[#141416]/50 to-transparent pointer-events-none" />
 
-          {/* Close & Share Buttons */}
-          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
+          {/* Close, Admin Actions & Share Buttons */}
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-20">
+            {isCatalogAdmin && (
+              <div className="flex items-center gap-1 bg-black/75 p-1 rounded-full border border-white/20 backdrop-blur-md shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => openEditMediaModal(selectedMedia)}
+                  className="px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                  title="Editar ficha en el catálogo"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Editar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-1.5 rounded-full bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500 transition-all"
+                  title="Quitar / Eliminar del catálogo"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             <button
               onClick={handleShare}
               className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10  transition-colors"
@@ -1146,6 +1176,52 @@ export const DetailModal: React.FC = () => {
           )}
 
         </div>
+
+        {/* DIÁLOGO DE CONFIRMACIÓN PARA ELIMINAR DEL CATÁLOGO */}
+        {showDeleteConfirm && (
+          <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md rounded-3xl bg-[#141416] border border-rose-500/40 p-6 space-y-4 shadow-2xl text-left">
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="w-10 h-10 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-black text-white">¿Quitar "{selectedMedia.title}" del catálogo?</h3>
+                  <span className="text-[11px] text-slate-400 font-semibold">Acción de administrador</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Esta película/serie se eliminará permanentemente del catálogo general de ScreenLog Pro en el servidor.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={async () => {
+                    setIsDeleting(true);
+                    await deleteMediaItem(selectedMedia.id);
+                    setIsDeleting(false);
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-lg shadow-rose-900/30 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeleting ? 'Eliminando...' : 'Sí, eliminar del catálogo'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

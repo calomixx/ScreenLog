@@ -91,6 +91,7 @@ export const EditMediaModal: React.FC = () => {
   // UI state
   const [isDirty, setIsDirty] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [showConfirmRestore, setShowConfirmRestore] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const [imageInputMethod, setImageInputMethod] = useState<'url' | 'file'>('url');
@@ -1040,19 +1041,38 @@ export const EditMediaModal: React.FC = () => {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`¿Seguro que deseas restaurar los datos originales de ${mediaToEdit.title}? Se perderán las modificaciones personalizadas de este título.`)) {
-                  restoreMediaItem(mediaToEdit.id);
-                  setIsEditMediaModalOpen(false);
-                }
-              }}
-              className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 text-xs font-semibold transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restaurar datos originales de fábrica</span>
-            </button>
+            {showConfirmRestore ? (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-amber-300 font-semibold">¿Restaurar originales?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreMediaItem(mediaToEdit.id);
+                    setIsEditMediaModalOpen(false);
+                    setShowConfirmRestore(false);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors"
+                >
+                  Sí, restaurar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmRestore(false)}
+                  className="px-2 py-1 text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowConfirmRestore(true)}
+                className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 text-xs font-semibold transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restaurar datos originales de fábrica</span>
+              </button>
+            )}
           </div>
 
           {/* Footer Actions */}

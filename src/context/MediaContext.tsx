@@ -72,6 +72,7 @@ interface MediaContextType {
   updateUserProfile: (data: Partial<UserProfile>) => void;
 
   updateMediaItem: (item: MediaItem, summary?: string) => { success: boolean; message?: string };
+  deleteMediaItem: (id: string) => Promise<{ success: boolean; message?: string }>;
   restoreMediaItem: (id: string) => { success: boolean; message?: string };
   restoreAllMedia: () => void;
   undoLastMediaChange: (id: string) => { success: boolean; message?: string };
@@ -700,6 +701,33 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [authUser, showToast],
   );
 
+  const deleteMediaItem = useCallback(
+    async (id: string): Promise<{ success: boolean; message?: string }> => {
+      if (!authUser || !canEditCatalog(authUser.role)) {
+        showToast('Solo administradores y el Owner pueden eliminar títulos del catálogo.', 'warning');
+        return { success: false, message: 'No tienes permisos para eliminar títulos del catálogo.' };
+      }
+
+      const itemToDelete = mediaList.find((m) => m.id === id);
+      const title = itemToDelete?.title || 'Título';
+
+      try {
+        await apiRequest(`/api/media/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        setMediaList((prev) => prev.filter((m) => m.id !== id));
+        if (selectedMediaId === id) {
+          setSelectedMediaId(null);
+        }
+        showToast(`"${title}" ha sido eliminado del catálogo.`, 'info');
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg = err instanceof ApiError ? err.message : 'No se pudo eliminar el título del servidor.';
+        showToast(errorMsg, 'warning');
+        return { success: false, message: errorMsg };
+      }
+    },
+    [authUser, mediaList, selectedMediaId, showToast, setSelectedMediaId],
+  );
+
   const addCustomMedia = useCallback(
     (item: Partial<MediaItem> & { title: string; type: MediaItem['type'] }): string => {
       if (!authUser) {
@@ -1108,6 +1136,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updateProfile,
     updateUserProfile,
     updateMediaItem,
+    deleteMediaItem,
     restoreMediaItem,
     restoreAllMedia,
     undoLastMediaChange,

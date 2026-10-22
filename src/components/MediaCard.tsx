@@ -30,12 +30,14 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     removeFromMyList,
     openTrailer,
     currentUser,
-    openEditMediaModal
+    openEditMediaModal,
+    deleteMediaItem
   } = useMedia();
 
   const cardRef = useRef<HTMLDivElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showCardDeleteConfirm, setShowCardDeleteConfirm] = useState(false);
   const [tiltStyle, setTiltStyle] = useState({
     transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
     glareX: 50,
@@ -278,6 +280,36 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                       </button>
                     </div>
                   )}
+
+                  {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
+                    <div className="pt-1 mt-1 border-t border-white/10 space-y-0.5">
+                      <span className="text-[9px] uppercase font-bold text-rose-400 px-2.5 block tracking-wider">
+                        Administrador
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsMenuOpen(false);
+                          openEditMediaModal(media);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-amber-500/10 flex items-center gap-2 font-medium"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                        Editar ficha
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsMenuOpen(false);
+                          setShowCardDeleteConfirm(true);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 font-medium"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        Quitar del catálogo
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -394,6 +426,43 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           </div>
         )}
       </div>
+
+      {/* Confirmation overlay for admin catalog deletion */}
+      {showCardDeleteConfirm && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute inset-0 z-30 bg-black/90 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-150"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <Trash2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-white font-bold leading-snug">
+              ¿Eliminar "{media.title}"?
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Se quitará del catálogo para todos los usuarios.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 w-full pt-1">
+            <button
+              onClick={() => setShowCardDeleteConfirm(false)}
+              className="flex-1 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-semibold transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={async () => {
+                await deleteMediaItem(media.id);
+                setShowCardDeleteConfirm(false);
+              }}
+              className="flex-1 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/50 transition-colors"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

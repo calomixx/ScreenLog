@@ -915,6 +915,38 @@ Responde en español, tono amable y cinéfilo.`;
     res.json({ success: true, data: update });
   }));
 
+  router.delete('/media/:id', requireCatalogEditor, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const user = req.authUser;
+    if (!user) return;
+    const id = sanitizeText(req.params.id, 120);
+    const index = store.media.findIndex((media) => media.id === id);
+    if (index === -1) return safeError(res, 404, 'Título no encontrado.', 'MEDIA_NOT_FOUND');
+    const removedItem = store.media[index];
+    store.media.splice(index, 1);
+
+    addAudit(store, {
+      actorId: user.id,
+      actorName: user.name,
+      action: 'catalog.delete',
+      targetType: 'media',
+      targetId: id,
+      targetName: removedItem.title,
+      result: 'success',
+    });
+    addLog(store, {
+      level: 'warning',
+      category: 'admin',
+      message: `Título eliminado del catálogo: "${removedItem.title}" (${removedItem.year}) por ${user.email}`,
+      actorId: user.id,
+      actorName: user.name,
+      target: removedItem.title,
+      ip: getClientIp(req),
+    });
+    await saveStore();
+    res.json({ success: true, message: `"${removedItem.title}" eliminado correctamente del catálogo.` });
+  }));
+
   router.get('/testimonials', asyncRoute(async (_req, res) => {
     const store = await getStore();
     const items = [...store.testimonials].sort(

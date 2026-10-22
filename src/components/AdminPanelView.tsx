@@ -34,6 +34,9 @@ import {
   Users,
   Wallet,
   X,
+  Film,
+  Plus,
+  Edit3,
 } from 'lucide-react';
 import {
   AuditLog,
@@ -51,10 +54,13 @@ import {
   isOwner,
   useAuth,
 } from '../context/AuthContext';
+import { useMedia } from '../context/MediaContext';
+import type { MediaItem, MediaType } from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
 
 type AdminTab =
   | 'summary'
+  | 'catalog'
   | 'users'
   | 'moderation'
   | 'settings'
@@ -113,6 +119,14 @@ interface TransferResponse {
   data: { user: UserAccount; newOwner: UserAccount };
 }
 
+interface ConfirmDialogState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onConfirm: () => Promise<void> | void;
+}
+
 const inputClass =
   'w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 focus:outline-none transition-colors';
 
@@ -131,6 +145,20 @@ const RolePill: React.FC<{ role: UserAccount['role'] }> = ({ role }) => {
       {ROLE_LABELS[role]}
     </span>
   );
+};
+
+const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
+  pelicula: 'Película',
+  serie: 'Serie',
+  anime: 'Anime',
+  documental: 'Documental',
+};
+
+const MEDIA_TYPE_STYLES: Record<MediaType, string> = {
+  pelicula: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  serie: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+  anime: 'bg-pink-500/15 text-pink-300 border-pink-500/30',
+  documental: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
 };
 
 const StatCard: React.FC<{ icon: React.ElementType; label: string; value: string | number; tone?: string }> = ({
@@ -154,6 +182,14 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
 
 export const AdminPanelView: React.FC = () => {
   const { currentUser, refresh, requestLogin } = useAuth();
+  const {
+    mediaList,
+    openEditMediaModal,
+    deleteMediaItem,
+    setIsAddModalOpen,
+    setSelectedMediaId,
+  } = useMedia();
+
   const [activeTab, setActiveTab] = useState<AdminTab>('summary');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -168,12 +204,18 @@ export const AdminPanelView: React.FC = () => {
   const [billing, setBilling] = useState<BillingState | null>(null);
   const [credentials, setCredentials] = useState<CredentialStatus>({});
 
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogTypeFilter, setCatalogTypeFilter] = useState<'all' | MediaType>('all');
+
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | UserAccount['role']>('all');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
   const [moderationType, setModerationType] = useState<'all' | 'comment' | 'review'>('all');
   const [moderationStatus, setModerationStatus] = useState<'all' | 'visible' | 'hidden'>('all');
   const [tempPassword, setTempPassword] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [selectedUserForModal, setSelectedUserForModal] = useState<AdminUser | null>(null);
 
   const [settingsForm, setSettingsForm] = useState<AdminSettings | null>(null);
   const [billingForm, setBillingForm] = useState({ planName: '', planStatus: '', stripePublishableKey: '' });
@@ -190,6 +232,7 @@ export const AdminPanelView: React.FC = () => {
   const tabs = useMemo(() => {
     const base: { id: AdminTab; label: string; icon: React.ElementType }[] = [
       { id: 'summary', label: 'Resumen', icon: BarChart3 },
+      { id: 'catalog', label: 'Catálogo', icon: Film },
       { id: 'users', label: 'Usuarios', icon: Users },
       { id: 'moderation', label: 'Moderación', icon: ShieldAlert },
       { id: 'settings', label: 'Ajustes', icon: Settings },
@@ -320,6 +363,47 @@ export const AdminPanelView: React.FC = () => {
     return true;
   });
 
+  const filteredCatalog = useMemo(() => {
+    return mediaList.filter((item) => {
+      if (catalogTypeFilter !== 'all' && item.type !== catalogTypeFilter) return false;
+      if (!catalogSearch.trim()) return true;
+      const q = catalogSearch.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        (item.originalTitle && item.originalTitle.toLowerCase().includes(q)) ||
+        (item.director && item.director.toLowerCase().includes(q)) ||
+        item.genres.some((g) => g.toLowerCase().includes(q))
+      );
+    });
+  }, [mediaList, catalogSearch, catalogTypeFilter]);
+
+  const triggerDeleteMedia = (media: MediaItem) => {
+    const typeLabel = MEDIA_TYPE_LABELS[media.type] || 'título';
+    setConfirmDialog({
+      title: `¿Eliminar "${media.title}" del catálogo?`,
+      description: `Esta acción quitará de forma permanente este título (${typeLabel}, ${media.year}) del catálogo de ScreenLog y registrará la acción en la auditoría.`,
+      confirmLabel: 'Quitar del catálogo',
+      danger: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          const res = await deleteMediaItem(media.id);
+          if (res.success) {
+            flash(`"${media.title}" eliminada del catálogo.`);
+            setConfirmDialog(null);
+            void loadCore();
+          } else {
+            setError(res.message || 'No se pudo eliminar el elemento del catálogo.');
+          }
+        } catch (requestError) {
+          handleError(requestError);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  };
+
   const summary = {
     totalUsers: users.length,
     blockedUsers: users.filter((user) => user.blocked).length,
@@ -330,36 +414,75 @@ export const AdminPanelView: React.FC = () => {
     hidden: moderation.filter((item) => item.hidden).length,
   };
 
-  const runUserAction = async (
+  const executeUserAction = async (
     user: AdminUser,
     action: 'block' | 'unblock' | 'reset-password' | 'force-logout',
   ) => {
-    const confirmations: Record<typeof action, string> = {
-      block: `¿Bloquear a ${user.name}? Se cerrarán todas sus sesiones.`,
-      unblock: `¿Desbloquear a ${user.name}?`,
-      'reset-password': `¿Restablecer la contraseña de ${user.name}? Se generará una temporal y se cerrarán sus sesiones.`,
-      'force-logout': `¿Cerrar todas las sesiones de ${user.name}?`,
-    };
-    if (!window.confirm(confirmations[action])) return;
+    setActionLoading(true);
     try {
       const response = await apiRequest<{ success: boolean; data: AdminUser & { temporaryPassword?: string } }>(
         `/api/admin/users/${encodeURIComponent(user.id)}/${action}`,
         { method: 'POST' },
       );
       await loadCore();
+      setConfirmDialog(null);
+
+      // Keep user in modal in sync if open
+      if (response.data) {
+        setSelectedUserForModal((prev) => (prev?.id === user.id ? { ...prev, ...response.data } : prev));
+      }
+
       if (action === 'reset-password' && response.data?.temporaryPassword) {
         setTempPassword({ name: user.name, email: user.email, password: response.data.temporaryPassword });
-        setNotice('Contraseña temporal generada. Se muestra una sola vez en el diálogo.');
+        setNotice('Contraseña temporal generada con éxito. Se muestra a continuación.');
       } else {
         flash('Acción completada correctamente.');
       }
     } catch (requestError) {
       handleError(requestError);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const runModeration = async (item: ModerationItem, action: 'hide' | 'unhide' | 'delete') => {
-    if (action !== 'unhide' && !window.confirm(`¿${action === 'hide' ? 'Ocultar' : 'Eliminar'} esta publicación?`)) return;
+  const triggerUserAction = (
+    user: AdminUser,
+    action: 'block' | 'unblock' | 'reset-password' | 'force-logout',
+  ) => {
+    const titles: Record<typeof action, string> = {
+      block: `¿Bloquear a ${user.name}?`,
+      unblock: `¿Desbloquear a ${user.name}?`,
+      'reset-password': `¿Restablecer contraseña de ${user.name}?`,
+      'force-logout': `¿Cerrar todas las sesiones de ${user.name}?`,
+    };
+    const descriptions: Record<typeof action, string> = {
+      block: `Se revocarán los accesos y se cerrarán inmediatamente sus ${user.sessionsCount} sesiones activas.`,
+      unblock: `El usuario podrá volver a acceder a ScreenLog Pro normalmente.`,
+      'reset-password': `Se generará una contraseña temporal de un solo uso y se cerrarán todas sus sesiones. La clave se mostrará en pantalla para que puedas copiarla.`,
+      'force-logout': `Se cerrarán sus ${user.sessionsCount} sesiones en todos sus navegadores y dispositivos. Deberá iniciar sesión de nuevo.`,
+    };
+    const labels: Record<typeof action, string> = {
+      block: 'Bloquear usuario',
+      unblock: 'Desbloquear usuario',
+      'reset-password': 'Generar contraseña temporal',
+      'force-logout': 'Cerrar sesiones activas',
+    };
+
+    setConfirmDialog({
+      title: titles[action],
+      description: descriptions[action],
+      confirmLabel: labels[action],
+      danger: action !== 'unblock',
+      onConfirm: async () => {
+        await executeUserAction(user, action);
+      },
+    });
+  };
+
+  const runUserAction = triggerUserAction;
+
+  const executeModeration = async (item: ModerationItem, action: 'hide' | 'unhide' | 'delete') => {
+    setActionLoading(true);
     try {
       if (action === 'delete') {
         await apiRequest(`/api/admin/moderation/${encodeURIComponent(item.id)}?type=${item.type}`, {
@@ -373,10 +496,33 @@ export const AdminPanelView: React.FC = () => {
       }
       await loadCore();
       flash('Moderación aplicada.');
+      setConfirmDialog(null);
     } catch (requestError) {
       handleError(requestError);
+    } finally {
+      setActionLoading(false);
     }
   };
+
+  const triggerModeration = (item: ModerationItem, action: 'hide' | 'unhide' | 'delete') => {
+    if (action === 'unhide') {
+      void executeModeration(item, 'unhide');
+      return;
+    }
+    setConfirmDialog({
+      title: action === 'hide' ? '¿Ocultar publicación?' : '¿Eliminar publicación?',
+      description: action === 'hide'
+        ? 'La publicación dejará de verse en la comunidad pero permanecerá en los registros.'
+        : 'Esta acción es permanente y eliminará el comentario o reseña de la base de datos.',
+      confirmLabel: action === 'hide' ? 'Ocultar' : 'Eliminar definitivamente',
+      danger: action === 'delete',
+      onConfirm: async () => {
+        await executeModeration(item, action);
+      },
+    });
+  };
+
+  const runModeration = triggerModeration;
 
   const saveSettings = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -489,34 +635,58 @@ export const AdminPanelView: React.FC = () => {
     }
   };
 
-  const revokeAdmin = async (admin: AdminUser) => {
-    if (!window.confirm(`¿Revocar el rol de administrador a ${admin.name}?`)) return;
-    try {
-      await apiRequest(`/api/owner/admins/${encodeURIComponent(admin.id)}`, { method: 'DELETE' });
-      const response = await apiRequest<{ success: boolean; data: AdminUser[] }>('/api/owner/admins');
-      setAdmins(response.data || []);
-      flash('Rol de administrador revocado.');
-      await loadCore();
-    } catch (requestError) {
-      handleError(requestError);
-    }
+  const triggerRevokeAdmin = (admin: AdminUser) => {
+    setConfirmDialog({
+      title: `¿Revocar rol de administrador a ${admin.name}?`,
+      description: 'El usuario pasará a ser un usuario estándar sin privilegios de moderación ni administración.',
+      confirmLabel: 'Revocar rol de administrador',
+      danger: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiRequest(`/api/owner/admins/${encodeURIComponent(admin.id)}`, { method: 'DELETE' });
+          const response = await apiRequest<{ success: boolean; data: AdminUser[] }>('/api/owner/admins');
+          setAdmins(response.data || []);
+          flash('Rol de administrador revocado.');
+          await loadCore();
+          setConfirmDialog(null);
+        } catch (requestError) {
+          handleError(requestError);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const transferOwnership = async (event: React.FormEvent) => {
+  const revokeAdmin = triggerRevokeAdmin;
+
+  const transferOwnership = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!window.confirm('Esta acción transferirá la propiedad del portal de forma permanente. ¿Continuar?')) return;
-    try {
-      await apiRequest<TransferResponse>('/api/owner/transfer-ownership', {
-        method: 'POST',
-        body: JSON.stringify(transferForm),
-      });
-      setTransferForm({ email: '', password: '', confirmation: '', doubleConfirm: false });
-      flash('Propiedad transferida. Tu rol ahora es Administrador.');
-      await refresh();
-      await loadCore();
-    } catch (requestError) {
-      handleError(requestError);
-    }
+    setConfirmDialog({
+      title: '¿Confirmar transferencia de propiedad?',
+      description: `Esta acción transferirá la titularidad del portal de forma permanente e irreversible a ${transferForm.email}. Tu cuenta pasará a ser Administrador.`,
+      confirmLabel: 'Transferir propiedad ahora',
+      danger: true,
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiRequest<TransferResponse>('/api/owner/transfer-ownership', {
+            method: 'POST',
+            body: JSON.stringify(transferForm),
+          });
+          setTransferForm({ email: '', password: '', confirmation: '', doubleConfirm: false });
+          flash('Propiedad transferida con éxito. Tu rol ahora es Administrador.');
+          setConfirmDialog(null);
+          await refresh();
+          await loadCore();
+        } catch (requestError) {
+          handleError(requestError);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const copyTempPassword = async () => {
@@ -611,7 +781,8 @@ export const AdminPanelView: React.FC = () => {
 
       {activeTab === 'summary' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard icon={Film} label="Catálogo" value={mediaList.length} tone="text-emerald-400" />
             <StatCard icon={Users} label="Usuarios" value={summary.totalUsers} />
             <StatCard icon={UserX} label="Bloqueados" value={summary.blockedUsers} tone="text-amber-400" />
             <StatCard icon={MessageSquare} label="Comentarios" value={summary.comments} tone="text-sky-400" />
@@ -651,6 +822,18 @@ export const AdminPanelView: React.FC = () => {
               </div>
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Títulos en catálogo</span>
+                  <span className="text-slate-200 font-bold">{mediaList.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Películas</span>
+                  <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'movie').length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Series</span>
+                  <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'tv').length}</span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-slate-500">Administradores</span>
                   <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'admin').length}</span>
                 </div>
@@ -659,23 +842,203 @@ export const AdminPanelView: React.FC = () => {
                   <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'owner').length}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Cambio de clave pendiente</span>
-                  <span className="text-slate-200 font-bold">{summary.pendingPassword}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Reseñas privadas</span>
+                  <span className="text-slate-500">Reseñas comunitarias</span>
                   <span className="text-slate-200 font-bold">{summary.reviews}</span>
                 </div>
               </div>
               <div className="pt-3 border-t border-white/5">
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Los permisos se validan en el servidor en cada solicitud. Los administradores no pueden modificar al
-                  Owner ni a otros administradores.
+                  Los administradores y el owner tienen permisos completos CRUD sobre el catálogo (añadir por TMDB o manual, editar ficha técnica y quitar títulos).
                 </p>
               </div>
             </section>
           </div>
         </div>
+      )}
+
+      {activeTab === 'catalog' && (
+        <section className={`${cardClass} p-4 sm:p-5 space-y-4`}>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-white/5">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-lg font-black tracking-tight text-white">
+                  Gestión de catálogo
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
+                  {filteredCatalog.length} de {mediaList.length}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Añade nuevos títulos, edita cualquier ficha técnica o retira películas y series del catálogo.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Añadir nuevo título
+            </button>
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                value={catalogSearch}
+                onChange={(event) => setCatalogSearch(event.target.value)}
+                placeholder="Buscar por título, director o género..."
+                className={`${inputClass} pl-9`}
+                aria-label="Buscar en catálogo"
+              />
+              {catalogSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCatalogSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <select
+              value={catalogTypeFilter}
+              onChange={(event) => setCatalogTypeFilter(event.target.value as typeof catalogTypeFilter)}
+              className={`${inputClass} md:w-48`}
+              aria-label="Filtrar por tipo"
+            >
+              <option value="all">Todos los formatos</option>
+              <option value="pelicula">Películas únicamente</option>
+              <option value="serie">Series únicamente</option>
+              <option value="anime">Anime</option>
+              <option value="documental">Documentales</option>
+            </select>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-white/10">
+                  <th className="py-2.5 pr-3 font-bold">Título</th>
+                  <th className="py-2.5 pr-3 font-bold">Tipo</th>
+                  <th className="py-2.5 pr-3 font-bold">Año / Duración</th>
+                  <th className="py-2.5 pr-3 font-bold">Géneros</th>
+                  <th className="py-2.5 pr-3 font-bold">Director / Creador</th>
+                  <th className="py-2.5 pr-3 font-bold">Nota</th>
+                  <th className="py-2.5 font-bold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCatalog.map((item) => (
+                  <tr key={item.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3 pr-3">
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <img
+                          src={item.posterUrl}
+                          alt={item.title}
+                          className="w-10 h-14 rounded-lg object-cover bg-black/40 ring-1 ring-white/10 shrink-0"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=200&q=80';
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-white font-bold text-sm truncate">{item.title}</p>
+                          {item.originalTitle && item.originalTitle !== item.title && (
+                            <p className="text-[10px] text-slate-500 truncate italic">
+                              Orig: {item.originalTitle}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                            {item.defaultPlatform || item.streamingPlatforms?.[0] || 'Catálogo general'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                          MEDIA_TYPE_STYLES[item.type] || 'bg-white/10 text-slate-300 border-white/20'
+                        }`}
+                      >
+                        {MEDIA_TYPE_LABELS[item.type] || item.type}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
+                      <span className="text-slate-300 font-semibold">{item.year}</span>
+                      <span className="text-[10px] text-slate-500 block">
+                        {item.duration || (item.seasonsCount ? `${item.seasonsCount} temp` : '—')}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                        {item.genres.slice(0, 2).map((genre) => (
+                          <span
+                            key={genre}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 border border-white/5 text-slate-400"
+                          >
+                            {genre}
+                          </span>
+                        ))}
+                        {item.genres.length > 2 && (
+                          <span className="text-[10px] text-slate-500">+{item.genres.length - 2}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <p className="text-slate-300 text-xs truncate max-w-[140px]">
+                        {item.director || '—'}
+                      </p>
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
+                      <span className="text-amber-400 font-bold">★ {Number(item.communityRating || 0).toFixed(1)}</span>
+                    </td>
+                    <td className="py-3 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMediaId(item.id)}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                          title="Ver ficha completa"
+                          aria-label={`Ver ficha de ${item.title}`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditMediaModal(item)}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 transition-colors"
+                          title="Editar película o serie"
+                          aria-label={`Editar ${item.title}`}
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => triggerDeleteMedia(item)}
+                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white transition-colors"
+                          title="Quitar del catálogo"
+                          aria-label={`Quitar ${item.title} del catálogo`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCatalog.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-500 text-xs">
+                      No se encontraron títulos con los filtros actuales.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {activeTab === 'users' && (
@@ -730,18 +1093,23 @@ export const AdminPanelView: React.FC = () => {
                 {filteredUsers.map((user) => (
                   <tr key={user.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                     <td className="py-3 pr-3">
-                      <div className="flex items-center gap-2.5 min-w-[180px]">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUserForModal(user)}
+                        className="flex items-center gap-2.5 min-w-[180px] text-left group hover:opacity-95 transition-opacity"
+                        title="Abrir ventana de gestión de usuario"
+                      >
                         <img
                           src={user.avatar}
                           alt=""
-                          className="w-8 h-8 rounded-lg object-cover ring-1 ring-white/10"
+                          className="w-8 h-8 rounded-lg object-cover ring-1 ring-white/10 group-hover:ring-rose-500/50 transition-all"
                           referrerPolicy="no-referrer"
                         />
                         <div className="min-w-0">
-                          <p className="text-slate-200 font-semibold truncate">{user.name}</p>
+                          <p className="text-slate-200 font-semibold truncate group-hover:text-rose-300 transition-colors">{user.name}</p>
                           <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
                         </div>
-                      </div>
+                      </button>
                     </td>
                     <td className="py-3 pr-3">
                       <RolePill role={user.role} />
@@ -765,36 +1133,43 @@ export const AdminPanelView: React.FC = () => {
                     <td className="py-3 pr-3 text-slate-500">{formatDate(user.lastLoginAt)}</td>
                     <td className="py-3">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserForModal(user)}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/25 text-rose-300 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                          title="Abrir ventana de gestión de usuario"
+                        >
+                          <UserCog className="w-3.5 h-3.5" />
+                          <span>Gestionar</span>
+                        </button>
                         {canManageTarget(user) ? (
                           <>
                             <button
                               type="button"
-                              onClick={() => void runUserAction(user, user.blocked ? 'unblock' : 'block')}
+                              onClick={() => triggerUserAction(user, user.blocked ? 'unblock' : 'block')}
                               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition-colors"
-                              title={user.blocked ? 'Desbloquear' : 'Bloquear'}
+                              title={user.blocked ? 'Desbloquear acceso' : 'Bloquear acceso'}
                             >
-                              {user.blocked ? <Check className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                              {user.blocked ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Ban className="w-3.5 h-3.5 text-rose-400" />}
                             </button>
                             <button
                               type="button"
-                              onClick={() => void runUserAction(user, 'reset-password')}
+                              onClick={() => triggerUserAction(user, 'reset-password')}
                               className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-300 transition-colors"
-                              title="Restablecer contraseña"
+                              title="Restablecer contraseña (generar clave temporal)"
                             >
                               <KeyRound className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => void runUserAction(user, 'force-logout')}
+                              onClick={() => triggerUserAction(user, 'force-logout')}
                               className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 transition-colors"
-                              title="Forzar cierre de sesión"
+                              title="Forzar cierre de todas las sesiones"
                             >
                               <Lock className="w-3.5 h-3.5" />
                             </button>
                           </>
-                        ) : (
-                          <span className="text-[10px] text-slate-600">Sin acciones</span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -1519,6 +1894,244 @@ export const AdminPanelView: React.FC = () => {
             >
               Entendido, ocultar contraseña
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* VENTANA DE GESTIÓN DE USUARIO */}
+      {selectedUserForModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-[#141416] border border-white/15 p-6 sm:p-7 space-y-6 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <img
+                  src={selectedUserForModal.avatar}
+                  alt={selectedUserForModal.name}
+                  className="w-12 h-12 rounded-2xl object-cover ring-2 ring-white/10 bg-black/40"
+                  referrerPolicy="no-referrer"
+                />
+                <div>
+                  <h3 className="font-display text-lg font-black text-white tracking-tight flex items-center gap-2">
+                    {selectedUserForModal.name}
+                    <RolePill role={selectedUserForModal.role} />
+                  </h3>
+                  <p className="text-xs text-slate-400">{selectedUserForModal.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForModal(null)}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                aria-label="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Badges & Status summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-2xl bg-[#0A0A0B] border border-white/5 text-center">
+                <span className="block text-[10px] uppercase font-bold text-slate-500">Estado</span>
+                <span className="text-xs font-bold mt-1 inline-block">
+                  {selectedUserForModal.blocked ? (
+                    <span className="text-rose-400">Bloqueado</span>
+                  ) : selectedUserForModal.mustChangePassword ? (
+                    <span className="text-amber-400">Clave pendiente</span>
+                  ) : (
+                    <span className="text-emerald-400">Activo</span>
+                  )}
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#0A0A0B] border border-white/5 text-center">
+                <span className="block text-[10px] uppercase font-bold text-slate-500">Sesiones</span>
+                <span className="text-xs font-bold text-slate-200 mt-1 inline-block">
+                  {selectedUserForModal.sessionsCount} activas
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#0A0A0B] border border-white/5 text-center">
+                <span className="block text-[10px] uppercase font-bold text-slate-500">Último acceso</span>
+                <span className="text-xs font-bold text-slate-300 mt-1 inline-block truncate max-w-full">
+                  {formatDate(selectedUserForModal.lastLoginAt) || 'Nunca'}
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#0A0A0B] border border-white/5 text-center">
+                <span className="block text-[10px] uppercase font-bold text-slate-500">Registro</span>
+                <span className="text-xs font-bold text-slate-300 mt-1 inline-block truncate max-w-full">
+                  {formatDate(selectedUserForModal.createdAt)}
+                </span>
+              </div>
+            </div>
+
+            {/* Action buttons inside this window */}
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Acciones sobre esta cuenta
+              </h4>
+
+              {canManageTarget(selectedUserForModal) ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => triggerUserAction(selectedUserForModal, selectedUserForModal.blocked ? 'unblock' : 'block')}
+                    className={`p-3 rounded-2xl border text-left text-xs font-semibold flex items-center gap-2.5 transition-colors ${
+                      selectedUserForModal.blocked
+                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                        : 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300'
+                    }`}
+                  >
+                    {selectedUserForModal.blocked ? <Check className="w-4 h-4 flex-shrink-0" /> : <Ban className="w-4 h-4 flex-shrink-0" />}
+                    <div>
+                      <span className="block font-bold">{selectedUserForModal.blocked ? 'Desbloquear acceso' : 'Bloquear usuario'}</span>
+                      <span className="text-[10px] opacity-75">{selectedUserForModal.blocked ? 'Permitir inicio de sesión' : 'Suspender inmediatamente'}</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerUserAction(selectedUserForModal, 'reset-password')}
+                    className="p-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <span className="block font-bold">Generar clave temporal</span>
+                      <span className="text-[10px] opacity-75">Restablecer contraseña</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerUserAction(selectedUserForModal, 'force-logout')}
+                    className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors"
+                  >
+                    <Lock className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <span className="block font-bold">Cerrar sesiones</span>
+                      <span className="text-[10px] opacity-75">Desconectar dispositivos</span>
+                    </div>
+                  </button>
+
+                  {/* If current user is Owner, promote or demote */}
+                  {isOwnerUser && selectedUserForModal.role === 'user' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDialog({
+                          title: `¿Promover a ${selectedUserForModal.name} como Administrador?`,
+                          description: 'Tendrá permisos para moderar contenido, gestionar catálogo y revisar reportes.',
+                          confirmLabel: 'Promover a Administrador',
+                          onConfirm: async () => {
+                            setActionLoading(true);
+                            try {
+                              await apiRequest('/api/owner/admins', {
+                                method: 'POST',
+                                body: JSON.stringify({ email: selectedUserForModal.email, mode: 'promote' }),
+                              });
+                              await loadCore();
+                              setSelectedUserForModal((prev) => (prev ? { ...prev, role: 'admin' } : null));
+                              flash('Usuario promovido a Administrador con éxito.');
+                              setConfirmDialog(null);
+                            } catch (e) {
+                              handleError(e);
+                            } finally {
+                              setActionLoading(false);
+                            }
+                          },
+                        });
+                      }}
+                      className="p-3 rounded-2xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors"
+                    >
+                      <Crown className="w-4 h-4 flex-shrink-0" />
+                      <div>
+                        <span className="block font-bold">Promover a Admin</span>
+                        <span className="text-[10px] opacity-75">Otorgar privilegios</span>
+                      </div>
+                    </button>
+                  )}
+
+                  {isOwnerUser && selectedUserForModal.role === 'admin' && (
+                    <button
+                      type="button"
+                      onClick={() => triggerRevokeAdmin(selectedUserForModal)}
+                      className="p-3 rounded-2xl bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 text-slate-300 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors"
+                    >
+                      <UserCog className="w-4 h-4 flex-shrink-0" />
+                      <div>
+                        <span className="block font-bold">Revocar Admin</span>
+                        <span className="text-[10px] opacity-75">Volver a usuario regular</span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 text-xs text-slate-400">
+                  {selectedUserForModal.id === currentUser.id ? (
+                    <span>Esta es tu cuenta activa. Para cambiar tus datos o contraseña, ve a <strong>Mi Cuenta</strong> en la barra de navegación superior.</span>
+                  ) : selectedUserForModal.role === 'owner' ? (
+                    <span>Esta cuenta pertenece al <strong>Propietario del portal</strong>. Su rol y accesos solo pueden modificarse mediante transferencia de propiedad.</span>
+                  ) : (
+                    <span>No tienes los permisos requeridos para gestionar este usuario.</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-white/10 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedUserForModal(null)}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-colors"
+              >
+                Cerrar ventana
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIÁLOGO MODAL DE CONFIRMACIÓN (REEMPLAZA WINDOW.CONFIRM) */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl bg-[#141416] border border-white/20 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${confirmDialog.danger ? 'bg-rose-600/20 text-rose-400 border border-rose-500/30' : 'bg-amber-600/20 text-amber-400 border border-amber-500/30'}`}>
+                {confirmDialog.danger ? <AlertTriangle className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display text-base font-black text-white tracking-tight">{confirmDialog.title}</h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {confirmDialog.description}
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!actionLoading) setConfirmDialog(null);
+                }}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDialog.onConfirm()}
+                disabled={actionLoading}
+                className={`px-4 py-2 rounded-xl text-white text-xs font-bold transition-colors flex items-center gap-2 ${
+                  confirmDialog.danger
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-900/30'
+                    : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
+                } disabled:opacity-50`}
+              >
+                {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{confirmDialog.confirmLabel}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
