@@ -1,10 +1,14 @@
-import express from 'express';
-import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { createApiRouter } from './server/routes';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+import { createApiRouter } from './server/routes';
 
 async function startServer() {
   const app = express();

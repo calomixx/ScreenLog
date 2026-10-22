@@ -600,12 +600,36 @@ export function createApiRouter(): Router {
     }
   }
 
-  function localFallbackLookup(title: string) {
-    const { INITIAL_MEDIA_LIST } = require('../src/data/initialMedia');
+  async function localFallbackLookup(title: string) {
+    const { INITIAL_MEDIA_LIST } = await import('../src/data/initialMedia');
     const normalized = title.trim().toLowerCase();
     for (const media of INITIAL_MEDIA_LIST) {
       if (media.title.toLowerCase().includes(normalized) || normalized.includes(media.title.toLowerCase())) {
-        return { ...media, confidence: 0.3, source: 'local', partial: true, message: 'Coincidencia local (revisa los datos)' };
+        return { 
+          ...media, 
+          originalTitle: media.originalTitle || media.title,
+          duration: media.duration || '2h 00m',
+          trailerYoutubeId: media.trailerYoutubeId || '',
+          seasonsCount: media.seasonsCount ?? 0,
+          episodesCount: media.episodesCount ?? 0,
+          releaseDate: media.releaseDate || '',
+          country: media.country || '',
+          language: media.language || '',
+          ageRating: media.ageRating || '',
+          status: media.status || '',
+          tags: media.tags || [],
+          customFields: media.customFields || [],
+          lastEditedBy: media.lastEditedBy || '',
+          lastEditedAt: media.lastEditedAt || '',
+          editHistory: media.editHistory || [],
+          createdByUserId: media.createdByUserId || '',
+          watchProviders: media.watchProviders || [],
+          streamingPlatforms: media.streamingPlatforms || [media.defaultPlatform],
+          confidence: 0.3, 
+          source: 'local', 
+          partial: true, 
+          message: 'Coincidencia local (revisa los datos)' 
+        };
       }
     }
     return null;
@@ -623,7 +647,7 @@ export function createApiRouter(): Router {
       const jikanResult = await fetchFromJikan(title.trim());
       if (jikanResult && (!result || jikanResult.confidence > result.confidence)) result = jikanResult;
     }
-    if (!result) result = localFallbackLookup(title.trim());
+    if (!result) result = await localFallbackLookup(title.trim());
 
     if (!result) {
       return res.json({ success: true, data: null, message: 'No encontramos coincidencias. Completa la ficha manualmente.' });
@@ -639,7 +663,7 @@ export function createApiRouter(): Router {
     }
     let result = await fetchFromTMDB(title.trim());
     if (!result) result = await fetchFromJikan(title.trim());
-    if (!result) result = localFallbackLookup(title.trim());
+    if (!result) result = await localFallbackLookup(title.trim());
     if (!result) {
       return res.json({ success: true, data: null, message: 'No encontramos coincidencias. Completa la ficha manualmente.' });
     }
