@@ -38,6 +38,7 @@ import {
   verifyPassword,
 } from './security';
 import type { MediaItem, RewatchChoice, WatchStatus } from '../src/types';
+import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -249,6 +250,51 @@ function buildStats(store: StoreData) {
   );
 }
 
+function normalizeTitle(t: string): string {
+  return (t || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isVersionOrRemake(title1: string, year1: number, title2: string, year2: number): boolean {
+  // If release years differ by 2 or more years, it's considered a remake/reboot from another era (e.g. 1984 vs 2021)
+  if (Math.abs(year1 - year2) >= 2) {
+    return true;
+  }
+  // Check for edition, cut or remake keywords in either title
+  const variantKeywords = [
+    'remake',
+    'version extendida',
+    'versión extendida',
+    'extended',
+    'director\'s cut',
+    'directors cut',
+    'corte del director',
+    'montaje del director',
+    'edicion especial',
+    'edición especial',
+    'special edition',
+    'reboot',
+    'remaster',
+    'remastered',
+    'remasterizada',
+    'live action',
+    'live-action',
+    'ova',
+    'uncut',
+    'sin censura',
+    'definitiva',
+    'definitive',
+    'final cut',
+  ];
+  const t1 = (title1 || '').toLowerCase();
+  const t2 = (title2 || '').toLowerCase();
+  return variantKeywords.some((kw) => t1.includes(kw) || t2.includes(kw));
+}
+
 function buildMediaFromBody(body: any, existing?: MediaItem): MediaItem {
   const mediaTypes = ['pelicula', 'serie', 'anime', 'documental'];
   const type = mediaTypes.includes(body.type) ? body.type : existing?.type || 'pelicula';
@@ -452,10 +498,85 @@ export function createApiRouter(): Router {
     });
   }));
 
+  const TMDB_DEFAULT_KEY = '5aeed13f63f1071425b9ab7815b80949';
+
+  function getValidTmdbKey(): string {
+    const envKey = (process.env.TMDB_API_KEY || '').trim();
+    if (/^[a-f0-9]{32}$/i.test(envKey)) {
+      return envKey;
+    }
+    return TMDB_DEFAULT_KEY;
+  }
+
+  async function searchTMDB(query: string, type?: string): Promise<any[]> {
+    const apiKey = getValidTmdbKey();
+    const baseUrl = 'https://api.themoviedb.org/3';
+    try {
+      const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(query)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
+      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(4500) });
+      if (!res.ok) return [];
+      const data = await res.json();
+      const results = (data.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
+
+      return results.slice(0, 8).map((r: any) => {
+        const isMovie = r.media_type === 'movie';
+        const isAnime = r.origin_country?.includes('JP') && (r.genre_ids?.includes(16) || type === 'anime');
+        const inferredType = isAnime ? 'anime' : isMovie ? 'pelicula' : 'serie';
+        const title = isMovie ? r.title || r.name : r.name || r.title;
+        const originalTitle = isMovie ? r.original_title : r.original_name;
+        const releaseYear = (r.release_date || r.first_air_date || '').slice(0, 4);
+
+        return {
+          id: `tmdb-${r.media_type}-${r.id}`,
+          tmdbId: r.id,
+          mediaType: r.media_type as 'movie' | 'tv',
+          title,
+          originalTitle: originalTitle || title,
+          type: inferredType,
+          year: Number(releaseYear) || new Date().getFullYear(),
+          posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w342${r.poster_path}` : '',
+          backdropUrl: r.backdrop_path ? `https://image.tmdb.org/t/p/w1280${r.backdrop_path}` : '',
+          synopsis: r.overview || '',
+          source: 'tmdb',
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
   router.get('/media', asyncRoute(async (_req, res) => {
     const store = await getStore();
     const items = [...store.media].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     res.json({ success: true, data: items });
+  }));
+
+  // GET /api/media/similar - real-time search & suggestions for autocompletion
+  router.get('/media/similar', asyncRoute(async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const type = typeof req.query.type === 'string' ? req.query.type.trim() : undefined;
+    if (!q || q.length < 2) {
+      return res.json({ success: true, bestMatch: null, similar: [] });
+    }
+
+    const tmdbList = await searchTMDB(q, type);
+    if (tmdbList.length > 0) {
+      return res.json({
+        success: true,
+        bestMatch: tmdbList[0],
+        similar: tmdbList.slice(1, 6),
+      });
+    }
+
+    const store = await getStore().catch(() => null);
+    const catalog = [...(store?.media || []), ...INITIAL_MEDIA_LIST];
+    const normalized = q.toLowerCase();
+    const localMatches = catalog.filter((m) => m.title.toLowerCase().includes(normalized)).slice(0, 5);
+    res.json({
+      success: true,
+      bestMatch: localMatches[0] || null,
+      similar: localMatches.slice(1),
+    });
   }));
 
   router.get('/media/:id', asyncRoute(async (req, res) => {
@@ -468,23 +589,20 @@ export function createApiRouter(): Router {
 
   // Media lookup / autofill with TMDB/Jikan fallback
   async function fetchFromTMDB(title: string, type?: string, year?: number) {
-    const apiKey = process.env.TMDB_API_KEY;
-    const accessToken = process.env.TMDB_ACCESS_TOKEN;
-    if (!apiKey && !accessToken) return null;
-
+    const apiKey = getValidTmdbKey();
     const baseUrl = 'https://api.themoviedb.org/3';
-    const headers: Record<string, string> = { 'Accept': 'application/json' };
-    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
 
     try {
-      const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false${apiKey ? `&api_key=${apiKey}` : ''}`;
-      const searchRes = await fetch(searchUrl, { headers, signal: controller.signal });
-      if (!searchRes.ok) throw new Error('TMDB search failed');
+      const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
+      const searchRes = await fetch(searchUrl, { signal: controller.signal });
+      if (!searchRes.ok) {
+        console.warn(`TMDB search returned HTTP ${searchRes.status} for query "${title}"`);
+        return null;
+      }
       const searchData = await searchRes.json();
-      const results = searchData.results || [];
+      const results = (searchData.results || []).filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv');
       if (results.length === 0) return null;
 
       let bestMatch = results[0];
@@ -495,9 +613,12 @@ export function createApiRouter(): Router {
       }
 
       const mediaType = bestMatch.media_type === 'movie' ? 'movie' : 'tv';
-      const detailUrl = `${baseUrl}/${mediaType}/${bestMatch.id}?language=es-ES&append_to_response=credits,videos,watch/providers,external_ids${apiKey ? `&api_key=${apiKey}` : ''}`;
-      const detailRes = await fetch(detailUrl, { headers, signal: controller.signal });
-      if (!detailRes.ok) throw new Error('TMDB detail failed');
+      const detailUrl = `${baseUrl}/${mediaType}/${bestMatch.id}?language=es-ES&append_to_response=credits,videos,watch/providers,external_ids&api_key=${apiKey}`;
+      const detailRes = await fetch(detailUrl, { signal: controller.signal });
+      if (!detailRes.ok) {
+        console.warn(`TMDB detail returned HTTP ${detailRes.status} for ID ${bestMatch.id}`);
+        return null;
+      }
       const detail = await detailRes.json();
 
       const crew = detail.credits?.crew || [];
@@ -505,10 +626,10 @@ export function createApiRouter(): Router {
         (mediaType === 'tv' ? detail.created_by?.[0]?.name : null) || 'Desconocido';
       const cast = (detail.credits?.cast || []).slice(0, 6).map((c: any) => c.name);
       const genres = (detail.genres || []).map((g: any) => g.name);
-      const videos = (detail.videos?.results || []).filter((v: any) => v.site === 'YouTube' && v.type === 'Trailer');
+      const videos = (detail.videos?.results || []).filter((v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
       const trailerYoutubeId = videos[0]?.key || '';
 
-      const providers = detail['watch/providers']?.results?.ES?.flatrate || detail['watch/providers']?.results?.US?.flatrate || [];
+      const providers = detail['watch/providers']?.results?.ES?.flatrate || detail['watch/providers']?.results?.US?.flatrate || detail['watch/providers']?.results?.MX?.flatrate || [];
       const platformMap: Record<string, string> = {
         'Netflix': 'Netflix', 'HBO Max': 'Max (HBO)', 'Max': 'Max (HBO)',
         'Amazon Prime Video': 'Prime Video', 'Disney Plus': 'Disney+', 'Apple TV+': 'Apple TV+',
@@ -518,7 +639,7 @@ export function createApiRouter(): Router {
         ? (platformMap[providers[0].provider_name] || providers[0].provider_name) : 'Otra';
 
       const isAnime = detail.origin_country?.includes('JP') && genres.some((g: string) => g.toLowerCase().includes('anim'));
-      const year = mediaType === 'movie'
+      const releaseYear = mediaType === 'movie'
         ? (detail.release_date ? new Date(detail.release_date).getFullYear() : new Date().getFullYear())
         : (detail.first_air_date ? new Date(detail.first_air_date).getFullYear() : new Date().getFullYear());
 
@@ -526,7 +647,7 @@ export function createApiRouter(): Router {
         title: mediaType === 'movie' ? detail.title : detail.name,
         originalTitle: mediaType === 'movie' ? detail.original_title : detail.original_name,
         type: isAnime ? 'anime' : (mediaType === 'movie' ? 'pelicula' : 'serie'),
-        year,
+        year: releaseYear,
         director,
         cast,
         genres: genres.length > 0 ? genres : ['Drama'],
@@ -541,14 +662,16 @@ export function createApiRouter(): Router {
         seasonsCount: mediaType === 'tv' ? detail.number_of_seasons : 0,
         episodesCount: mediaType === 'tv' ? detail.number_of_episodes : 0,
         releaseDate: mediaType === 'movie' ? detail.release_date : detail.first_air_date,
-        country: detail.origin_country?.[0],
-        language: detail.original_language,
-        confidence: 0.9,
+        country: detail.origin_country?.[0] || 'US',
+        language: detail.original_language || 'es',
+        confidence: 0.95,
         source: 'tmdb',
         createdByUserId: undefined
       };
-    } catch (e) {
-      console.warn('TMDB lookup failed:', e);
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        console.warn('TMDB lookup failed:', e?.message || e);
+      }
       return null;
     } finally {
       clearTimeout(timeout);
@@ -731,16 +854,26 @@ Responde en español, tono amable y cinéfilo.`;
       return safeError(res, 400, 'El título es obligatorio.', 'INVALID_TITLE');
     }
     const item = buildMediaFromBody(req.body);
-    // Check for duplicate by title + year + type
-    const normalizedTitle = item.title.trim().toLowerCase();
-    const duplicate = store.media.find(
-      (media) =>
-        media.title.trim().toLowerCase() === normalizedTitle &&
-        media.year === item.year &&
-        media.type === item.type
-    );
-    if (duplicate) {
-      return safeError(res, 409, 'Ya existe ese título; búscalo en el catálogo.', 'MEDIA_DUPLICATE');
+
+    // Duplicate check: prevent duplicate movies/series unless remake (different year) or extended version
+    const normalizedNewTitle = normalizeTitle(item.title);
+    const allCatalog = [...store.media, ...INITIAL_MEDIA_LIST];
+    const existing = allCatalog.find((m) => {
+      if (m.id === item.id) return false;
+      const normalizedExisting = normalizeTitle(m.title);
+      return normalizedExisting === normalizedNewTitle && m.type === item.type;
+    });
+
+    if (existing) {
+      const isRemakeOfOtherEra = Math.abs(item.year - existing.year) >= 2;
+      if (!isRemakeOfOtherEra) {
+        return safeError(
+          res,
+          409,
+          `Ya existe la obra "${existing.title}" (${existing.year}) en el catálogo. Para registrarla nuevamente, debe tratarse de un remake (año distinto) o especificar la variante en el título (ej: 'Versión Extendida', 'Director's Cut').`,
+          'MEDIA_DUPLICATE',
+        );
+      }
     }
     item.createdByUserId = user.id;
     item.isCustomUserCreated = true;

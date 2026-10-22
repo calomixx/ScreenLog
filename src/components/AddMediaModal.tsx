@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   Upload, 
@@ -49,7 +49,8 @@ export const AddMediaModal: React.FC = () => {
     isAddModalOpen, 
     setIsAddModalOpen, 
     addCustomMedia, 
-    setSelectedMediaId 
+    setSelectedMediaId,
+    mediaList,
   } = useMedia();
 
   const [title, setTitle] = useState('');
@@ -77,17 +78,172 @@ export const AddMediaModal: React.FC = () => {
   const [language, setLanguage] = useState('');
   const [ageRating, setAgeRating] = useState('');
 
-  // Gemini AI Autofill States
+  // TMDB Autofill, Suggestions & Duplicate States
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
   const [autofillWarning, setAutofillWarning] = useState<string | null>(null);
   const [autofillError, setAutofillError] = useState<string | null>(null);
   const [hasAutofilled, setHasAutofilled] = useState(false);
   const [animeInfo, setAnimeInfo] = useState<{ format?: string; episodes?: string } | null>(null);
+  const [similarSuggestions, setSimilarSuggestions] = useState<any[]>([]);
 
-  // Update autofill to use /api/media/lookup
-  const handleAutofill = async () => {
-    const trimmedTitle = title.trim();
+  // Live query for similar titles in TMDB/catalog
+  useEffect(() => {
+    const trimmed = title.trim();
+    if (trimmed.length < 2) {
+      setSimilarSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiRequest<{ success: boolean; similar?: any[]; bestMatch?: any }>(
+          `/api/media/similar?q=${encodeURIComponent(trimmed)}&type=${type}`,
+        );
+        const list: any[] = [];
+        if (res.bestMatch) list.push(res.bestMatch);
+        if (Array.isArray(res.similar)) list.push(...res.similar);
+        const seen = new Set();
+        const unique = list.filter((item) => {
+          const k = item.id || item.title;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        setSimilarSuggestions(unique.slice(0, 5));
+      } catch {
+        // silent
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [title, type]);
+
+  // Duplicate check: checks against existing catalog in real time
+  const duplicateWarning = useMemo(() => {
+    const trimmed = title.trim();
+    if (trimmed.length < 2) return null;
+    const normNew = trimmed
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+    const existing = mediaList.find((m) => {
+      const norm = (m.title || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+      return norm === normNew && m.type === type;
+    });
+
+    if (!existing) return null;
+
+    const currentYear = Number(year) || new Date().getFullYear();
+    const isRemakeOfOtherEra = Math.abs(currentYear - existing.year) >= 2;
+    if (isRemakeOfOtherEra) {
+      return null; // Allowed as remake of another era
+    }
+
+    return existing;
+  }, [title, type, year, mediaList]);
+
+  const applyAutofillData = (data: any) => {
+    if (!data) return;
+
+    if (data.title && typeof data.title === 'string') {
+      setTitle(data.title);
+    }
+    if (data.originalTitle && typeof data.originalTitle === 'string') {
+      setOriginalTitle(data.originalTitle);
+    }
+    if (data.type && ['pelicula', 'serie', 'anime', 'documental'].includes(data.type)) {
+      setType(data.type as MediaType);
+    }
+    if (data.year && !isNaN(Number(data.year))) {
+      setYear(Number(data.year));
+    }
+    if (data.director && typeof data.director === 'string') {
+      setDirector(data.director);
+    }
+    if (Array.isArray(data.cast) && data.cast.length > 0) {
+      setCastInput(data.cast.join(', '));
+    }
+    if (data.duration && typeof data.duration === 'string') {
+      setDuration(data.duration);
+    }
+    if (data.defaultPlatform && typeof data.defaultPlatform === 'string') {
+      setDefaultPlatform(data.defaultPlatform);
+    }
+    if (data.synopsis && typeof data.synopsis === 'string') {
+      setSynopsis(data.synopsis);
+    }
+    if (data.trailerYoutubeId && typeof data.trailerYoutubeId === 'string') {
+      setTrailerUrl(data.trailerYoutubeId);
+    }
+    if (Array.isArray(data.genres) && data.genres.length > 0) {
+      setSelectedGenres(data.genres);
+    }
+    if (data.posterUrl && typeof data.posterUrl === 'string') {
+      setPosterUrl(data.posterUrl);
+    }
+    if (data.backdropUrl && typeof data.backdropUrl === 'string') {
+      setBackdropUrl(data.backdropUrl);
+    }
+    if (data.seasonsCount !== undefined && data.seasonsCount !== null) {
+      setSeasonsCount(Number(data.seasonsCount));
+    }
+    if (data.episodesCount !== undefined && data.episodesCount !== null) {
+      setEpisodesCount(Number(data.episodesCount));
+    }
+    if (data.animeFormat && typeof data.animeFormat === 'string') {
+      setAnimeFormat(data.animeFormat);
+    }
+    if (data.releaseDate && typeof data.releaseDate === 'string') {
+      setReleaseDate(data.releaseDate.split('T')[0]);
+    }
+    if (data.country && typeof data.country === 'string') {
+      setCountry(data.country);
+    }
+    if (data.language && typeof data.language === 'string') {
+      setLanguage(data.language);
+    }
+    if (data.ageRating && typeof data.ageRating === 'string') {
+      setAgeRating(data.ageRating);
+    }
+
+    const isAnime = data.type === 'anime' || (data.genres && data.genres.includes('Animación') && data.originalTitle?.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/));
+    const isOva = data.animeFormat === 'OVA' || (typeof data.duration === 'string' && data.duration.toLowerCase().includes('ova'));
+    
+    if (isAnime) {
+      setType('anime');
+      setAnimeInfo({
+        format: isOva ? 'OVA' : data.animeFormat || 'Anime',
+        episodes: data.episodesCount && data.episodesCount !== 'No aplica' ? data.episodesCount : undefined
+      });
+    } else {
+      setAnimeInfo(null);
+    }
+
+    setHasAutofilled(true);
+
+    const confidence = typeof data.confidence === 'number' ? data.confidence : 1.0;
+    if (isAnime) {
+      const episodeText = data.episodesCount && data.episodesCount !== 'No aplica' ? ` • ${data.episodesCount}` : '';
+      const badgeText = isOva ? `🎬 ¡Anime OVA detectado! (${data.duration || 'OVA'}${episodeText})` : `🎌 ¡Anime detectado! (${data.animeFormat || 'Serie'}${episodeText})`;
+      setAutofillSuccess(`${badgeText}. Ficha oficial completada con éxito.`);
+    } else {
+      const sourceLabel = data.source === 'tmdb' ? 'The Movie Database (TMDB)' : data.source === 'jikan' ? 'Jikan' : data.source === 'local' ? 'Base local' : 'Base oficial';
+      setAutofillSuccess(`🎬 ¡Ficha técnica completada desde ${sourceLabel}! Póster, director, reparto, duración y sinopsis cargados.`);
+    }
+  };
+
+  // Main autofill triggered by button or Enter key or suggestion click
+  const handleAutofill = async (overrideTitle?: string) => {
+    const trimmedTitle = (overrideTitle || title).trim();
     if (!trimmedTitle || trimmedTitle.length < 2 || isAutofilling) return;
 
     setIsAutofilling(true);
@@ -102,97 +258,15 @@ export const AddMediaModal: React.FC = () => {
       });
 
       const data = result.data;
-
       if (!data) {
-        setAutofillWarning('No se encontraron coincidencias. Completa la ficha manualmente.');
+        setAutofillWarning('No se encontraron coincidencias exactas en TMDB. Completa la ficha manualmente o elige un título similar.');
         return;
       }
 
-      // Autocomplete all form fields
-      if (data.title && typeof data.title === 'string') {
-        setTitle(data.title);
-      }
-      if (data.originalTitle && typeof data.originalTitle === 'string') {
-        setOriginalTitle(data.originalTitle);
-      }
-      if (data.type && ['pelicula', 'serie', 'anime', 'documental'].includes(data.type)) {
-        setType(data.type as MediaType);
-      }
-      if (data.year && !isNaN(Number(data.year))) {
-        setYear(Number(data.year));
-      }
-      if (data.director && typeof data.director === 'string') {
-        setDirector(data.director);
-      }
-      if (Array.isArray(data.cast) && data.cast.length > 0) {
-        setCastInput(data.cast.join(', '));
-      }
-      if (data.duration && typeof data.duration === 'string') {
-        setDuration(data.duration);
-      }
-      if (data.defaultPlatform && typeof data.defaultPlatform === 'string') {
-        setDefaultPlatform(data.defaultPlatform);
-      }
-      if (data.synopsis && typeof data.synopsis === 'string') {
-        setSynopsis(data.synopsis);
-      }
-      if (data.trailerYoutubeId && typeof data.trailerYoutubeId === 'string') {
-        setTrailerUrl(data.trailerYoutubeId);
-      }
-      if (Array.isArray(data.genres) && data.genres.length > 0) {
-        setSelectedGenres(data.genres);
-      }
-      if (data.seasonsCount !== undefined && data.seasonsCount !== null) {
-        setSeasonsCount(Number(data.seasonsCount));
-      }
-      if (data.episodesCount !== undefined && data.episodesCount !== null) {
-        setEpisodesCount(Number(data.episodesCount));
-      }
-      if (data.animeFormat && typeof data.animeFormat === 'string') {
-        setAnimeFormat(data.animeFormat);
-      }
-      if (data.releaseDate && typeof data.releaseDate === 'string') {
-        setReleaseDate(data.releaseDate.split('T')[0]);
-      }
-      if (data.country && typeof data.country === 'string') {
-        setCountry(data.country);
-      }
-      if (data.language && typeof data.language === 'string') {
-        setLanguage(data.language);
-      }
-      if (data.ageRating && typeof data.ageRating === 'string') {
-        setAgeRating(data.ageRating);
-      }
-
-      const isAnime = data.type === 'anime' || (data.genres && data.genres.includes('Animación') && data.originalTitle?.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/));
-      const isOva = data.animeFormat === 'OVA' || (typeof data.duration === 'string' && data.duration.toLowerCase().includes('ova'));
-      
-      if (isAnime) {
-        setType('anime');
-        setAnimeInfo({
-          format: isOva ? 'OVA' : data.animeFormat || 'Anime',
-          episodes: data.episodesCount && data.episodesCount !== 'No aplica' ? data.episodesCount : undefined
-        });
-      } else {
-        setAnimeInfo(null);
-      }
-
-      setHasAutofilled(true);
-
-      const confidence = typeof data.confidence === 'number' ? data.confidence : 1.0;
-      if (isAnime) {
-        const episodeText = data.episodesCount && data.episodesCount !== 'No aplica' ? ` • ${data.episodesCount}` : '';
-        const badgeText = isOva ? `🎬 ¡Anime OVA detectado! (${data.duration || 'OVA'}${episodeText})` : `🎌 ¡Anime detectado! (${data.animeFormat || 'Serie'}${episodeText})`;
-        setAutofillSuccess(`${badgeText}. Datos técnicos y capítulos completados con éxito.`);
-      } else if (confidence < 0.5) {
-        setAutofillWarning(`Se completaron los datos con baja confianza (${Math.round(confidence * 100)}%), por favor revisa los campos.`);
-      } else {
-        const sourceLabel = data.source === 'tmdb' ? 'TMDB' : data.source === 'jikan' ? 'Jikan' : data.source === 'local' ? 'Base local' : 'IA';
-        setAutofillSuccess(`¡Ficha autocompletada desde ${sourceLabel}! (${Math.round(confidence * 100)}% confianza). Puedes editar cualquier campo.`);
-      }
+      applyAutofillData(data);
     } catch (err: any) {
       console.warn('Autofill error:', err);
-      setAutofillError(err.message || 'No fue posible autocompletar la ficha automáticamente. Puedes rellenar los datos manualmente.');
+      setAutofillError(err.message || 'No fue posible autocompletar la ficha con TMDB. Puedes rellenar los datos manualmente.');
     } finally {
       setIsAutofilling(false);
     }
@@ -239,6 +313,13 @@ export const AddMediaModal: React.FC = () => {
     e.preventDefault();
     if (!title.trim()) return;
 
+    if (duplicateWarning) {
+      setAutofillError(
+        `Ya existe "${duplicateWarning.title}" (${duplicateWarning.year}) en el catálogo. Si se trata de un remake de otro año o una versión extendida / director's cut, indícalo en el título (ej: '${duplicateWarning.title} (Versión Extendida)').`,
+      );
+      return;
+    }
+
     // Parse youtube ID if full URL
     let ytid = trailerUrl.trim();
     if (ytid.includes('v=')) {
@@ -275,6 +356,8 @@ export const AddMediaModal: React.FC = () => {
       ageRating: ageRating || undefined,
       streamingPlatforms: [defaultPlatform],
     });
+
+    if (!newId) return;
 
     setIsAddModalOpen(false);
     setSelectedMediaId(newId);
@@ -322,20 +405,20 @@ export const AddMediaModal: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  onClick={handleAutofill}
+                  onClick={() => handleAutofill()}
                   disabled={isAutofilling || title.trim().length < 2}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-rose-600/20 border border-amber-500/30 text-amber-300 hover:text-white hover:from-amber-500/30 hover:to-rose-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                  title="Rellenar ficha técnica automáticamente con IA Gemini"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-600/20 border border-emerald-500/30 text-emerald-300 hover:text-white hover:from-emerald-500/30 hover:to-teal-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-all active:scale-95 shadow-sm"
+                  title="Autocompletar ficha técnica con The Movie Database (TMDB)"
                 >
                   {isAutofilling ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                      <span>Buscando ficha con Gemini...</span>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                      <span>Buscando en TMDB...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>✨ Autocompletar con IA</span>
+                      <Film className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>🎬 Autocompletar con TMDB</span>
                     </>
                   )}
                 </button>
@@ -351,15 +434,66 @@ export const AddMediaModal: React.FC = () => {
                     handleAutofill();
                   }
                 }}
-                placeholder="ej: Rurouni Kenshin Tsuiokuhen, FLCL, Hellsing..."
+                placeholder="ej: Gladiator, Inception, Breaking Bad, Naruto..."
                 className={`w-full bg-[#0A0A0B] border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all ${
-                  isAutofilling 
-                    ? 'border-amber-500/60 ring-2 ring-amber-500/20 animate-pulse' 
+                  duplicateWarning
+                    ? 'border-amber-500/60 ring-2 ring-amber-500/20'
+                    : isAutofilling 
+                    ? 'border-emerald-500/60 ring-2 ring-emerald-500/20 animate-pulse' 
                     : hasAutofilled
                     ? 'border-emerald-500/50 focus:border-rose-500'
                     : 'border-white/10 focus:border-rose-500'
                 }`}
               />
+
+              {/* Duplicate Prevention Alert */}
+              {duplicateWarning && (
+                <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 animate-in fade-in duration-150">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 text-[11px] leading-relaxed">
+                    <strong>Coincidencia en el catálogo:</strong> Ya existe <em>"{duplicateWarning.title}" ({duplicateWarning.year})</em>. Para guardarlo como nueva entrada debe ser un <strong>remake</strong> (año diferente) o especificar la variante en el título (ej: <em>"{duplicateWarning.title} (Versión Extendida)"</em>).
+                  </div>
+                </div>
+              )}
+
+              {/* Similar titles suggestions chips */}
+              {similarSuggestions.length > 0 && !duplicateWarning && (
+                <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between text-[11px] text-emerald-300 font-semibold mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Film className="w-3.5 h-3.5 text-emerald-400" />
+                      Resultados en TMDB:
+                    </span>
+                    <span className="text-[10px] text-slate-400">Clic para rellenar ficha</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                    {similarSuggestions.map((item) => (
+                      <button
+                        key={item.id || item.title}
+                        type="button"
+                        onClick={() => {
+                          setTitle(item.title);
+                          handleAutofill(item.title);
+                          setSimilarSuggestions([]);
+                        }}
+                        className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#0A0A0B] hover:bg-emerald-600/30 border border-white/10 hover:border-emerald-500/50 text-xs text-slate-200 hover:text-white transition-all text-left shadow-sm group active:scale-95"
+                      >
+                        {item.posterUrl && (
+                          <img
+                            src={item.posterUrl}
+                            alt=""
+                            className="w-4 h-5 object-cover rounded shadow-sm"
+                          />
+                        )}
+                        <span className="font-medium group-hover:text-emerald-200">{item.title}</span>
+                        <span className="text-[10px] text-slate-400 group-hover:text-emerald-300">
+                          ({item.year} • {item.type})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -376,12 +510,12 @@ export const AddMediaModal: React.FC = () => {
             </div>
           </div>
 
-          {/* AI Status / Feedback Banners */}
+          {/* TMDB Status / Feedback Banners */}
           {isAutofilling && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin text-amber-400 flex-shrink-0" />
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-400 flex-shrink-0" />
               <div className="flex-1">
-                <span className="font-bold">Gemini AI:</span> Analizando ficha técnica, formato (OVA/Serie/Película), capítulos, director/estudio, duración y géneros para "{title.trim()}"...
+                <span className="font-bold">TMDB:</span> Obteniendo ficha técnica oficial, director, reparto, duración, póster y tráiler para "{title.trim()}"...
               </div>
             </div>
           )}
@@ -436,11 +570,11 @@ export const AddMediaModal: React.FC = () => {
             </div>
           )}
 
-          {title.trim().length >= 3 && !hasAutofilled && !isAutofilling && !autofillError && !autofillSuccess && (
+          {title.trim().length >= 3 && !hasAutofilled && !isAutofilling && !autofillError && !autofillSuccess && !duplicateWarning && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-slate-400">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <Film className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               <span>
-                Consejo cinéfilo: Pulsa <strong className="text-amber-300">"✨ Autocompletar con IA"</strong> para que Gemini rellene automáticamente el director, actores, duración, géneros y sinopsis.
+                Consejo cinéfilo: Pulsa <strong className="text-emerald-300">"🎬 Autocompletar con TMDB"</strong> para que la base de datos oficial rellene automáticamente director, reparto, duración, géneros, póster y sinopsis.
               </span>
             </div>
           )}

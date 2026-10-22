@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Bookmark, 
   CheckCircle2, 
@@ -19,6 +19,8 @@ import {
   Table as TableIcon,
   BookOpen,
   Download,
+  Upload,
+  Loader2,
   Share2,
   Lock,
   Shield,
@@ -43,14 +45,34 @@ export const MyListView: React.FC = () => {
     setActiveTab,
     statusCounts,
     currentUser,
-    openAuthModal
+    openAuthModal,
+    exportLocalBackup,
+    importLocalBackup,
+    showToast,
   } = useMedia();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'todas' | WatchStatus>('todas');
   const [typeFilter, setTypeFilter] = useState<'todos' | MediaType>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recientes' | 'estrellas' | 'ano' | 'titulo'>('recientes');
   const [viewMode, setViewMode] = useState<'grid' | 'table' | 'journal'>('grid');
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const res = await importLocalBackup(file);
+      showToast(res.message, res.success ? 'success' : 'warning');
+    } catch (err: any) {
+      showToast(err?.message || 'Error al importar respaldo.', 'warning');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // If user is not authenticated, display the dedicated login lock screen
   if (!currentUser) {
@@ -202,14 +224,36 @@ export const MyListView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleFileImport}
+            className="hidden"
+          />
+
           <button
-            onClick={exportToJson}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-colors"
-            title="Exportar copia de seguridad en JSON"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 transition-colors disabled:opacity-50"
+            title="Importar y validar copia de seguridad en JSON"
+          >
+            {isImporting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+            <span>{isImporting ? 'Validando...' : 'Importar Respaldo'}</span>
+          </button>
+
+          <button
+            onClick={exportLocalBackup}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 transition-colors"
+            title="Exportar copia de seguridad completa en JSON"
           >
             <Download className="w-3.5 h-3.5 text-rose-400" />
-            Exportar Lista
+            <span>Exportar Respaldo</span>
           </button>
 
           <button
@@ -217,7 +261,7 @@ export const MyListView: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-900/30 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Añadir Título
+            <span>Añadir Título</span>
           </button>
         </div>
       </div>

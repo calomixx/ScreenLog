@@ -3,6 +3,7 @@ import {
   MediaItem,
   UserReview,
   WatchStatus,
+  RewatchChoice,
   CommunityComment,
   DetailedCommunityVotes,
   UserProfile,
@@ -705,6 +706,36 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         requestLogin('login');
         return '';
       }
+
+      // Check for duplicates: allow remakes (different year) or extended/director cuts
+      const normalizedNew = (item.title || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+      const existing = mediaList.find((m) => {
+        const norm = (m.title || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+        return norm === normalizedNew && m.type === item.type;
+      });
+
+      if (existing) {
+        const itemYear = Number(item.year) || new Date().getFullYear();
+        const isRemakeOfOtherEra = Math.abs(itemYear - existing.year) >= 2;
+        if (!isRemakeOfOtherEra) {
+          showToast(
+            `Ya existe "${existing.title}" (${existing.year}) en el catálogo. Para registrarlo nuevamente, debe tratarse de un remake (año distinto con al menos 2 años de diferencia) o especificar una variante en el título (ej: 'Versión Extendida', 'Director's Cut').`,
+            'warning',
+          );
+          return '';
+        }
+      }
+
       const newId = `custom-${Date.now()}-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
       const now = new Date().toISOString();
       const newMedia: MediaItem = {
@@ -779,12 +810,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
         .then(() => showToast(`Título añadido: ${newMedia.title}.`, 'success'))
         .catch((error) => {
+          setMediaList((prev) => prev.filter((m) => m.id !== newMedia.id));
           showToast(error instanceof ApiError ? error.message : 'El título no se guardó en el servidor.', 'warning');
         });
 
       return newId;
     },
-    [authUser, showToast],
+    [authUser, mediaList, showToast, requestLogin],
   );
 
   const getReview = useCallback((mediaId: string) => userReviews[mediaId], [userReviews]);
@@ -806,7 +838,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         version: '2.0',
         exportedAt: new Date().toISOString(),
         currentUser: currentUser || null,
-        mediaList,
+        mediaList: mediaList.filter((m) => m.isCustomUserCreated),
         userReviews,
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -818,6 +850,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
+      showToast('Copia de seguridad exportada correctamente.', 'success');
     } catch {
       showToast('No se pudo exportar el respaldo.', 'warning');
     }
@@ -826,35 +859,160 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const importLocalBackup = useCallback(
     async (file: File): Promise<{ success: boolean; message: string; count: number }> => {
       if (!authUser) {
-        return { success: false, message: 'Inicia sesión para importar reseñas.', count: 0 };
+        return { success: false, message: 'Inicia sesión para importar un respaldo.', count: 0 };
       }
+
+      // 1. File existence and size limit (max 10MB)
+      if (!file) {
+        return { success: false, message: 'No se seleccionó ningún archivo.', count: 0 };
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return { success: false, message: 'El archivo excede el tamaño máximo permitido (10 MB).', count: 0 };
+      }
+
+      // 2. File type validation
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.json') && file.type && !file.type.includes('json') && file.type !== 'text/plain') {
+        return { success: false, message: 'Formato inválido. Debe ser un archivo .json de respaldo.', count: 0 };
+      }
+
       try {
-        const data = JSON.parse(await file.text());
-        if (!data.userReviews || typeof data.userReviews !== 'object') {
-          return { success: false, message: 'Archivo inválido: no contiene reseñas.', count: 0 };
+        const text = await file.text();
+        if (!text || !text.trim()) {
+          return { success: false, message: 'El archivo está vacío.', count: 0 };
         }
-        const entries = Object.values(data.userReviews) as UserReview[];
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          return { success: false, message: 'El archivo no contiene un JSON válido o está dañado.', count: 0 };
+        }
+
+        // 3. Extract candidate reviews and media items from various backup formats
+        let candidateReviews: any[] = [];
+        let candidateMedia: MediaItem[] = [];
+
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (item?.review && typeof item.review === 'object') {
+              candidateReviews.push(item.review);
+              if (item.media && typeof item.media === 'object') candidateMedia.push(item.media);
+            } else if (item?.mediaId && item?.status) {
+              candidateReviews.push(item);
+            }
+          }
+        } else if (parsed && typeof parsed === 'object') {
+          if (parsed.userReviews && typeof parsed.userReviews === 'object') {
+            candidateReviews = Object.values(parsed.userReviews);
+          }
+          if (Array.isArray(parsed.mediaList)) {
+            candidateMedia = parsed.mediaList;
+          }
+        }
+
+        if (candidateReviews.length === 0 && candidateMedia.length === 0) {
+          return {
+            success: false,
+            message: 'El archivo no contiene reseñas ni títulos compatibles con ScreenLog.',
+            count: 0,
+          };
+        }
+
+        // 4. Restore custom media items so reviews will not be orphaned
+        if (candidateMedia.length > 0) {
+          for (const media of candidateMedia) {
+            if (media?.id && media?.title && media.isCustomUserCreated) {
+              const alreadyExists = mediaList.some((m) => m.id === media.id);
+              if (!alreadyExists) {
+                try {
+                  await apiRequest('/api/media', {
+                    method: 'POST',
+                    body: JSON.stringify(media),
+                  });
+                  setMediaList((prev) => [media, ...prev]);
+                } catch {
+                  // Ignore if already registered
+                }
+              }
+            }
+          }
+        }
+
+        // 5. Sanitize, validate and persist each review
         let imported = 0;
-        for (const review of entries) {
-          if (!review?.mediaId) continue;
+        const validStatuses: WatchStatus[] = ['pendiente', 'en_proceso', 'terminada'];
+        const validRewatches: RewatchChoice[] = ['si_totalmente', 'quizas', 'no_suficiente', 'jamas'];
+
+        for (const raw of candidateReviews) {
+          if (!raw || typeof raw !== 'object' || !raw.mediaId || typeof raw.mediaId !== 'string') continue;
+
+          const mediaId = String(raw.mediaId).slice(0, 120).trim();
+          if (!mediaId) continue;
+
+          const status: WatchStatus =
+            raw.status === 'viendo'
+              ? 'en_proceso'
+              : validStatuses.includes(raw.status)
+              ? raw.status
+              : 'pendiente';
+          const stars = typeof raw.stars === 'number' && !isNaN(raw.stars) ? Math.max(0, Math.min(5, raw.stars)) : 0;
+          const wouldRewatch: RewatchChoice =
+            validRewatches.includes(raw.wouldRewatch)
+              ? raw.wouldRewatch
+              : raw.rewatch === 'si'
+              ? 'si_totalmente'
+              : raw.rewatch === 'no'
+              ? 'no_suficiente'
+              : 'quizas';
+          const platform = typeof raw.platform === 'string' ? raw.platform.slice(0, 80) : '';
+          const critique = typeof raw.critique === 'string' ? raw.critique.slice(0, 4000) : '';
+          const watchedDate = typeof raw.watchedDate === 'string' ? raw.watchedDate.slice(0, 40) : '';
+
+          const sanitizedReview: UserReview = {
+            mediaId,
+            status,
+            stars,
+            wouldRewatch,
+            platform,
+            critique,
+            watchedDate,
+            year: Number(raw.year) || new Date().getFullYear(),
+            genres: Array.isArray(raw.genres) ? raw.genres : [],
+            evaluation: typeof raw.evaluation === 'string' ? raw.evaluation : '',
+            director: typeof raw.director === 'string' ? raw.director : '',
+            updatedAt: raw.updatedAt && typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString(),
+          };
+
           try {
-            await apiRequest(`/api/me/library/${encodeURIComponent(review.mediaId)}`, {
+            await apiRequest(`/api/me/library/${encodeURIComponent(mediaId)}`, {
               method: 'PUT',
-              body: JSON.stringify({ review }),
+              body: JSON.stringify({ review: sanitizedReview }),
             });
             imported += 1;
           } catch {
             // continue with remaining entries
           }
         }
+
+        // 6. Refresh library in local state
         const response = await apiRequest<{ success: boolean; data: Record<string, UserReview> }>('/api/me/library');
         setUserReviews(response.data || {});
-        return { success: true, message: `Se importaron ${imported} reseñas.`, count: imported };
-      } catch {
-        return { success: false, message: 'No se pudo leer el archivo.', count: 0 };
+
+        return {
+          success: true,
+          message: `Respaldo restaurado con éxito: ${imported} reseñas validadas y sincronizadas.`,
+          count: imported,
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          message: err?.message || 'Error inesperado al procesar el archivo.',
+          count: 0,
+        };
       }
     },
-    [authUser],
+    [authUser, mediaList],
   );
 
   const clearLocalData = useCallback(() => {
