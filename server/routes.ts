@@ -635,8 +635,8 @@ export function createApiRouter(): Router {
     return null;
   }
 
-  // POST /api/media/lookup - main lookup endpoint
-  router.post('/media/lookup', requireAuth, asyncRoute(async (req, res) => {
+  // POST /api/media/lookup - main lookup endpoint (no auth required for AI Studio compatibility)
+  router.post('/media/lookup', asyncRoute(async (req, res) => {
     const { title, type, year } = req.body;
     if (!title || typeof title !== 'string' || title.trim().length < 2) {
       return safeError(res, 400, 'El título debe tener al menos 2 caracteres.', 'INVALID_TITLE');
@@ -656,7 +656,7 @@ export function createApiRouter(): Router {
   }));
 
   // POST /api/autofill - alias for compatibility
-  router.post('/autofill', requireAuth, asyncRoute(async (req, res) => {
+  router.post('/autofill', asyncRoute(async (req, res) => {
     const { title } = req.body;
     if (!title || typeof title !== 'string' || title.trim().length < 2) {
       return safeError(res, 400, 'El título debe tener al menos 2 caracteres para autocompletar.', 'INVALID_TITLE');
