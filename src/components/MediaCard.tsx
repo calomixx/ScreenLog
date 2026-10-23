@@ -193,6 +193,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 }}
                 className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
                 title="Editar título (Admin demon)"
+                aria-label={`Editar título de ${media.title}`}
               >
                 <Edit3 className="w-3 h-3" />
               </button>
@@ -221,6 +222,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   }}
                   className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
                   title="Editar catálogo (Admin demon)"
+                  aria-label={`Editar ficha de ${media.title}`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -234,6 +236,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   }}
                   className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
                   title="Opciones de estado"
+                  aria-label="Opciones de estado"
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
