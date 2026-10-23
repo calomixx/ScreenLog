@@ -31,6 +31,7 @@ export const TrailerModal: React.FC = () => {
 
           <button
             onClick={closeTrailer}
+            aria-label="Cerrar tráiler"
             className="p-1.5 rounded-full bg-white/5 hover:bg-rose-600 hover:text-white text-slate-300 transition-colors"
           >
             <X className="w-4 h-4" />
