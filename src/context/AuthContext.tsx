@@ -108,9 +108,9 @@ export interface AuthContextType {
   sessionInfo: SessionInfo | null;
   isGuest: boolean;
   settings: PublicSettings;
-  login: (email: string, password: string, remember?: boolean) => Promise<AuthResult>;
-  register: (data: { name: string; email: string; password: string; avatar?: string }) => Promise<AuthResult>;
-  setupOwner: (data: { name: string; email: string; password: string }) => Promise<AuthResult>;
+  login: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
+  register: (data: { name: string; username?: string; email: string; password: string; avatar?: string }) => Promise<AuthResult>;
+  setupOwner: (data: { name: string; username?: string; email: string; password: string }) => Promise<AuthResult>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
@@ -180,17 +180,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { cancelled = true; };
   }, [applyStatus]);
 
-  const login = useCallback(async (email: string, password: string, remember = false): Promise<AuthResult> => {
+  const login = useCallback(async (identifier: string, password: string, remember = false): Promise<AuthResult> => {
     try {
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/login',
-        { method: 'POST', body: JSON.stringify({ email, password, remember }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            identifier: identifier.trim(),
+            email: identifier.trim(),
+            username: identifier.trim(),
+            password,
+            remember,
+          }),
+        },
       );
       if (response.data.token) {
         setStoredAuthToken(response.data.token);
       }
       try {
-        localStorage.setItem('sl_last_email', email);
+        localStorage.setItem('sl_last_email', identifier.trim());
       } catch {
         // ignore
       }
@@ -208,7 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const register = useCallback(async (data: { name: string; email: string; password: string; avatar?: string }): Promise<AuthResult> => {
+  const register = useCallback(async (data: { name: string; username?: string; email: string; password: string; avatar?: string }): Promise<AuthResult> => {
     try {
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/register',
@@ -218,7 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStoredAuthToken(response.data.token);
       }
       try {
-        localStorage.setItem('sl_last_email', data.email);
+        localStorage.setItem('sl_last_email', data.username || data.email);
       } catch {
         // ignore
       }
@@ -235,7 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const setupOwner = useCallback(async (data: { name: string; email: string; password: string }): Promise<AuthResult> => {
+  const setupOwner = useCallback(async (data: { name: string; username?: string; email: string; password: string }): Promise<AuthResult> => {
     try {
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/setup',
@@ -245,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStoredAuthToken(response.data.token);
       }
       try {
-        localStorage.setItem('sl_last_email', data.email);
+        localStorage.setItem('sl_last_email', data.username || data.email);
       } catch {
         // ignore
       }

@@ -8,6 +8,7 @@ export type Role = 'owner' | 'admin' | 'user';
 export interface StoredUser {
   id: string;
   name: string;
+  username?: string;
   email: string;
   passwordHash: string;
   salt: string;
@@ -251,10 +252,11 @@ export async function updateStore<T>(mutator: (data: StoreData) => T): Promise<T
 }
 
 export function publicUser(user: StoredUser) {
+  const defaultUsername = (user.name || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '') || user.email.split('@')[0];
   return {
     id: user.id,
     name: user.name,
-    username: user.email.split('@')[0],
+    username: user.username || defaultUsername,
     email: user.email,
     role: user.role,
     avatar: user.avatar,
@@ -275,6 +277,33 @@ export function publicUser(user: StoredUser) {
 export function findUserByEmail(store: StoreData, email: string): StoredUser | undefined {
   const normalized = email.trim().toLowerCase();
   return store.users.find((u) => u.email === normalized);
+}
+
+export function findUserByIdentifier(store: StoreData, identifier: string): StoredUser | undefined {
+  const normalized = identifier.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  // 1. Exact match on username
+  const byUsername = store.users.find((u) => u.username && u.username.toLowerCase() === normalized);
+  if (byUsername) return byUsername;
+
+  // 2. Exact match on full email
+  const byEmail = store.users.find((u) => u.email.toLowerCase() === normalized);
+  if (byEmail) return byEmail;
+
+  // 3. Match on email prefix (e.g. "daemon" for "daemon@screenlog.app")
+  const byEmailPrefix = store.users.find((u) => u.email.split('@')[0].toLowerCase() === normalized);
+  if (byEmailPrefix) return byEmailPrefix;
+
+  // 4. Match on name normalized (e.g. "deamon" or "CalomixPerceo")
+  const byName = store.users.find((u) => {
+    const cleanName = (u.name || '').trim().toLowerCase();
+    const cleanNoSpaces = cleanName.replace(/[^a-z0-9._-]/g, '');
+    return cleanName === normalized || cleanNoSpaces === normalized;
+  });
+  if (byName) return byName;
+
+  return undefined;
 }
 
 export function findUserById(store: StoreData, id: string): StoredUser | undefined {

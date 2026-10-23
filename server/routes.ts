@@ -5,6 +5,7 @@ import {
   getStore,
   saveStore,
   findUserByEmail,
+  findUserByIdentifier,
   findUserById,
   ownerExists,
   publicUser,
@@ -134,8 +135,18 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
+function cleanUsername(raw: string): string {
+  return (raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .replace(/[^a-z0-9._-]/g, '')
+    .slice(0, 30);
+}
+
 function createUserRecord(input: {
   name: string;
+  username?: string;
   email: string;
   password: string;
   role: Role;
@@ -143,9 +154,13 @@ function createUserRecord(input: {
 }): StoredUser {
   const now = new Date().toISOString();
   const { salt, hash } = hashPassword(input.password);
+  const userChosen = input.username ? cleanUsername(input.username) : '';
+  const finalUsername =
+    userChosen || cleanUsername(input.name) || cleanUsername(input.email.split('@')[0]) || 'usuario';
   return {
     id: randomUUID(),
     name: sanitizeText(input.name, 80) || 'Cinéfilo',
+    username: finalUsername,
     email: input.email.trim().toLowerCase(),
     passwordHash: hash,
     salt,
@@ -1018,13 +1033,14 @@ Responde en español, tono amable y cinéfilo.`;
     }
     const name = sanitizeText(req.body?.name, 80);
     const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const username = cleanUsername(req.body?.username || '');
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!name) return safeError(res, 400, 'Indica tu nombre.', 'INVALID_NAME');
     if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, 'INVALID_PASSWORD');
 
-    const user = createUserRecord({ name, email, password, role: 'owner' });
+    const user = createUserRecord({ name, username: username || undefined, email, password, role: 'owner' });
     store.users.push(user);
     store.settings.updatedAt = new Date().toISOString();
     store.settings.updatedBy = user.id;
@@ -1032,7 +1048,7 @@ Responde en español, tono amable y cinéfilo.`;
     addLog(store, {
       level: 'security',
       category: 'auth',
-      message: `Configuración inicial completada. Owner creado: ${email}`,
+      message: `Configuración inicial completada. Owner creado: ${email} (@${user.username})`,
       actorId: user.id,
       actorName: user.name,
       ip: getClientIp(req),
@@ -1058,6 +1074,7 @@ Responde en español, tono amable y cinéfilo.`;
     }
     const name = sanitizeText(req.body?.name, 80);
     const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const rawUsername = cleanUsername(req.body?.username || '');
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!name) return safeError(res, 400, 'Indica tu nombre.', 'INVALID_NAME');
     if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
@@ -1066,8 +1083,17 @@ Responde en español, tono amable y cinéfilo.`;
     if (findUserByEmail(store, email)) {
       return safeError(res, 409, 'Ya existe una cuenta con este correo.', 'EMAIL_IN_USE');
     }
+    if (rawUsername) {
+      if (rawUsername.length < 3) {
+        return safeError(res, 400, 'El nombre de usuario debe tener al menos 3 caracteres.', 'INVALID_USERNAME');
+      }
+      if (findUserByIdentifier(store, rawUsername)) {
+        return safeError(res, 409, 'Este nombre de usuario ya está en uso. Por favor elige otro.', 'USERNAME_IN_USE');
+      }
+    }
     const user = createUserRecord({
       name,
+      username: rawUsername || undefined,
       email,
       password,
       role: 'user',
@@ -1078,7 +1104,7 @@ Responde en español, tono amable y cinéfilo.`;
     addLog(store, {
       level: 'info',
       category: 'auth',
-      message: `Nueva cuenta registrada: ${email}`,
+      message: `Nueva cuenta registrada: ${email} (@${user.username})`,
       actorId: user.id,
       actorName: user.name,
       ip: getClientIp(req),
@@ -1089,18 +1115,22 @@ Responde en español, tono amable y cinéfilo.`;
 
   router.post('/auth/login', asyncRoute(async (req, res) => {
     const store = await getStore();
-    const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const rawIdentifier = sanitizeText(
+      req.body?.identifier || req.body?.email || req.body?.username,
+      160,
+    ).trim();
+    const identifier = rawIdentifier.toLowerCase();
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     const remember = Boolean(req.body?.remember);
     const ip = getClientIp(req);
-    const rateKey = `${ip}:${email}`;
+    const rateKey = `${ip}:${identifier}`;
 
     const rate = checkLoginRateLimit(rateKey);
     if (!rate.allowed) {
       addLog(store, {
         level: 'security',
         category: 'security',
-        message: `Bloqueo temporal por intentos fallidos para ${email || 'correo vacío'}`,
+        message: `Bloqueo temporal por intentos fallidos para ${identifier || 'identificador vacío'}`,
         ip,
       });
       await saveStore();
@@ -1109,17 +1139,17 @@ Responde en español, tono amable y cinéfilo.`;
       return;
     }
 
-    const user = findUserByEmail(store, email);
+    const user = findUserByIdentifier(store, identifier);
     if (!user) {
       registerLoginFailure(rateKey);
       addLog(store, {
         level: 'warning',
         category: 'security',
-        message: `Inicio de sesión fallido: cuenta inexistente (${email || 'vacío'})`,
+        message: `Inicio de sesión fallido: cuenta inexistente (${identifier || 'vacío'})`,
         ip,
       });
       await saveStore();
-      return safeError(res, 401, 'Correo o contraseña incorrectos.', 'INVALID_CREDENTIALS');
+      return safeError(res, 401, 'Usuario o contraseña incorrectos.', 'INVALID_CREDENTIALS');
     }
     if (user.blocked) {
       addLog(store, {
@@ -1150,13 +1180,13 @@ Responde en español, tono amable y cinéfilo.`;
       addLog(store, {
         level: 'warning',
         category: 'security',
-        message: `Inicio de sesión fallido para ${user.email}`,
+        message: `Inicio de sesión fallido para ${user.email} (@${user.username})`,
         actorId: user.id,
         actorName: user.name,
         ip,
       });
       await saveStore();
-      return safeError(res, 401, 'Correo o contraseña incorrectos.', 'INVALID_CREDENTIALS');
+      return safeError(res, 401, 'Usuario o contraseña incorrectos.', 'INVALID_CREDENTIALS');
     }
 
     clearLoginFailures(rateKey);
@@ -1167,7 +1197,7 @@ Responde en español, tono amable y cinéfilo.`;
     addLog(store, {
       level: 'info',
       category: 'auth',
-      message: `Inicio de sesión correcto: ${user.email}`,
+      message: `Inicio de sesión correcto: ${user.email} (@${user.username})`,
       actorId: user.id,
       actorName: user.name,
       ip,
@@ -1332,6 +1362,19 @@ Responde en español, tono amable y cinéfilo.`;
     const body = req.body || {};
     if (typeof body.name === 'string' && sanitizeText(body.name, 80)) {
       user.name = sanitizeText(body.name, 80);
+    }
+    if (typeof body.username === 'string') {
+      const sanitizedUsername = cleanUsername(body.username);
+      if (sanitizedUsername) {
+        if (sanitizedUsername.length < 3) {
+          return safeError(res, 400, 'El nombre de usuario debe tener al menos 3 caracteres.', 'INVALID_USERNAME');
+        }
+        const existing = findUserByIdentifier(store, sanitizedUsername);
+        if (existing && existing.id !== user.id) {
+          return safeError(res, 409, 'Este nombre de usuario ya está en uso. Por favor elige otro.', 'USERNAME_IN_USE');
+        }
+        user.username = sanitizedUsername;
+      }
     }
     if (typeof body.bio === 'string') user.bio = sanitizeMultiline(body.bio, 500);
     if (typeof body.city === 'string') user.city = sanitizeText(body.city, 120);

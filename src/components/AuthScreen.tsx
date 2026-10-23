@@ -44,7 +44,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const [loginEmail, setLoginEmail] = useState(() => {
+  const [loginIdentifier, setLoginIdentifier] = useState(() => {
     try {
       return localStorage.getItem('sl_last_email') || '';
     } catch {
@@ -55,6 +55,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
   const [remember, setRemember] = useState(true);
 
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -71,12 +72,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    if (!loginEmail.trim() || !loginPassword) {
-      setError('Ingresa tu correo y tu contraseña.');
+    if (!loginIdentifier.trim() || !loginPassword) {
+      setError('Ingresa tu nombre de usuario o correo y tu contraseña.');
       return;
     }
     setSubmitting(true);
-    const result = await login(loginEmail.trim(), loginPassword, remember);
+    const result = await login(loginIdentifier.trim(), loginPassword, remember);
     setSubmitting(false);
     if (!result.success) setError(result.message || 'No se pudo iniciar sesión.');
   };
@@ -101,7 +102,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
       return;
     }
     setSubmitting(true);
-    const result = await register({ name: name.trim(), email: email.trim(), password, avatar });
+    const result = await register({
+      name: name.trim(),
+      username: username.trim() || undefined,
+      email: email.trim(),
+      password,
+      avatar,
+    });
     setSubmitting(false);
     if (!result.success) setError(result.message || 'No se pudo crear la cuenta.');
   };
@@ -280,18 +287,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
               {mode === 'login' && (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label htmlFor="auth-email" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                      Correo electrónico
+                    <label htmlFor="auth-identifier" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Usuario o correo</span>
+                      <span className="text-[10px] text-rose-400 font-normal lowercase">ej: daemon o tu@correo.com</span>
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                       <input
-                        id="auth-email"
-                        type="email"
-                        autoComplete="email"
-                        value={loginEmail}
-                        onChange={(event) => setLoginEmail(event.target.value)}
-                        placeholder="tu@correo.com"
+                        id="auth-identifier"
+                        type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        autoComplete="username"
+                        value={loginIdentifier}
+                        onChange={(event) => setLoginIdentifier(event.target.value)}
+                        placeholder="daemon o tu@correo.com"
                         className={inputClass}
                         required
                       />
@@ -372,6 +383,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                         placeholder="Cómo quieres aparecer"
                         className={inputClass}
                         required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="register-username" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Usuario único (opcional)</span>
+                      <span className="text-[10px] text-slate-400 font-normal lowercase">para entrar sin tu correo</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-400 pointer-events-none">@</span>
+                      <input
+                        id="register-username"
+                        type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        value={username}
+                        onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                        placeholder="mi_usuario_cinefilo"
+                        className={`${inputClass} pl-8`}
                       />
                     </div>
                   </div>
