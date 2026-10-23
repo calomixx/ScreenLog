@@ -1,0 +1,3 @@
+## 2024-05-24 - React Context Re-render Bottlenecks
+**Learning:** Storing UI state (like `selectedMediaId` or `isAddModalOpen`) in a global `MediaContext` alongside data causes all consumer components (`CatalogView`, `MyListView`) to re-render whenever a modal is toggled. When these components perform heavy list filtering (O(N)) or sorting (O(N log N)) on every render pass, UI interactions feel sluggish.
+**Action:** Always wrap computationally expensive array manipulations in `useMemo` hooks, specifying exactly which dependencies (like search query or filter types) should trigger a recalculation.
