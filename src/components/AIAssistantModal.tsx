@@ -263,6 +263,7 @@ export const AIAssistantModal: React.FC = () => {
             <div className="flex items-center gap-1">
               <button
                 onClick={handleResetChat}
+                aria-label="Reiniciar chat"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
                 title="Reiniciar chat"
               >
@@ -270,6 +271,7 @@ export const AIAssistantModal: React.FC = () => {
               </button>
               <button
                 onClick={closeAssistant}
+                aria-label="Cerrar asistente"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
                 title="Cerrar asistente"
               >
@@ -385,6 +387,7 @@ export const AIAssistantModal: React.FC = () => {
               <button
                 type="submit"
                 disabled={!inputMessage.trim() || isLoading}
+                aria-label="Enviar mensaje"
                 className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:hover:bg-rose-600 text-white font-bold transition-all shadow-md shadow-rose-900/30 flex-shrink-0"
                 title="Enviar mensaje"
               >

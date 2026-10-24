@@ -359,6 +359,7 @@ export const EditMediaModal: React.FC = () => {
             )}
             <button
               onClick={handleClose}
+              aria-label="Cerrar editor"
               className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 transition-colors"
               title="Cerrar editor"
             >

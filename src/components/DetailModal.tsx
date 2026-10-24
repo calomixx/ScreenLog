@@ -377,6 +377,7 @@ export const DetailModal: React.FC = () => {
 
             <button
               onClick={handleShare}
+              aria-label="Copiar enlace"
               className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10  transition-colors"
               title="Copiar enlace"
             >
@@ -390,6 +391,7 @@ export const DetailModal: React.FC = () => {
             <button
               id="detail-modal-close-btn"
               onClick={() => setSelectedMediaId(null)}
+              aria-label="Cerrar ventana"
               className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10  transition-colors"
               title="Cerrar ventana"
             >
