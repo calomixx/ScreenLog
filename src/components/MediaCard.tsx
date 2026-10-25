@@ -102,6 +102,13 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     setIsMenuOpen(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setSelectedMediaId(media.id);
+    }
+  };
+
   const getStatusBadge = () => {
     if (!userReview) return null;
     switch (userReview.status) {
@@ -137,13 +144,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onKeyDown={handleKeyDown}
+      role="article"
+      aria-label={`${media.title} (${media.year})`}
+      tabIndex={0}
       style={{
         transform: parallax ? tiltStyle.transform : undefined,
         transformStyle: 'preserve-3d',
         transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
       }}
-      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
-        !parallax ? 'transform hover:-translate-y-1.5' : ''
+      className={`group relative bg-[#161618] hover:bg-[#1c1c20] focus-within:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-all duration-300 flex flex-col cursor-pointer ${
+        !parallax ? 'transform hover:-translate-y-1.5 focus-within:-translate-y-1.5' : ''
       }`}
     >
       {/* Specular glare dynamic light reflection */}
@@ -177,7 +188,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Top Badges (visible when not hovered) */}
         <div className={`absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10 transition-opacity duration-200 ${
-          isHovered ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          isHovered ? 'opacity-0 pointer-events-none group-focus-within:opacity-0 group-focus-within:pointer-events-none' : 'opacity-100'
         }`}>
           <span className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white backdrop-blur-md text-[10px] font-bold uppercase tracking-wider shadow">
             {media.type}
@@ -193,6 +204,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 }}
                 className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
                 title="Editar título (Admin demon)"
+                aria-label="Editar título (Admin)"
               >
                 <Edit3 className="w-3 h-3" />
               </button>
@@ -203,7 +215,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Cinematic Parallax Overlay: Full Movie Synopsis & Quick Actions */}
         <div className={`absolute inset-0 z-20 flex flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-sm transition-all duration-300 ${
-          isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+          isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto'
         }`}>
           {/* Top of hover overlay: Platform / Category & Menu */}
           <div className="flex items-center justify-between gap-1.5">
@@ -219,8 +231,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     e.stopPropagation();
                     openEditMediaModal(media);
                   }}
-                  className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
+                  className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                   title="Editar catálogo (Admin demon)"
+                  aria-label="Editar ficha (Admin)"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -232,8 +245,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     e.stopPropagation();
                     setIsMenuOpen(!isMenuOpen);
                   }}
-                  className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
+                  className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                   title="Opciones de estado"
+                  aria-label="Opciones de estado en mi lista"
+                  aria-haspopup="menu"
+                  aria-expanded={isMenuOpen}
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
@@ -244,36 +260,40 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   className="absolute right-0 top-full mt-1 w-48 bg-[#161618] border border-white/10 rounded-xl p-1.5 shadow-2xl z-30 animate-in fade-in"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1" role="presentation">
                     Cambiar estado
                   </div>
                   <button
                     onClick={(e) => handleStatusChange(e, 'pendiente')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none flex items-center gap-2"
+                    role="menuitem"
                   >
                     <Bookmark className="w-3.5 h-3.5 text-sky-400" />
                     Pendiente
                   </button>
                   <button
                     onClick={(e) => handleStatusChange(e, 'en_proceso')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none flex items-center gap-2"
+                    role="menuitem"
                   >
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
                     En proceso
                   </button>
                   <button
                     onClick={(e) => handleStatusChange(e, 'terminada')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none flex items-center gap-2"
+                    role="menuitem"
                   >
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
                     Terminada (Calificar)
                   </button>
 
                   {userReview && (
-                    <div className="pt-1 mt-1 border-t border-white/10">
+                    <div className="pt-1 mt-1 border-t border-white/10" role="group">
                       <button
                         onClick={handleRemove}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 focus-visible:bg-rose-500/10 focus-visible:outline-none flex items-center gap-2"
+                        role="menuitem"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         Quitar de mi lista
@@ -282,8 +302,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   )}
 
                   {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
-                    <div className="pt-1 mt-1 border-t border-white/10 space-y-0.5">
-                      <span className="text-[9px] uppercase font-bold text-rose-400 px-2.5 block tracking-wider">
+                    <div className="pt-1 mt-1 border-t border-white/10 space-y-0.5" role="group">
+                      <span className="text-[9px] uppercase font-bold text-rose-400 px-2.5 block tracking-wider" role="presentation">
                         Administrador
                       </span>
                       <button
@@ -292,7 +312,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                           setIsMenuOpen(false);
                           openEditMediaModal(media);
                         }}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-amber-500/10 flex items-center gap-2 font-medium"
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-amber-500/10 focus-visible:bg-amber-500/10 focus-visible:outline-none flex items-center gap-2 font-medium"
+                        role="menuitem"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-amber-400" />
                         Editar ficha
@@ -303,7 +324,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                           setIsMenuOpen(false);
                           setShowCardDeleteConfirm(true);
                         }}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 font-medium"
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 focus-visible:bg-rose-500/10 focus-visible:outline-none flex items-center gap-2 font-medium"
+                        role="menuitem"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                         Quitar del catálogo
@@ -350,8 +372,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   e.stopPropagation();
                   openTrailer(media.trailerYoutubeId);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 title="Ver Tráiler"
+                aria-label="Ver Tráiler"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Tráiler</span>
@@ -363,8 +386,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 e.stopPropagation();
                 setSelectedMediaId(media.id);
               }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/15 transition-all active:scale-95"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/15 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               title="Ver Ficha y Evaluaciones"
+              aria-label="Ver Ficha"
             >
               <Eye className="w-3.5 h-3.5 text-rose-400" />
               <span>Ficha</span>
@@ -374,7 +398,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Bottom Poster Info Overlay (when not hovered) */}
         <div className={`absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between pointer-events-none transition-opacity duration-200 ${
-          isHovered ? 'opacity-0' : 'opacity-100'
+          isHovered ? 'opacity-0 group-focus-within:opacity-0' : 'opacity-100'
         }`}>
           <span className="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[11px] text-slate-300 font-medium border border-white/10">
             {media.defaultPlatform}
