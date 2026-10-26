@@ -360,6 +360,7 @@ export const DetailModal: React.FC = () => {
                   onClick={() => openEditMediaModal(selectedMedia)}
                   className="px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 transition-all"
                   title="Editar ficha en el catálogo"
+                  aria-label="Editar ficha en el catálogo"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Editar</span>
@@ -369,6 +370,7 @@ export const DetailModal: React.FC = () => {
                   onClick={() => setShowDeleteConfirm(true)}
                   className="p-1.5 rounded-full bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500 transition-all"
                   title="Quitar / Eliminar del catálogo"
+                  aria-label="Quitar / Eliminar del catálogo"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -379,6 +381,7 @@ export const DetailModal: React.FC = () => {
               onClick={handleShare}
               className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10  transition-colors"
               title="Copiar enlace"
+              aria-label="Copiar enlace"
             >
               <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
@@ -392,6 +395,7 @@ export const DetailModal: React.FC = () => {
               onClick={() => setSelectedMediaId(null)}
               className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10  transition-colors"
               title="Cerrar ventana"
+              aria-label="Cerrar ventana"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
