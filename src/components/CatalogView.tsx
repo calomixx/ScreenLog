@@ -73,53 +73,60 @@ export const CatalogView: React.FC = () => {
     return Array.from(set);
   }, [mediaList]);
 
-  // Filter media
-  const filtered = mediaList.filter((item) => {
-    // Filter by type
-    if (selectedType !== 'todos' && item.type !== selectedType) return false;
+  // ⚡ Bolt Optimization: Memoize filtered media list
+  // The global MediaContext triggers re-renders on unrelated UI changes (like modal toggles).
+  // Wrapping this O(N) filtering in useMemo prevents it from running unnecessarily on every render.
+  const filtered = useMemo(() => {
+    return mediaList.filter((item) => {
+      // Filter by type
+      if (selectedType !== 'todos' && item.type !== selectedType) return false;
 
-    // Filter by genre
-    if (selectedGenre !== 'Todos' && !item.genres.includes(selectedGenre)) return false;
+      // Filter by genre
+      if (selectedGenre !== 'Todos' && !item.genres.includes(selectedGenre)) return false;
 
-    // Filter by release year
-    if (selectedYear !== 'todos') {
-      if (selectedYear === '2020s') {
-        if (item.year < 2020) return false;
-      } else if (selectedYear === '2010s') {
-        if (item.year < 2010 || item.year > 2019) return false;
-      } else if (selectedYear === 'pre-2010') {
-        if (item.year >= 2010) return false;
-      } else {
-        if (item.year !== Number(selectedYear)) return false;
+      // Filter by release year
+      if (selectedYear !== 'todos') {
+        if (selectedYear === '2020s') {
+          if (item.year < 2020) return false;
+        } else if (selectedYear === '2010s') {
+          if (item.year < 2010 || item.year > 2019) return false;
+        } else if (selectedYear === 'pre-2010') {
+          if (item.year >= 2010) return false;
+        } else {
+          if (item.year !== Number(selectedYear)) return false;
+        }
       }
-    }
 
-    // Filter by minimum rating
-    if (item.communityRating < minRating) return false;
+      // Filter by minimum rating
+      if (item.communityRating < minRating) return false;
 
-    // Filter by platform
-    if (selectedPlatform !== 'Todas' && item.defaultPlatform !== selectedPlatform) return false;
+      // Filter by platform
+      if (selectedPlatform !== 'Todas' && item.defaultPlatform !== selectedPlatform) return false;
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = item.title.toLowerCase().includes(q) || (item.originalTitle || '').toLowerCase().includes(q);
-      const matchDir = item.director.toLowerCase().includes(q);
-      const matchCast = item.cast.some((c) => c.toLowerCase().includes(q));
-      if (!matchTitle && !matchDir && !matchCast) return false;
-    }
+      // Filter by search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = item.title.toLowerCase().includes(q) || (item.originalTitle || '').toLowerCase().includes(q);
+        const matchDir = item.director.toLowerCase().includes(q);
+        const matchCast = item.cast.some((c) => c.toLowerCase().includes(q));
+        if (!matchTitle && !matchDir && !matchCast) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [mediaList, selectedType, selectedGenre, selectedYear, minRating, selectedPlatform, searchQuery]);
 
-  // Sort media
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'calificacion') return b.communityRating - a.communityRating;
-    if (sortBy === 'anadidas') return b.addedToListCount - a.addedToListCount;
-    if (sortBy === 'ano') return b.year - a.year;
-    if (sortBy === 'titulo') return a.title.localeCompare(b.title);
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  // ⚡ Bolt Optimization: Memoize sorted media list
+  // Prevents unnecessary array cloning and O(N log N) sorting on every render when filters/sort haven't changed.
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'calificacion') return b.communityRating - a.communityRating;
+      if (sortBy === 'anadidas') return b.addedToListCount - a.addedToListCount;
+      if (sortBy === 'ano') return b.year - a.year;
+      if (sortBy === 'titulo') return a.title.localeCompare(b.title);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [filtered, sortBy]);
 
   const activeFiltersCount = 
     (selectedGenre !== 'Todos' ? 1 : 0) +
