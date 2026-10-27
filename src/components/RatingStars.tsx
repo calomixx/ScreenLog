@@ -60,9 +60,49 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!interactive || !onChange) return;
+
+    let newRating = displayRating;
+
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowUp':
+        newRating = Math.min(maxStars, displayRating + precision);
+        e.preventDefault();
+        break;
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        newRating = Math.max(0, displayRating - precision);
+        e.preventDefault();
+        break;
+      case 'Home':
+        newRating = 0;
+        e.preventDefault();
+        break;
+      case 'End':
+        newRating = maxStars;
+        e.preventDefault();
+        break;
+      default:
+        return;
+    }
+
+    onChange(newRating);
+  };
+
   return (
     <div
-      className="inline-flex items-center gap-1.5 select-none"
+      className={`inline-flex items-center gap-1.5 select-none ${
+        interactive ? 'focus-visible:ring-2 focus-visible:ring-rose-500 rounded outline-none' : ''
+      }`}
+      role={interactive ? "slider" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-valuemin={interactive ? 0 : undefined}
+      aria-valuemax={interactive ? maxStars : undefined}
+      aria-valuenow={interactive ? displayRating : undefined}
+      aria-label={interactive ? "Calificación" : undefined}
+      onKeyDown={handleKeyDown}
       onMouseLeave={() => interactive && setHoverRating(null)}
     >
       <div className="flex items-center gap-0.5">
