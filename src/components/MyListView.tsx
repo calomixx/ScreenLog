@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Bookmark, 
   CheckCircle2, 
@@ -154,34 +154,40 @@ export const MyListView: React.FC = () => {
   }
 
   // Filter entries
-  const filteredEntries = myListEntries.filter(({ media, review }) => {
-    if (statusFilter !== 'todas' && review.status !== statusFilter) return false;
-    if (typeFilter !== 'todos' && media.type !== typeFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = media.title.toLowerCase().includes(q);
-      const matchDirector = (review.director || media.director).toLowerCase().includes(q);
-      const matchPlatform = (review.platform || media.defaultPlatform).toLowerCase().includes(q);
-      const matchCritique = (review.critique || '').toLowerCase().includes(q);
-      if (!matchTitle && !matchDirector && !matchPlatform && !matchCritique) return false;
-    }
-    return true;
-  });
+  // ⚡ Bolt: Memoize filter operation to prevent expensive re-evaluations on context updates
+  const filteredEntries = useMemo(() => {
+    return myListEntries.filter(({ media, review }) => {
+      if (statusFilter !== 'todas' && review.status !== statusFilter) return false;
+      if (typeFilter !== 'todos' && media.type !== typeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = media.title.toLowerCase().includes(q);
+        const matchDirector = (review.director || media.director).toLowerCase().includes(q);
+        const matchPlatform = (review.platform || media.defaultPlatform).toLowerCase().includes(q);
+        const matchCritique = (review.critique || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDirector && !matchPlatform && !matchCritique) return false;
+      }
+      return true;
+    });
+  }, [myListEntries, statusFilter, typeFilter, searchQuery]);
 
   // Sort entries
-  const sortedEntries = [...filteredEntries].sort((a, b) => {
-    if (sortBy === 'estrellas') {
-      return (b.review.stars || 0) - (a.review.stars || 0);
-    }
-    if (sortBy === 'ano') {
-      return (b.review.year || b.media.year) - (a.review.year || a.media.year);
-    }
-    if (sortBy === 'titulo') {
-      return a.media.title.localeCompare(b.media.title);
-    }
-    // Default: recientes
-    return new Date(b.review.updatedAt).getTime() - new Date(a.review.updatedAt).getTime();
-  });
+  // ⚡ Bolt: Memoize sort operation to prevent array cloning and sorting on every render cycle
+  const sortedEntries = useMemo(() => {
+    return [...filteredEntries].sort((a, b) => {
+      if (sortBy === 'estrellas') {
+        return (b.review.stars || 0) - (a.review.stars || 0);
+      }
+      if (sortBy === 'ano') {
+        return (b.review.year || b.media.year) - (a.review.year || a.media.year);
+      }
+      if (sortBy === 'titulo') {
+        return a.media.title.localeCompare(b.media.title);
+      }
+      // Default: recientes
+      return new Date(b.review.updatedAt).getTime() - new Date(a.review.updatedAt).getTime();
+    });
+  }, [filteredEntries, sortBy]);
 
   // Calculate statistics
   const finishedEntries = myListEntries.filter((e) => e.review.status === 'terminada');
