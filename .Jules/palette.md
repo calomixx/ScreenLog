@@ -1,0 +1,4 @@
+
+## $(date +%Y-%m-%d) - Keyboard Accessibility on Custom Interactive Cards
+**Learning:** In this application's design system, standard interactive card components (like `MediaCard` acting as buttons to open details) rely exclusively on mouse/touch events (`onClick`), leaving keyboard users (and screen readers relying on focus) completely unable to select or interact with them. In addition, the icon-only quick actions inside the cards frequently miss screen reader descriptions.
+**Action:** Always ensure that custom interactive `div` containers acting as actionable elements (cards) include `role="button"`, `tabIndex={0}`, and an `onKeyDown` handler (listening for `Enter` and `Space`). Also apply clear `:focus-visible` styles to replace default focus rings, and assign `aria-label`s to any icon-only actions inside the component.
