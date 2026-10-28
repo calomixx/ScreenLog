@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Bookmark, 
   CheckCircle2, 
@@ -154,47 +154,61 @@ export const MyListView: React.FC = () => {
   }
 
   // Filter entries
-  const filteredEntries = myListEntries.filter(({ media, review }) => {
-    if (statusFilter !== 'todas' && review.status !== statusFilter) return false;
-    if (typeFilter !== 'todos' && media.type !== typeFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = media.title.toLowerCase().includes(q);
-      const matchDirector = (review.director || media.director).toLowerCase().includes(q);
-      const matchPlatform = (review.platform || media.defaultPlatform).toLowerCase().includes(q);
-      const matchCritique = (review.critique || '').toLowerCase().includes(q);
-      if (!matchTitle && !matchDirector && !matchPlatform && !matchCritique) return false;
-    }
-    return true;
-  });
+  const filteredEntries = useMemo(() => {
+    return myListEntries.filter(({ media, review }) => {
+      if (statusFilter !== 'todas' && review.status !== statusFilter) return false;
+      if (typeFilter !== 'todos' && media.type !== typeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = media.title.toLowerCase().includes(q);
+        const matchDirector = (review.director || media.director).toLowerCase().includes(q);
+        const matchPlatform = (review.platform || media.defaultPlatform).toLowerCase().includes(q);
+        const matchCritique = (review.critique || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDirector && !matchPlatform && !matchCritique) return false;
+      }
+      return true;
+    });
+  }, [myListEntries, statusFilter, typeFilter, searchQuery]);
 
   // Sort entries
-  const sortedEntries = [...filteredEntries].sort((a, b) => {
-    if (sortBy === 'estrellas') {
-      return (b.review.stars || 0) - (a.review.stars || 0);
-    }
-    if (sortBy === 'ano') {
-      return (b.review.year || b.media.year) - (a.review.year || a.media.year);
-    }
-    if (sortBy === 'titulo') {
-      return a.media.title.localeCompare(b.media.title);
-    }
-    // Default: recientes
-    return new Date(b.review.updatedAt).getTime() - new Date(a.review.updatedAt).getTime();
-  });
+  const sortedEntries = useMemo(() => {
+    return [...filteredEntries].sort((a, b) => {
+      if (sortBy === 'estrellas') {
+        return (b.review.stars || 0) - (a.review.stars || 0);
+      }
+      if (sortBy === 'ano') {
+        return (b.review.year || b.media.year) - (a.review.year || a.media.year);
+      }
+      if (sortBy === 'titulo') {
+        return a.media.title.localeCompare(b.media.title);
+      }
+      // Default: recientes
+      return new Date(b.review.updatedAt).getTime() - new Date(a.review.updatedAt).getTime();
+    });
+  }, [filteredEntries, sortBy]);
 
   // Calculate statistics
-  const finishedEntries = myListEntries.filter((e) => e.review.status === 'terminada');
-  const totalStars = finishedEntries.reduce((acc, curr) => acc + (curr.review.stars || 0), 0);
-  const avgStars = finishedEntries.length > 0 ? (totalStars / finishedEntries.length).toFixed(1) : '—';
+  const finishedEntries = useMemo(() => {
+    return myListEntries.filter((e) => e.review.status === 'terminada');
+  }, [myListEntries]);
+
+  const totalStars = useMemo(() => {
+    return finishedEntries.reduce((acc, curr) => acc + (curr.review.stars || 0), 0);
+  }, [finishedEntries]);
+
+  const avgStars = useMemo(() => {
+    return finishedEntries.length > 0 ? (totalStars / finishedEntries.length).toFixed(1) : '—';
+  }, [finishedEntries, totalStars]);
 
   // Find most frequent platform
-  const platformCounts: Record<string, number> = {};
-  myListEntries.forEach((e) => {
-    const p = e.review.platform || e.media.defaultPlatform;
-    platformCounts[p] = (platformCounts[p] || 0) + 1;
-  });
-  const topPlatform = Object.entries(platformCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Netflix';
+  const topPlatform = useMemo(() => {
+    const platformCounts: Record<string, number> = {};
+    myListEntries.forEach((e) => {
+      const p = e.review.platform || e.media.defaultPlatform;
+      platformCounts[p] = (platformCounts[p] || 0) + 1;
+    });
+    return Object.entries(platformCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Netflix';
+  }, [myListEntries]);
 
   const exportToJson = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(myListEntries, null, 2));
