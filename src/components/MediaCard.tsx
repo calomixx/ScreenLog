@@ -133,7 +133,15 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     <div
       ref={cardRef}
       id={`media-card-${media.id}`}
+      role="button"
+      tabIndex={0}
       onClick={() => setSelectedMediaId(media.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setSelectedMediaId(media.id);
+        }
+      }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -142,7 +150,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
         transformStyle: 'preserve-3d',
         transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
       }}
-      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
+      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
         !parallax ? 'transform hover:-translate-y-1.5' : ''
       }`}
     >
@@ -191,8 +199,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   e.stopPropagation();
                   openEditMediaModal(media);
                 }}
-                className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
+                className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
                 title="Editar título (Admin demon)"
+                aria-label={`Editar ${media.title}`}
               >
                 <Edit3 className="w-3 h-3" />
               </button>
@@ -219,8 +228,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     e.stopPropagation();
                     openEditMediaModal(media);
                   }}
-                  className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
+                  className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   title="Editar catálogo (Admin demon)"
+                  aria-label={`Editar catálogo ${media.title}`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -232,8 +242,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     e.stopPropagation();
                     setIsMenuOpen(!isMenuOpen);
                   }}
-                  className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
+                  className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
                   title="Opciones de estado"
+                  aria-label="Opciones de estado"
+                  aria-expanded={isMenuOpen}
+                  aria-haspopup="true"
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
@@ -350,7 +363,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   e.stopPropagation();
                   openTrailer(media.trailerYoutubeId);
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
                 title="Ver Tráiler"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
@@ -363,7 +376,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 e.stopPropagation();
                 setSelectedMediaId(media.id);
               }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/15 transition-all active:scale-95"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/15 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               title="Ver Ficha y Evaluaciones"
             >
               <Eye className="w-3.5 h-3.5 text-rose-400" />
