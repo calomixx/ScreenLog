@@ -23,7 +23,8 @@ async function startServer() {
   app.use('/api', (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error('API Error:', err);
     const status = err?.status || err?.statusCode || 500;
-    const message = err?.message || 'Error interno del servidor';
+    // Security: Do not expose internal error messages on 500 status codes
+    const message = status >= 500 ? 'Error interno del servidor' : (err?.message || 'Error interno del servidor');
     const code = err?.code || 'INTERNAL_ERROR';
     res.status(status).json({ success: false, error: message, code });
   });
