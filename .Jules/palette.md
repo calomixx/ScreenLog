@@ -1,0 +1,3 @@
+## 2024-10-30 - Keyboard Accessibility for Complex Interactive Containers
+**Learning:** When making complex UI containers (like `MediaCard` with nested buttons) keyboard focusable via `tabIndex={0}`, pressing Enter or Space while a child button has focus can trigger the wrapper's `onKeyDown` handler due to event bubbling, which intercepts and breaks the child button's native behavior.
+**Action:** Always include an event bubbling guard (`if (e.target !== e.currentTarget) return;`) in the wrapper's `onKeyDown` handler to ensure it only processes keyboard events when the wrapper itself is directly focused.
