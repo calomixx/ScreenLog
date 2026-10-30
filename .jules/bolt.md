@@ -1,0 +1,3 @@
+## 2026-10-30 - Memoizing Array Computations due to Global Context
+**Learning:** The React app uses a global `MediaContext` that often triggers unnecessary re-renders in consumer components such as `CatalogView` and `MyListView` on simple UI state changes (e.g., modal toggles). Unoptimized array filtering and sorting calculations running on every render cause noticeable bottlenecks when the dataset scales.
+**Action:** When filtering or sorting data arrays in components that consume `MediaContext`, wrap the expensive array operations in `useMemo` hooks to mitigate this architectural bottleneck and preserve performance.
