@@ -1,0 +1,3 @@
+## 2024-10-31 - Keyboard Events in Interactive Cards
+**Learning:** When adding keyboard accessibility (`onKeyDown`) to an interactive container (like a media card wrapper) that contains nested interactive elements (buttons, links), catching keyboard events like 'Enter' or 'Space' on the wrapper can inadvertently intercept and prevent the native interactions of the nested child components.
+**Action:** Always include an event bubbling guard (`if (e.target !== e.currentTarget) return;`) in the `onKeyDown` handler of the wrapper element to ensure that if a user focuses on and interacts with a child element, the parent's event handler is ignored.

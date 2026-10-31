@@ -133,7 +133,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     <div
       ref={cardRef}
       id={`media-card-${media.id}`}
+      role="article"
+      tabIndex={0}
+      aria-label={`Ver detalles de ${media.title}`}
       onClick={() => setSelectedMediaId(media.id)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setSelectedMediaId(media.id);
+        }
+      }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -142,7 +152,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
         transformStyle: 'preserve-3d',
         transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
       }}
-      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
+      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none ${
         !parallax ? 'transform hover:-translate-y-1.5' : ''
       }`}
     >
