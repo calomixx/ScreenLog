@@ -129,11 +129,22 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setSelectedMediaId(media.id);
+    }
+  };
+
   return (
-    <div
+    <article
       ref={cardRef}
       id={`media-card-${media.id}`}
+      tabIndex={0}
+      aria-label={`Ver detalles de ${media.title}`}
       onClick={() => setSelectedMediaId(media.id)}
+      onKeyDown={handleKeyDown}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -142,7 +153,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
         transformStyle: 'preserve-3d',
         transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
       }}
-      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
+      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
         !parallax ? 'transform hover:-translate-y-1.5' : ''
       }`}
     >
@@ -193,6 +204,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 }}
                 className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
                 title="Editar título (Admin demon)"
+                aria-label="Editar título"
               >
                 <Edit3 className="w-3 h-3" />
               </button>
@@ -221,6 +233,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   }}
                   className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
                   title="Editar catálogo (Admin demon)"
+                  aria-label="Editar catálogo"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -234,6 +247,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   }}
                   className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
                   title="Opciones de estado"
+                  aria-expanded={isMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Opciones de estado"
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
@@ -463,6 +479,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           </div>
         </div>
       )}
-    </div>
+    </article>
   );
 };
