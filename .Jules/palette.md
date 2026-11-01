@@ -1,0 +1,3 @@
+## 2026-11-01 - Interactive MediaCard Accessibility Pattern
+**Learning:** When making wrapper elements like `MediaCard` focusable and interactive, simply adding `tabIndex={0}` and an `onKeyDown` handler is insufficient for full semantic accessibility. A `role="button"` (or appropriate interaction role) is required for screen readers to properly announce the element's interaction type to the user.
+**Action:** When adding keyboard interaction to custom components (like `<article>` or `<div>`), ensure `role="button"` is included alongside `tabIndex={0}` and key handlers, while continuing to use event target guards for nested interactive elements.
