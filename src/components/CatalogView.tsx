@@ -74,7 +74,7 @@ export const CatalogView: React.FC = () => {
   }, [mediaList]);
 
   // Filter media
-  const filtered = mediaList.filter((item) => {
+  const filtered = useMemo(() => mediaList.filter((item) => {
     // Filter by type
     if (selectedType !== 'todos' && item.type !== selectedType) return false;
 
@@ -110,16 +110,16 @@ export const CatalogView: React.FC = () => {
     }
 
     return true;
-  });
+  }), [mediaList, selectedType, selectedGenre, selectedYear, minRating, selectedPlatform, searchQuery]);
 
   // Sort media
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = useMemo(() => [...filtered].sort((a, b) => {
     if (sortBy === 'calificacion') return b.communityRating - a.communityRating;
     if (sortBy === 'anadidas') return b.addedToListCount - a.addedToListCount;
     if (sortBy === 'ano') return b.year - a.year;
     if (sortBy === 'titulo') return a.title.localeCompare(b.title);
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  }), [filtered, sortBy]);
 
   const activeFiltersCount = 
     (selectedGenre !== 'Todos' ? 1 : 0) +

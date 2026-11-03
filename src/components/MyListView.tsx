@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Bookmark, 
   CheckCircle2, 
@@ -154,7 +154,7 @@ export const MyListView: React.FC = () => {
   }
 
   // Filter entries
-  const filteredEntries = myListEntries.filter(({ media, review }) => {
+  const filteredEntries = useMemo(() => myListEntries.filter(({ media, review }) => {
     if (statusFilter !== 'todas' && review.status !== statusFilter) return false;
     if (typeFilter !== 'todos' && media.type !== typeFilter) return false;
     if (searchQuery.trim()) {
@@ -166,10 +166,10 @@ export const MyListView: React.FC = () => {
       if (!matchTitle && !matchDirector && !matchPlatform && !matchCritique) return false;
     }
     return true;
-  });
+  }), [myListEntries, statusFilter, typeFilter, searchQuery]);
 
   // Sort entries
-  const sortedEntries = [...filteredEntries].sort((a, b) => {
+  const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
     if (sortBy === 'estrellas') {
       return (b.review.stars || 0) - (a.review.stars || 0);
     }
@@ -181,7 +181,7 @@ export const MyListView: React.FC = () => {
     }
     // Default: recientes
     return new Date(b.review.updatedAt).getTime() - new Date(a.review.updatedAt).getTime();
-  });
+  }), [filteredEntries, sortBy]);
 
   // Calculate statistics
   const finishedEntries = myListEntries.filter((e) => e.review.status === 'terminada');
