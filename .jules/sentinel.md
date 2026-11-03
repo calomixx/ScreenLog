@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Fix hardcoded TMDB API key
+**Vulnerability:** A hardcoded API key (`TMDB_DEFAULT_KEY`) was present in `server/routes.ts` as a fallback when `TMDB_API_KEY` was missing from the environment.
+**Learning:** Hardcoding credentials exposes them in the source code, which is a critical security risk. The application must fail securely (e.g., returning empty results) rather than relying on hardcoded secrets when environment variables are absent.
+**Prevention:** Never hardcode API keys or secrets in the codebase. Always use environment variables and ensure functions handle the absence of these variables gracefully and securely.
