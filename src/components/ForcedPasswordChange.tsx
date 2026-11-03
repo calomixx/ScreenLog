@@ -123,6 +123,7 @@ export const ForcedPasswordChange: React.FC = () => {
               type="button"
               onClick={() => setShowPasswords((value) => !value)}
               className="text-[11px] font-semibold text-slate-400 hover:text-white flex items-center gap-1.5"
+              aria-label={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
             >
               {showPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               {showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
