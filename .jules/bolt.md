@@ -1,0 +1,3 @@
+## 2024-03-24 - [MediaContext Bottleneck]
+**Learning:** The React app uses a global `MediaContext` that can trigger unnecessary re-renders in consumer components (like CatalogView and MyListView) on simple UI state changes (e.g., modal toggles). Unmemoized filtering and sorting of potentially large arrays of media lists blocks the main thread during these re-renders.
+**Action:** Wrapping expensive operations like array filtering and sorting in `useMemo` is the established pattern to mitigate this bottleneck and prevent main thread blocking when unrelated state changes trigger context updates.
