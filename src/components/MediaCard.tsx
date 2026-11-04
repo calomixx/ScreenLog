@@ -129,11 +129,23 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setSelectedMediaId(media.id);
+    }
+  };
+
   return (
     <div
       ref={cardRef}
       id={`media-card-${media.id}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver detalles de ${media.title}`}
       onClick={() => setSelectedMediaId(media.id)}
+      onKeyDown={handleKeyDown}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
