@@ -79,10 +79,10 @@ const MainAppContent: React.FC = () => {
             <button type="button" onClick={() => setActiveTab('mi_lista')} className="hover:text-white transition-colors">
               Mi Lista
             </button>
-            <button type="button" onClick={() => setActiveTab('landing')} className="hover:text-white transition-colors">
+            <button type="button" onClick={() => setActiveTab('opiniones')} className="hover:text-white transition-colors">
               Opiniones
             </button>
-            <button type="button" onClick={() => setActiveTab('landing')} className="hover:text-white transition-colors">
+            <button type="button" onClick={() => setActiveTab('contacto')} className="hover:text-white transition-colors">
               Contacto
             </button>
           </nav>

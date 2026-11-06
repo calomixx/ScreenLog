@@ -114,6 +114,43 @@ export const Navbar: React.FC = () => {
     setActiveTab(currentUser ? 'sistema' : 'landing');
     setSelectedMediaId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    try { window.history.replaceState(null, '', window.location.pathname); } catch {}
+  };
+
+  const handleTabClick = (tabId: AppTab) => {
+    setSelectedMediaId(null);
+    if (tabId === 'landing' || tabId === 'sistema') {
+      setActiveTab(currentUser ? 'sistema' : 'landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try { window.history.replaceState(null, '', window.location.pathname); } catch {}
+      return;
+    }
+    if (tabId === 'explorar') {
+      setActiveTab('explorar');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try { window.history.replaceState(null, '', '#explorar'); } catch {}
+      return;
+    }
+    if (tabId === 'opiniones') {
+      setActiveTab('opiniones');
+      try { window.history.replaceState(null, '', '#opiniones'); } catch {}
+      const el = document.getElementById('user-testimonials-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+    if (tabId === 'contacto') {
+      setActiveTab('contacto');
+      try { window.history.replaceState(null, '', '#contacto'); } catch {}
+      const el = document.getElementById('contact-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+    setActiveTab(tabId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSearchChange = (value: string) => {
@@ -185,7 +222,7 @@ export const Navbar: React.FC = () => {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabClick(tab.id)}
                     className={`relative inline-flex items-center gap-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
                       isActive
                         ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30 font-bold'
@@ -433,7 +470,7 @@ export const Navbar: React.FC = () => {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabClick(tab.id)}
                   className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap border transition-all ${
                     isActive
                       ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/30 font-bold'
@@ -514,7 +551,7 @@ export const Navbar: React.FC = () => {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
                 className={`relative flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-w-0 transition-colors ${
                   isActive ? 'text-rose-400 bg-rose-600/10' : 'text-slate-500 hover:text-slate-300'
                 }`}
