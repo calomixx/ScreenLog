@@ -352,9 +352,9 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
                 <h2 className="text-base sm:text-lg font-display font-extrabold text-white tracking-tight">
                   Películas Vistas por Género
                 </h2>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-400 group-hover:border-rose-500/40 group-hover:text-rose-300 transition-colors">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-400">
                   <Sparkles className="w-3 h-3 text-amber-400" />
-                  Pasa el cursor para ampliar
+                  Interactivo
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -473,10 +473,10 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
           </div>
         </div>
 
-        {/* Recharts BarChart Area: Compact by default (h-36/h-44), expands to full (h-72/h-80) on hover */}
+        {/* Recharts BarChart Area: Stable responsive height to prevent vertical page jump and jitter */}
         {genreStats.length > 0 ? (
           <div className="space-y-4">
-            <div className="w-full bg-[#0A0A0B]/80 rounded-2xl border border-white/5 p-2.5 sm:p-4 transition-all duration-500 ease-in-out h-36 sm:h-44 group-hover:h-72 sm:group-hover:h-80 relative overflow-hidden">
+            <div className="w-full bg-[#0A0A0B]/80 rounded-2xl border border-white/5 p-3 sm:p-4 h-64 sm:h-72 relative overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={genreStats}

@@ -146,13 +146,15 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
     return () => clearInterval(interval);
   }, [displayList.length, isPaused]);
 
-  // Scroll active thumbnail smoothly into view
+  // Scroll active thumbnail smoothly into view within the horizontal filmstrip container only
   useEffect(() => {
     if (activeThumbRef.current && filmstripRef.current) {
-      activeThumbRef.current.scrollIntoView({
+      const container = filmstripRef.current;
+      const thumb = activeThumbRef.current;
+      const targetLeft = thumb.offsetLeft - (container.clientWidth / 2) + (thumb.clientWidth / 2);
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
         behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest',
       });
     }
   }, [currentIndex, apartado]);

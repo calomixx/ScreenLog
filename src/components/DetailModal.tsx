@@ -127,6 +127,7 @@ export const DetailModal: React.FC = () => {
 
   // Tab scroll position preservation & body scroll-lock
   const contentContainerRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const tabScrollsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -158,13 +159,23 @@ export const DetailModal: React.FC = () => {
       tabScrollsRef.current[activeTab] = contentContainerRef.current.scrollTop;
     }
     setActiveTab(newTab);
-    // Restore saved scroll position without animations or page jumping
+    
+    // Restore saved scroll position smoothly without page jumping
     setTimeout(() => {
       if (contentContainerRef.current) {
-        const targetScroll = tabScrollsRef.current[newTab] || 0;
+        const heroHeight = heroRef.current?.offsetHeight || 220;
+        const currentScroll = contentContainerRef.current.scrollTop;
+        let targetScroll = tabScrollsRef.current[newTab];
+        
+        // If tab hasn't been visited yet, but user already scrolled past the hero,
+        // keep the sticky tabs neatly pinned at top
+        if (targetScroll === undefined) {
+          targetScroll = currentScroll > heroHeight ? heroHeight : 0;
+        }
+        
         contentContainerRef.current.scrollTop = targetScroll;
       }
-    });
+    }, 0);
   };
 
   // Community detailed vote state
@@ -176,24 +187,6 @@ export const DetailModal: React.FC = () => {
     direction: 9
   });
   const [hasVotedDetailed, setHasVotedDetailed] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  // Smooth scroll handler with hysteresis to prevent jump/flicker
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const top = target.scrollTop;
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-    scrollTimeoutRef.current = setTimeout(() => {
-      if (top > 40 && !isScrolled) {
-        setIsScrolled(true);
-      } else if (top < 10 && isScrolled) {
-        setIsScrolled(false);
-      }
-    scrollTimeoutRef.current = null; });
-  };
 
   // Close on Escape key
   useEffect(() => {
@@ -271,7 +264,6 @@ export const DetailModal: React.FC = () => {
       }
       setActiveTab('info');
       setHasVotedDetailed(false);
-      setIsScrolled(false);
       if (contentContainerRef.current) {
         contentContainerRef.current.scrollTop = 0;
       }
@@ -329,89 +321,95 @@ export const DetailModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/90  flex items-start sm:items-center justify-center p-1.5 sm:p-4 md:p-6 ">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/90 flex items-start sm:items-center justify-center p-1.5 sm:p-4 md:p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setSelectedMediaId(null);
+        }
+      }}
+    >
       <div 
         id="detail-modal-container"
-        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90  text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
+        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
       >
-        {/* Modal Header with Backdrop Image - Contracts smoothly on scroll */}
+        {/* Floating Top-Right Action Controls (Close, Share, Admin Edit) - Always accessible */}
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-40 pointer-events-auto">
+          {isCatalogAdmin && (
+            <div className="flex items-center gap-1 bg-black/80 p-1 rounded-full border border-white/20 backdrop-blur-md shadow-lg">
+              <button
+                type="button"
+                onClick={() => openEditMediaModal(selectedMedia)}
+                className="px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                title="Editar ficha en el catálogo"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Editar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-1.5 rounded-full bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500 transition-all"
+                title="Quitar / Eliminar del catálogo"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleShare}
+            className="p-2 sm:p-2.5 rounded-full bg-black/70 hover:bg-white/10 text-slate-200 border border-white/15 backdrop-blur-md shadow-lg transition-colors"
+            title="Copiar enlace"
+          >
+            <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
+          {copiedLink && (
+            <span className="absolute top-10 sm:top-12 right-0 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded shadow">
+              ¡Copiado!
+            </span>
+          )}
+          <button
+            id="detail-modal-close-btn"
+            onClick={() => setSelectedMediaId(null)}
+            className="p-2 sm:p-2.5 rounded-full bg-black/70 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/15 backdrop-blur-md shadow-lg transition-colors"
+            title="Cerrar ventana"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        </div>
+
+        {/* Main Unified Smooth Scroll Container */}
         <div 
-          className={`relative w-full overflow-hidden flex-shrink-0 bg-[#0A0A0B] transition-none ease-in-out ${
-            isScrolled ? 'h-28 sm:h-32' : 'h-48 sm:h-56 md:h-60'
-          }`}
+          ref={contentContainerRef}
+          id="detail-modal-body-content"
+          className="w-full flex-1 overflow-y-auto overscroll-contain bg-[#141416] relative text-slate-100"
         >
-          <img
-            src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
-            alt={selectedMedia.title}
-            className={`w-full h-full object-cover filter transition-none ease-out ${
-              isScrolled ? 'brightness-40' : 'brightness-60'
-            }`}
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/75 to-transparent pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/95 via-[#141416]/50 to-transparent pointer-events-none" />
-
-          {/* Close, Admin Actions & Share Buttons */}
-          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-20">
-            {isCatalogAdmin && (
-              <div className="flex items-center gap-1 bg-black/75 p-1 rounded-full border border-white/20 backdrop-blur-md shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => openEditMediaModal(selectedMedia)}
-                  className="px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 transition-all"
-                  title="Editar ficha en el catálogo"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Editar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="p-1.5 rounded-full bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-500 transition-all"
-                  title="Quitar / Eliminar del catálogo"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={handleShare}
-              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-white/10 text-slate-200 border border-white/10  transition-colors"
-              title="Copiar enlace"
-            >
-              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </button>
-            {copiedLink && (
-              <span className="absolute top-10 sm:top-12 right-0 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded shadow">
-                ¡Copiado!
-              </span>
-            )}
-            <button
-              id="detail-modal-close-btn"
-              onClick={() => setSelectedMediaId(null)}
-              className="p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10  transition-colors"
-              title="Cerrar ventana"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          </div>
-
-          {/* Banner Details (Poster + Title + Basic Info) */}
-          <div className={`absolute left-4 right-4 sm:left-6 sm:right-6 flex items-end gap-3.5 sm:gap-5 z-10 transition-none ${
-            isScrolled ? 'bottom-3 sm:bottom-3.5' : 'bottom-4 sm:bottom-5'
-          }`}>
+          {/* Collapsible Hero Header (Naturally scrolls up and minimizes as user scrolls down) */}
+          <div 
+            ref={heroRef}
+            id="detail-modal-header"
+            className="relative w-full bg-[#0A0A0B] min-h-[200px] sm:min-h-[230px] p-4 sm:p-6 pb-5 flex flex-col justify-end"
+          >
+            {/* Backdrop Image */}
             <img
-              src={selectedMedia.posterUrl}
+              src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
               alt={selectedMedia.title}
-              className={`aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 transition-none ease-out hover:scale-105 hover:shadow-2xl hover:shadow-rose-950/80 hover:border-rose-500/50 cursor-pointer ${
-                isScrolled ? 'w-12 sm:w-16' : 'w-20 sm:w-28 md:w-32'
-              }`}
+              className="absolute inset-0 w-full h-full object-cover filter brightness-40 pointer-events-none"
               referrerPolicy="no-referrer"
             />
-            <div className="flex-1 min-w-0 pb-0.5">
-              {!isScrolled && (
-                <div className="flex flex-wrap items-center gap-2 mb-1.5 overflow-hidden transition-none">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/85 to-[#0A0A0B]/60 pointer-events-none" />
+
+            {/* Banner Details (Poster + Title + Status Selector) */}
+            <div className="relative z-10 flex items-start sm:items-end gap-3.5 sm:gap-5 pt-8 sm:pt-6 pr-24 sm:pr-40">
+              <img
+                src={selectedMedia.posterUrl}
+                alt={selectedMedia.title}
+                className="aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 w-20 sm:w-28 md:w-32"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
                     {selectedMedia.type}
                   </span>
@@ -423,38 +421,32 @@ export const DetailModal: React.FC = () => {
                     <span className="text-xs text-slate-400">• {selectedMedia.duration}</span>
                   )}
                 </div>
-              )}
 
-              <h2 className={`font-display font-extrabold text-white truncate transition-none leading-tight ${
-                isScrolled ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl md:text-3xl'
-              }`}>
-                {selectedMedia.title}
-              </h2>
+                <h2 className="font-display font-extrabold text-white text-lg sm:text-2xl md:text-3xl leading-snug break-words">
+                  {selectedMedia.title}
+                </h2>
 
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-300 flex-wrap">
-                <span className="whitespace-nowrap overflow-hidden">
-                  Dir: <strong className="text-white">{selectedMedia.director}</strong>
-                </span>
-                {selectedMedia.communityVotesCount > 0 ? (
-                  <div className="flex items-center gap-1 text-amber-400 font-bold">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" />
-                    <span>{selectedMedia.communityRating.toFixed(1)}</span>
-                    {!isScrolled && (
+                <div className="flex items-center gap-3 mt-1 text-xs text-slate-300 flex-wrap">
+                  <span className="whitespace-nowrap overflow-hidden">
+                    Dir: <strong className="text-white">{selectedMedia.director}</strong>
+                  </span>
+                  {selectedMedia.communityVotesCount > 0 ? (
+                    <div className="flex items-center gap-1 text-amber-400 font-bold">
+                      <Star className="w-3.5 h-3.5 fill-amber-400" />
+                      <span>{selectedMedia.communityRating.toFixed(1)}</span>
                       <span className="text-slate-400 text-[11px] overflow-hidden whitespace-nowrap hidden sm:inline">
                         ({selectedMedia.communityVotesCount.toLocaleString()} votos)
                       </span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-slate-400 text-[11px] font-medium">Sin valoraciones</span>
-                )}
-              </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 text-[11px] font-medium">Sin valoraciones</span>
+                  )}
+                </div>
 
-              {!isScrolled && (
-                /* Status Action Selector integrated into movie header */
+                {/* Status Action Selector integrated into movie header */}
                 <div 
                   id="detail-modal-status-selector"
-                  className="mt-3 flex items-center gap-1.5 group/status transition-none"
+                  className="mt-2.5 sm:mt-3 flex items-center gap-1.5 flex-wrap group/status"
                 >
                   <span className="text-xs font-semibold text-slate-300 mr-1 hidden sm:inline select-none drop-shadow">
                     Tu estado:
@@ -475,22 +467,22 @@ export const DetailModal: React.FC = () => {
                             ? `${item.label} (activo • clic para desmarcar)` 
                             : `Marcar como ${item.label}`
                         }
-                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-none ease-out  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
+                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
                           isSelected
-                            ? `${item.activeClass} px-3 py-1.5 scale-100 z-10 border ${item.activeBorder}`
+                            ? `${item.activeClass} px-3 py-1.5 z-10 border ${item.activeBorder}`
                             : isShrunk
                               ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} hover:px-3 hover:bg-black/80`
                               : `px-3 py-1.5 text-slate-200 bg-black/60 border border-white/15 ${item.hoverColor} hover:bg-black/80`
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`} />
+                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'scale-110' : ''}`} />
                         <span
-                          className={`whitespace-nowrap overflow-hidden transition-none ease-out ${
+                          className={`whitespace-nowrap overflow-hidden ${
                             isSelected
                               ? 'max-w-[140px] opacity-100 ml-1.5'
-                            : isShrunk
-                              ? 'max-w-0 opacity-0 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
-                              : 'max-w-[120px] opacity-100 ml-1.5'
+                              : isShrunk
+                                ? 'max-w-0 opacity-0 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
+                                : 'max-w-[120px] opacity-100 ml-1.5'
                           }`}
                         >
                           {displayLabel}
@@ -507,94 +499,91 @@ export const DetailModal: React.FC = () => {
                     );
                   })}
                 </div>
-              )}
-
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Dedicated Modal Navigation Tabs Menu - 100% visible, clean, unobstructed */}
-        <div 
-          id="detail-modal-tabs-menu"
-          className="border-b border-white/10 bg-[#0E0E10] px-4 sm:px-6 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar select-none"
-        >
-          <button
-            onClick={() => setActiveTab('info')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'info' 
-                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
+          {/* Sticky Navigation Tabs Menu - Sticks firmly to top-0 when user scrolls down */}
+          <div 
+            id="detail-modal-tabs-menu"
+            className="sticky top-0 z-30 bg-[#0E0E10]/95 backdrop-blur-md border-y border-white/10 px-4 sm:px-6 py-2 sm:py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar select-none pr-28 sm:pr-40 shadow-lg shadow-black/60"
           >
-            <Film className="w-4 h-4 text-rose-400 flex-shrink-0" />
-            <span>Sinopsis</span>
-          </button>
+            <button
+              onClick={() => handleTabChange('info')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'info' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Film className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <span>Sinopsis</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('resena')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'resena' 
-                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
+            <button
+              onClick={() => handleTabChange('resena')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'resena' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Edit3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span>Mi Reseña</span>
+              {currentReview?.status === 'terminada' && (
+                <span className="text-amber-400 text-xs">⭐</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => handleTabChange('votaciones')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'votaciones' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Sliders className="w-4 h-4 text-sky-400 flex-shrink-0" />
+              <span>Votación Detallada</span>
+            </button>
+
+            <button
+              id="watch-tab-btn"
+              onClick={() => handleTabChange('donde_ver')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'donde_ver' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Tv className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>Dónde Ver</span>
+              {selectedMedia.watchProviders && selectedMedia.watchProviders.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              )}
+            </button>
+
+            <button
+              onClick={() => handleTabChange('comentarios')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'comentarios' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <span>Comentarios</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-white/10 text-slate-300 font-bold">
+                {selectedMedia.comments.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Tab Body Content Area */}
+          <div 
+            id="detail-modal-tab-content-wrapper"
+            className="p-5 sm:p-7 relative text-slate-100"
           >
-            <Edit3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <span>Mi Reseña</span>
-            {currentReview?.status === 'terminada' && (
-              <span className="text-amber-400 text-xs">⭐</span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('votaciones')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'votaciones' 
-                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <Sliders className="w-4 h-4 text-sky-400 flex-shrink-0" />
-            <span>Votación Detallada</span>
-          </button>
-
-          <button
-            id="watch-tab-btn"
-            onClick={() => setActiveTab('donde_ver')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'donde_ver' 
-                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <Tv className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span>Dónde Ver</span>
-            {selectedMedia.watchProviders && selectedMedia.watchProviders.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('comentarios')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'comentarios' 
-                ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <span>Comentarios</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-white/10 text-slate-300 font-bold">
-              {selectedMedia.comments.length}
-            </span>
-          </button>
-        </div>
-
-        {/* Tab Body Content Area (Selector 2) */}
-        <div 
-          id="detail-modal-body-content"
-          className="p-5 sm:p-7 overflow-y-auto flex-1 bg-[#141416] relative text-slate-100"
-          onScroll={handleScroll}
-        >
           
           {/* TAB 1: SINOPSIS & FICHA TÉCNICA */}
           {activeTab === 'info' && (
@@ -1175,6 +1164,7 @@ export const DetailModal: React.FC = () => {
             <WatchProvidersTab media={selectedMedia} />
           )}
 
+          </div>
         </div>
 
         {/* DIÁLOGO DE CONFIRMACIÓN PARA ELIMINAR DEL CATÁLOGO */}
