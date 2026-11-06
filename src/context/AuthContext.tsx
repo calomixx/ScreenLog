@@ -1,6 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { UserProfile, Role } from '../types';
 import { apiRequest, ApiError, setStoredAuthToken } from '../lib/api';
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  syncFirebaseUserProfile,
+} from '../lib/firebase';
 
 export type { Role };
 
@@ -103,12 +111,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export interface AuthContextType {
   loading: boolean;
+  isAuthReady: boolean;
   needsSetup: boolean;
   currentUser: UserAccount | null;
   sessionInfo: SessionInfo | null;
   isGuest: boolean;
   settings: PublicSettings;
   login: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
+  loginWithGoogle: () => Promise<AuthResult>;
   register: (data: { name: string; username?: string; email: string; password: string; avatar?: string }) => Promise<AuthResult>;
   setupOwner: (data: { name: string; username?: string; email: string; password: string }) => Promise<AuthResult>;
   logout: () => Promise<void>;
@@ -123,6 +133,7 @@ export interface AuthContextType {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
@@ -180,6 +191,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { cancelled = true; };
   }, [applyStatus]);
 
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setIsAuthReady(true);
+      if (fbUser && fbUser.emailVerified) {
+        try {
+          await syncFirebaseUserProfile(fbUser);
+        } catch (err) {
+          console.error('Error syncing Firebase user profile:', err);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
   const login = useCallback(async (identifier: string, password: string, remember = false): Promise<AuthResult> => {
     try {
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
@@ -214,6 +239,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: error.message, code: error.code };
       }
       return { success: false, message: 'No se pudo iniciar sesión. Inténtalo de nuevo.' };
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const fbUser = credential.user;
+      if (fbUser && fbUser.emailVerified) {
+        try {
+          await syncFirebaseUserProfile(fbUser);
+        } catch (err) {
+          console.error('Firestore profile sync warning:', err);
+        }
+      }
+      const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
+        '/api/auth/google',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            uid: fbUser.uid,
+            email: fbUser.email || '',
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cinéfilo',
+            avatar: fbUser.photoURL || '',
+          }),
+        },
+      );
+      if (response.data.token) {
+        setStoredAuthToken(response.data.token);
+      }
+      setCurrentUser(response.data.user);
+      setSessionInfo(response.data.session);
+      setIsGuest(false);
+      setNeedsSetup(false);
+      try { sessionStorage.removeItem('screenlog_guest'); } catch {}
+      return { success: true };
+    } catch (error: any) {
+      if (error instanceof ApiError) {
+        return { success: false, message: error.message, code: error.code };
+      }
+      if (error?.code === 'auth/popup-closed-by-user') {
+        return { success: false, message: 'Cerraste la ventana de inicio de sesión con Google.' };
+      }
+      return { success: false, message: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.' };
     }
   }, []);
 
@@ -278,6 +346,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // local state is cleared regardless
     }
+    try {
+      await firebaseSignOut(auth);
+    } catch {}
     setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
@@ -291,6 +362,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // local state is cleared regardless
     }
+    try {
+      await firebaseSignOut(auth);
+    } catch {}
     setStoredAuthToken(null);
     setCurrentUser(null);
     setSessionInfo(null);
@@ -321,6 +395,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify(data),
       });
       setCurrentUser(response.data.user);
+      if (auth.currentUser && auth.currentUser.emailVerified) {
+        try {
+          await syncFirebaseUserProfile(auth.currentUser, response.data.user);
+        } catch (err) {
+          console.error('Error updating Firestore user profile:', err);
+        }
+      }
       return { success: true };
     } catch (error) {
       if (error instanceof ApiError) {
@@ -345,12 +426,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = useMemo<AuthContextType>(() => ({
     loading,
+    isAuthReady,
     needsSetup,
     currentUser,
     sessionInfo,
     isGuest,
     settings,
     login,
+    loginWithGoogle,
     register,
     setupOwner,
     logout,
@@ -363,12 +446,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearErrorState,
   }), [
     loading,
+    isAuthReady,
     needsSetup,
     currentUser,
     sessionInfo,
     isGuest,
     settings,
     login,
+    loginWithGoogle,
     register,
     setupOwner,
     logout,

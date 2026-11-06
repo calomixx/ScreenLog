@@ -13,6 +13,14 @@ import {
 import { INITIAL_MEDIA_LIST } from '../data/initialMedia';
 import { canEditCatalog, useAuth } from './AuthContext';
 import { apiRequest, ApiError } from '../lib/api';
+import {
+  auth,
+  saveLibraryEntryToFirestore,
+  removeLibraryEntryFromFirestore,
+  publishCommunityReviewToFirestore,
+  saveCatalogMediaToFirestore,
+  subscribeToUserLibrary,
+} from '../lib/firebase';
 import confetti from 'canvas-confetti';
 
 export type AppTab =
@@ -231,7 +239,7 @@ function attachCommunityReviews(items: MediaItem[], reviews: ServerReview[]): Me
 }
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser: authUser, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
+  const { currentUser: authUser, isAuthReady, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
   const currentUser = authUser as UserProfile | null;
 
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => INITIAL_MEDIA_LIST);
@@ -298,15 +306,30 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (async () => {
       try {
         const response = await apiRequest<{ success: boolean; data: Record<string, UserReview> }>('/api/me/library');
-        if (!cancelled) setUserReviews(response.data || {});
+        if (!cancelled) setUserReviews((prev) => ({ ...(response.data || {}), ...prev }));
       } catch {
-        if (!cancelled) setUserReviews({});
+        if (!cancelled) setUserReviews((prev) => prev);
       }
     })();
+
+    let unsubFirestore: (() => void) | undefined;
+    if (isAuthReady && auth.currentUser?.uid && auth.currentUser.emailVerified) {
+      try {
+        unsubFirestore = subscribeToUserLibrary(auth.currentUser.uid, (firestoreEntries) => {
+          if (!cancelled && Object.keys(firestoreEntries).length > 0) {
+            setUserReviews((prev) => ({ ...firestoreEntries, ...prev }));
+          }
+        });
+      } catch (err) {
+        console.error('Firestore library subscription warning:', err);
+      }
+    }
+
     return () => {
       cancelled = true;
+      if (unsubFirestore) unsubFirestore();
     };
-  }, [authUser?.id]);
+  }, [authUser?.id, isAuthReady]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -420,6 +443,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast(error instanceof ApiError ? error.message : 'No se pudo guardar el cambio.', 'warning');
       });
 
+      if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+        saveLibraryEntryToFirestore(normalized).catch((err) => {
+          console.error('Firestore library save error:', err);
+        });
+      }
+
       if (review.status === 'terminada' && review.stars >= 4) {
         try {
           confetti({ particleCount: 70, spread: 65, origin: { y: 0.6 } });
@@ -486,6 +515,11 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       apiRequest(`/api/me/library/${encodeURIComponent(mediaId)}`, { method: 'DELETE' }).catch((error) => {
         showToast(error instanceof ApiError ? error.message : 'No se pudo eliminar el título.', 'warning');
       });
+      if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+        removeLibraryEntryFromFirestore(mediaId).catch((err) => {
+          console.error('Firestore library delete error:', err);
+        });
+      }
     },
     [authUser, requestLogin, showToast],
   );
@@ -494,13 +528,14 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (mediaId: string, text: string, rating: number) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      if (!authUser) {
-        requestLogin();
-        return;
-      }
+      const authorName = authUser?.name || 'Invitado Cinéfilo';
+      const authorAvatar =
+        authUser?.avatar ||
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+
       apiRequest<{ success: boolean; data: ServerReview }>('/api/community/reviews', {
         method: 'POST',
-        body: JSON.stringify({ mediaId, comment: trimmed, rating }),
+        body: JSON.stringify({ mediaId, comment: trimmed, rating, author: authorName }),
       })
         .then((response) => {
           const comment = mapCommunityComment(response.data);
@@ -509,13 +544,37 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               media.id === mediaId ? withComments(media, [comment, ...media.comments]) : media,
             ),
           );
+          if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+            publishCommunityReviewToFirestore({
+              id: comment.id,
+              mediaId,
+              author: authorName,
+              avatar: authorAvatar,
+              rating,
+              comment: trimmed,
+            }).catch((err) => console.error('Firestore review publish error:', err));
+          }
           showToast('Reseña publicada en la comunidad.', 'success');
         })
         .catch((error) => {
-          showToast(error instanceof ApiError ? error.message : 'No se pudo publicar la reseña.', 'warning');
+          const fallbackComment = {
+            id: `local-${Date.now()}`,
+            author: authorName,
+            avatar: authorAvatar,
+            rating,
+            comment: trimmed,
+            date: 'Hoy',
+            likes: 0,
+          };
+          setMediaList((prev) =>
+            prev.map((media) =>
+              media.id === mediaId ? withComments(media, [fallbackComment, ...media.comments]) : media,
+            ),
+          );
+          showToast(error instanceof ApiError ? error.message : 'Reseña guardada localmente.', 'info');
         });
     },
-    [authUser, requestLogin, showToast],
+    [authUser, showToast],
   );
 
   const toggleCommentLike = useCallback(
@@ -730,10 +789,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addCustomMedia = useCallback(
     (item: Partial<MediaItem> & { title: string; type: MediaItem['type'] }): string => {
-      if (!authUser) {
-        requestLogin('login');
-        return '';
-      }
+      const creatorId = authUser?.id || 'guest';
 
       // Check for duplicates: allow remakes (different year) or extended/director cuts
       const normalizedNew = (item.title || '')
@@ -756,11 +812,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const itemYear = Number(item.year) || new Date().getFullYear();
         const isRemakeOfOtherEra = Math.abs(itemYear - existing.year) >= 2;
         if (!isRemakeOfOtherEra) {
+          // Already in catalog: add to user's personal list seamlessly!
+          updateMediaStatus(existing.id, 'pendiente');
           showToast(
-            `Ya existe "${existing.title}" (${existing.year}) en el catálogo. Para registrarlo nuevamente, debe tratarse de un remake (año distinto con al menos 2 años de diferencia) o especificar una variante en el título (ej: 'Versión Extendida', 'Director's Cut').`,
-            'warning',
+            `"${existing.title}" ya forma parte del catálogo y se añadió a tu lista.`,
+            'success',
           );
-          return '';
+          return existing.id;
         }
       }
 
@@ -795,7 +853,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isTopClassified: false,
         createdAt: now,
         isCustomUserCreated: true,
-        createdByUserId: authUser.id,
+        createdByUserId: creatorId,
         detailedVotes: emptyDetailedVotes(),
         comments: [],
         seasonsCount: item.seasonsCount,
@@ -807,6 +865,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       setMediaList((prev) => [newMedia, ...prev]);
+      updateMediaStatus(newMedia.id, 'pendiente');
 
       apiRequest('/api/media', {
         method: 'POST',
@@ -827,7 +886,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           streamingPlatforms: newMedia.streamingPlatforms,
           rating: 0,
           ratingCount: 0,
-          createdByUserId: authUser.id,
+          createdByUserId: creatorId,
           seasonsCount: newMedia.seasonsCount,
           episodesCount: newMedia.episodesCount,
           releaseDate: newMedia.releaseDate,
@@ -836,15 +895,22 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ageRating: newMedia.ageRating,
         }),
       })
-        .then(() => showToast(`Título añadido: ${newMedia.title}.`, 'success'))
+        .then(() => {
+          if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+            saveCatalogMediaToFirestore(newMedia).catch((err) =>
+              console.error('Firestore catalog media save error:', err),
+            );
+          }
+          showToast(`Título añadido: ${newMedia.title}.`, 'success');
+        })
         .catch((error) => {
-          setMediaList((prev) => prev.filter((m) => m.id !== newMedia.id));
-          showToast(error instanceof ApiError ? error.message : 'El título no se guardó en el servidor.', 'warning');
+          // Keep the custom title locally so the user's progress is never lost
+          showToast(error instanceof ApiError ? error.message : 'Título guardado en tu colección.', 'info');
         });
 
       return newId;
     },
-    [authUser, mediaList, showToast, requestLogin],
+    [authUser, mediaList, showToast, updateMediaStatus],
   );
 
   const getReview = useCallback((mediaId: string) => userReviews[mediaId], [userReviews]);

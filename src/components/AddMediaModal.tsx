@@ -51,6 +51,8 @@ export const AddMediaModal: React.FC = () => {
     addCustomMedia, 
     setSelectedMediaId,
     mediaList,
+    updateMediaStatus,
+    showToast,
   } = useMedia();
 
   const [title, setTitle] = useState('');
@@ -314,9 +316,13 @@ export const AddMediaModal: React.FC = () => {
     if (!title.trim()) return;
 
     if (duplicateWarning) {
-      setAutofillError(
-        `Ya existe "${duplicateWarning.title}" (${duplicateWarning.year}) en el catálogo. Si se trata de un remake de otro año o una versión extendida / director's cut, indícalo en el título (ej: '${duplicateWarning.title} (Versión Extendida)').`,
+      updateMediaStatus(duplicateWarning.id, 'pendiente');
+      showToast(
+        `"${duplicateWarning.title}" (${duplicateWarning.year}) ya forma parte del catálogo y se añadió a tu lista.`,
+        'success',
       );
+      setIsAddModalOpen(false);
+      setSelectedMediaId(duplicateWarning.id);
       return;
     }
 
@@ -394,7 +400,7 @@ export const AddMediaModal: React.FC = () => {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
+        <form id="add-media-form" onSubmit={handleSubmit} className="p-6 pb-8 overflow-y-auto space-y-6 flex-1">
           
           {/* Main Info with AI Autofill */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -983,23 +989,25 @@ export const AddMediaModal: React.FC = () => {
             />
           </div>
 
-          {/* Footer Submit */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(false)}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-rose-900/30 active:scale-95 transition-all"
-            >
-              Publicar Título y Añadir a Mi Lista
-            </button>
-          </div>
         </form>
+
+        {/* Pinned Modal Footer */}
+        <div className="px-6 py-4 border-t border-white/10 bg-[#0A0A0B] flex items-center justify-end gap-3 flex-shrink-0 z-20">
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(false)}
+            className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="add-media-form"
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-rose-900/30 active:scale-95 transition-all"
+          >
+            Publicar Título y Añadir a Mi Lista
+          </button>
+        </div>
       </div>
     </div>
   );

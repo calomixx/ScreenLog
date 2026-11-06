@@ -1,0 +1,295 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public profile information for a ScreenLog user without sensitive PII.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique handle of the user.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Avatar URL for the user profile.",
+          "maxLength": 1000
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short biography of the cinephile.",
+          "maxLength": 500
+        },
+        "city": {
+          "type": "string",
+          "description": "City or region.",
+          "maxLength": 120
+        },
+        "favoriteGenres": {
+          "type": "array",
+          "description": "Bounded list of favorite genres (max 10)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last update."
+        }
+      },
+      "required": ["userId", "name", "username", "avatar", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Strictly isolated PII (email) for the user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address of the user.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp."
+        }
+      },
+      "required": ["userId", "email", "createdAt", "updatedAt"]
+    },
+    "UserLibraryEntry": {
+      "title": "UserLibraryEntry",
+      "description": "Personal media tracking entry in a user's watchlist/library.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mediaId": {
+          "type": "string",
+          "description": "Identifier of the media item.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "description": "Watch status of the media item.",
+          "enum": ["pendiente", "en_proceso", "terminada"]
+        },
+        "personalRating": {
+          "type": "number",
+          "description": "Personal rating from 0 to 5."
+        },
+        "rewatch": {
+          "type": "string",
+          "description": "Rewatch preference.",
+          "enum": ["si", "tal_vez", "no", "sin_definir"]
+        },
+        "liked": {
+          "type": "boolean",
+          "description": "Whether the user marked this title as favorite."
+        },
+        "personalComment": {
+          "type": "string",
+          "description": "Private personal notes.",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp."
+        }
+      },
+      "required": ["userId", "mediaId", "status", "personalRating", "rewatch", "liked", "personalComment", "createdAt", "updatedAt"]
+    },
+    "CommunityReview": {
+      "title": "CommunityReview",
+      "description": "Public community review and rating for a catalog media item.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the review author.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mediaId": {
+          "type": "string",
+          "description": "ID of the reviewed media item.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "author": {
+          "type": "string",
+          "description": "Display name of the review author.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Avatar URL of the author.",
+          "maxLength": 1000
+        },
+        "rating": {
+          "type": "number",
+          "description": "Score from 1 to 5."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Review text content.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "likes": {
+          "type": "number",
+          "description": "Number of community likes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update server timestamp."
+        }
+      },
+      "required": ["userId", "mediaId", "author", "avatar", "rating", "comment", "likes", "createdAt", "updatedAt"]
+    },
+    "CatalogMediaItem": {
+      "title": "CatalogMediaItem",
+      "description": "Custom or curated media catalog entry.",
+      "type": "object",
+      "properties": {
+        "authorId": {
+          "type": "string",
+          "description": "UID of the user who created or updated the item.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the movie or series.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "type": {
+          "type": "string",
+          "description": "Media type category.",
+          "enum": ["pelicula", "serie", "anime", "documental"]
+        },
+        "year": {
+          "type": "number",
+          "description": "Release year."
+        },
+        "director": {
+          "type": "string",
+          "description": "Director or creator.",
+          "maxLength": 120
+        },
+        "synopsis": {
+          "type": "string",
+          "description": "Plot summary.",
+          "maxLength": 2000
+        },
+        "posterUrl": {
+          "type": "string",
+          "description": "Poster image URL.",
+          "maxLength": 1000
+        },
+        "backdropUrl": {
+          "type": "string",
+          "description": "Backdrop image URL.",
+          "maxLength": 1000
+        },
+        "duration": {
+          "type": "string",
+          "description": "Formatted runtime or season count.",
+          "maxLength": 60
+        },
+        "defaultPlatform": {
+          "type": "string",
+          "description": "Primary streaming platform.",
+          "maxLength": 80
+        },
+        "genres": {
+          "type": "array",
+          "description": "Bounded list of genres (max 10)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update server timestamp."
+        }
+      },
+      "required": ["authorId", "title", "type", "year", "director", "synopsis", "posterUrl", "backdropUrl", "duration", "defaultPlatform", "genres", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users_public/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Publicly readable user profiles without PII."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Strictly isolated private user PII (email) readable only by owner or admin."
+    },
+    "/user_library/{entryId}": {
+      "schema": { "$ref": "#/entities/UserLibraryEntry" },
+      "description": "Personal media tracking items owned by a specific user."
+    },
+    "/community_reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/CommunityReview" },
+      "description": "Community reviews and ratings on catalog titles."
+    },
+    "/catalog_media/{mediaId}": {
+      "schema": { "$ref": "#/entities/CatalogMediaItem" },
+      "description": "Shared catalog media items created or curated by users and admins."
+    }
+  }
+}

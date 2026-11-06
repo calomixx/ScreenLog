@@ -1,0 +1,263 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'cmigueltorrealba03@gmail.com'
+      );
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidUserPublicProfile(data, userId) {
+      return data.keys().hasAll(['userId', 'name', 'username', 'avatar', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'name', 'username', 'avatar', 'bio', 'city', 'favoriteGenres', 'updatedAt']) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.userId == request.auth.uid &&
+        data.userId == userId &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+        data.username is string && data.username.size() >= 1 && data.username.size() <= 40 &&
+        data.avatar is string && data.avatar.size() <= 1000 &&
+        (!('bio' in data) || (data.bio is string && data.bio.size() <= 500)) &&
+        (!('city' in data) || (data.city is string && data.city.size() <= 120)) &&
+        (!('favoriteGenres' in data) || (
+          data.favoriteGenres is list &&
+          data.favoriteGenres.size() <= 10 &&
+          (data.favoriteGenres.size() == 0 || (data.favoriteGenres[0] is string && data.favoriteGenres[0].size() <= 40))
+        )) &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.userId == request.auth.uid &&
+        data.userId == userId &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidUserLibraryEntry(data) {
+      return data.keys().hasAll(['userId', 'mediaId', 'status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'mediaId', 'status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.userId == request.auth.uid &&
+        data.mediaId is string && data.mediaId.size() >= 1 && data.mediaId.size() <= 128 &&
+        data.mediaId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.status is string && data.status.size() <= 20 &&
+        data.status in ['pendiente', 'en_proceso', 'terminada'] &&
+        data.personalRating is number && data.personalRating >= 0 && data.personalRating <= 5 &&
+        data.rewatch is string && data.rewatch.size() <= 20 &&
+        data.rewatch in ['si', 'tal_vez', 'no', 'sin_definir'] &&
+        data.liked is bool &&
+        data.personalComment is string && data.personalComment.size() <= 2000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidCommunityReview(data) {
+      return data.keys().hasAll(['userId', 'mediaId', 'author', 'avatar', 'rating', 'comment', 'likes', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'mediaId', 'author', 'avatar', 'rating', 'comment', 'likes', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.mediaId is string && data.mediaId.size() >= 1 && data.mediaId.size() <= 128 &&
+        data.mediaId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.author is string && data.author.size() >= 1 && data.author.size() <= 80 &&
+        data.avatar is string && data.avatar.size() <= 1000 &&
+        data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+        data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 2000 &&
+        data.likes is int && data.likes >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidCatalogMediaItem(data) {
+      return data.keys().hasAll(['authorId', 'title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['authorId', 'title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'createdAt', 'updatedAt']) &&
+        data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+        data.authorId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+        data.type is string && data.type.size() <= 20 &&
+        data.type in ['pelicula', 'serie', 'anime', 'documental'] &&
+        data.year is int && data.year >= 1888 && data.year <= 2100 &&
+        data.director is string && data.director.size() <= 120 &&
+        data.synopsis is string && data.synopsis.size() <= 2000 &&
+        data.posterUrl is string && data.posterUrl.size() <= 1000 &&
+        data.backdropUrl is string && data.backdropUrl.size() <= 1000 &&
+        data.duration is string && data.duration.size() <= 60 &&
+        data.defaultPlatform is string && data.defaultPlatform.size() <= 80 &&
+        data.genres is list && data.genres.size() >= 1 && data.genres.size() <= 10 &&
+        data.genres[0] is string && data.genres[0].size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    // 4. Collection Rules
+
+    // Admins lookup collection (read-only for owner/admin, system-managed)
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list, create, update, delete: if false;
+    }
+
+    // Public User Profiles (No PII)
+    match /users_public/{userId} {
+      allow get: if isValidId(userId) && existing().userId == userId;
+      allow list: if isSignedIn() && existing().userId is string;
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserPublicProfile(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUserPublicProfile(incoming(), userId) && (
+        isAdmin() ||
+        (
+          incoming().userId == existing().userId &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'username', 'avatar', 'bio', 'city', 'favoriteGenres', 'updatedAt'])
+        )
+      );
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      // Strictly isolated Private User Info (PII: email)
+      match /private/{docId} {
+        allow read, write: if false;
+      }
+    }
+
+    // Isolated Private User PII Collection
+    match /users/{userId}/private/{docId} {
+      allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin()) &&
+        exists(/databases/$(database)/documents/users_public/$(userId));
+      allow list: if false;
+      allow create: if isOwner(userId) && isValidId(userId) && isValidId(docId) && docId == 'info' &&
+        isValidUserPrivateInfo(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        existsAfter(/databases/$(database)/documents/users_public/$(userId));
+      allow update: if isOwner(userId) && isValidId(userId) && isValidId(docId) && docId == 'info' &&
+        isValidUserPrivateInfo(incoming(), userId) &&
+        exists(/databases/$(database)/documents/users_public/$(userId)) && (
+          isAdmin() ||
+          (
+            incoming().userId == existing().userId &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+    }
+
+    // Personal User Library Entries
+    match /user_library/{entryId} {
+      allow get: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(entryId) &&
+        isValidUserLibraryEntry(incoming()) &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
+      allow update: if isVerifiedUser() && isValidId(entryId) &&
+        isValidUserLibraryEntry(incoming()) && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid &&
+            incoming().userId == existing().userId &&
+            incoming().mediaId == existing().mediaId &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Public Community Reviews
+    match /community_reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && existing().rating >= 1;
+      allow list: if existing().rating >= 1 && existing().rating <= 5;
+      allow create: if isVerifiedUser() && isValidId(reviewId) &&
+        isValidCommunityReview(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().likes == 0 &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
+      allow update: if isVerifiedUser() && isValidId(reviewId) &&
+        isValidCommunityReview(incoming()) && (
+          isAdmin() ||
+          // Action 1: Author edits their own review text or rating
+          (
+            existing().userId == request.auth.uid &&
+            incoming().userId == existing().userId &&
+            incoming().mediaId == existing().mediaId &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().likes == existing().likes &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['author', 'avatar', 'rating', 'comment', 'updatedAt'])
+          ) ||
+          // Action 2: Verified user increments/decrements likes by 1
+          (
+            incoming().userId == existing().userId &&
+            incoming().mediaId == existing().mediaId &&
+            incoming().author == existing().author &&
+            incoming().avatar == existing().avatar &&
+            incoming().rating == existing().rating &&
+            incoming().comment == existing().comment &&
+            incoming().createdAt == existing().createdAt &&
+            (incoming().likes == existing().likes + 1 || incoming().likes == existing().likes - 1) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(reviewId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Shared Catalog Media Items
+    match /catalog_media/{mediaId} {
+      allow get: if isValidId(mediaId) && existing().year >= 1888;
+      allow list: if existing().year >= 1888 && existing().year <= 2100;
+      allow create: if isVerifiedUser() && isValidId(mediaId) &&
+        isValidCatalogMediaItem(incoming()) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
+      allow update: if isVerifiedUser() && isValidId(mediaId) &&
+        isValidCatalogMediaItem(incoming()) && (
+          isAdmin() ||
+          (
+            existing().authorId == request.auth.uid &&
+            incoming().authorId == existing().authorId &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(mediaId) && isAdmin();
+    }
+  }
+}

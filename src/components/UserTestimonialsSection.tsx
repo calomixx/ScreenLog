@@ -95,9 +95,9 @@ export const UserTestimonialsSection: React.FC = () => {
       const item = response.data;
       const newComment: SiteComment = {
         id: String(item.id),
-        userName: item.userName || currentUser.name,
-        userAvatar: item.userAvatar || currentUser.avatar,
-        userRole: item.userRole || currentUser.role,
+        userName: item.userName || currentUser?.name || 'Cinéfilo',
+        userAvatar: item.userAvatar || currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        userRole: item.userRole || currentUser?.role || 'user',
         rating: Number(item.rating) || selectedRating,
         highlightFeature: item.highlightFeature || selectedFeature,
         content: item.content || commentText.trim(),

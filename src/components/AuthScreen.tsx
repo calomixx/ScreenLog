@@ -37,7 +37,7 @@ const inputClass =
   'w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 focus:outline-none transition-colors';
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' }) => {
-  const { login, register, settings, continueAsGuest } = useAuth();
+  const { login, loginWithGoogle, register, settings, continueAsGuest } = useAuth();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +80,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
     const result = await login(loginIdentifier.trim(), loginPassword, remember);
     setSubmitting(false);
     if (!result.success) setError(result.message || 'No se pudo iniciar sesión.');
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setSubmitting(true);
+    const result = await loginWithGoogle();
+    setSubmitting(false);
+    if (!result.success) setError(result.message || 'No se pudo iniciar sesión con Google.');
   };
 
   const handleRegister = async (event: React.FormEvent) => {
@@ -362,6 +370,39 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                     {submitting ? 'Entrando...' : 'Entrar a ScreenLog'}
+                  </button>
+
+                  <div className="relative flex items-center justify-center py-1">
+                    <div className="border-t border-white/10 w-full" />
+                    <span className="bg-[#141416] px-3 text-[11px] uppercase tracking-wider text-slate-500">o</span>
+                    <div className="border-t border-white/10 w-full" />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={submitting}
+                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2.5"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        fill="#EA4335"
+                        d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"
+                      />
+                      <path
+                        fill="#4285F4"
+                        d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 12.3s.6 3.3 1.6 5.3l3.7-2.8z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.8C3.5 19.9 7.4 23 12 23z"
+                      />
+                    </svg>
+                    Continuar con Google
                   </button>
                 </form>
               )}

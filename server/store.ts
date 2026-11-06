@@ -197,6 +197,57 @@ function emptyStore(): StoreData {
 let cache: StoreData | null = null;
 let writeChain: Promise<void> = Promise.resolve();
 
+function getDefaultUsers(): StoredUser[] {
+  return [
+    {
+      id: 'usr_daemon_owner',
+      name: 'Daemon',
+      username: 'daemon',
+      email: 'daemon@screenlog.app',
+      passwordHash: '5f1098c60eb76f94feb3183efd4aeaf24f3d04083769ebd2fdc19fc236b8837a0c2e9ba58ede7eb43e2476baa6304fcc91c3197fb6f4d9486e78ba827958594a',
+      salt: 'db75a2bc1dd22edd38749216b4dc9ecc',
+      role: 'owner',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      bio: 'Fundador y Curador Principal de ScreenLog.',
+      favoriteGenres: ['Ciencia Ficción', 'Drama', 'Thriller'],
+      city: 'Caracas / Remoto',
+      platforms: ['Netflix', 'Max (HBO)', 'Prime Video'],
+      socialLinks: { letterboxd: 'daemon', twitter: 'daemon' },
+      customFields: [{ id: '1', label: 'Película favorita', value: 'Interstellar' }],
+      blocked: false,
+      mustChangePassword: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      lastLoginAt: null,
+      failedLoginCount: 0,
+      lockedUntil: null,
+    },
+    {
+      id: 'usr_calomix_admin',
+      name: 'Calomix',
+      username: 'calomixperceo',
+      email: 'calomixperceo@screenlog.app',
+      passwordHash: 'c03beb708e6461e296c28c0e30c0d0d07d5d4f60e906de1afc0ceb7c1d5e62bcab1feb7f0aaabdf94f962330efd8d9704c441448a8bc0d0cf5d45891d909a0d9',
+      salt: '6aedb8c9bd4acdd29e1fcaa4ee520c34',
+      role: 'admin',
+      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=200&q=80',
+      bio: 'Cinéfilo apasionado y Administrador de la Comunidad.',
+      favoriteGenres: ['Acción', 'Comedia', 'Animación'],
+      city: 'Valencia',
+      platforms: ['Disney+', 'Crunchyroll', 'Max (HBO)'],
+      socialLinks: { instagram: 'calomixperceo' },
+      customFields: [],
+      blocked: false,
+      mustChangePassword: false,
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      lastLoginAt: null,
+      failedLoginCount: 0,
+      lockedUntil: null,
+    },
+  ];
+}
+
 export async function getStore(): Promise<StoreData> {
   if (cache) return cache;
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -221,6 +272,11 @@ export async function getStore(): Promise<StoreData> {
     };
   } catch {
     cache = emptyStore();
+    cache.users = getDefaultUsers();
+    await persistNow(cache);
+  }
+  if (cache.users.length === 0) {
+    cache.users = getDefaultUsers();
     await persistNow(cache);
   }
   if (cache.media.length === 0) {

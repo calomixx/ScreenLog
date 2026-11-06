@@ -1,18 +1,33 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-
+import fs from 'fs';
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import { createApiRouter } from './server/routes';
+
+// Load environment variables safely
+try {
+  const envFile = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile });
+  } else {
+    dotenv.config();
+  }
+} catch {
+  // Ignore errors reading .env
+}
 
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+
+  // Cloud Run / Kubernetes / Docker health check endpoint
+  app.get('/healthz', (_req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  });
+
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+  });
 
   app.use(express.json({ limit: '2mb' }));
 
@@ -28,17 +43,20 @@ async function startServer() {
     res.status(status).json({ success: false, error: message, code });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  // Vite middleware for development; static assets for production
+  if (isDev) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -48,4 +66,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
+});

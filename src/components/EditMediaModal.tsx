@@ -130,17 +130,18 @@ export const EditMediaModal: React.FC = () => {
 
   if (!isEditMediaModalOpen || !mediaToEdit) return null;
 
-  // Security check: only admin allowed
-  if (currentUser?.role !== 'admin') {
+  // Security check: owner, admin, or creator of this custom media allowed
+  const canEditThis = isSuperOrAdmin || (Boolean(currentUser?.id) && mediaToEdit.createdByUserId === currentUser?.id);
+  if (!canEditThis) {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-[#161618] border border-rose-500/30 rounded-3xl p-6 text-center space-y-4">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-white">Zona Exclusiva de Administración</h3>
+          <h3 className="text-lg font-bold text-white">Edición de Título</h3>
           <p className="text-xs text-slate-300">
-            Esto solo lo puede tocar un admin 🙂. Si crees que hay un error, pide permisos a demon.
+            Para modificar los datos técnicos oficiales del catálogo necesitas permisos de administración.
           </p>
           <button
             onClick={() => setIsEditMediaModalOpen(false)}
@@ -368,7 +369,7 @@ export const EditMediaModal: React.FC = () => {
         </div>
 
         {/* Modal Body Form */}
-        <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-200">
+        <form id="edit-media-form" onSubmit={handleSave} className="p-6 pb-8 overflow-y-auto space-y-6 flex-1 text-slate-200">
           
           {/* Section 1: Portada y Datos Principales */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1074,25 +1075,37 @@ export const EditMediaModal: React.FC = () => {
               </button>
             )}
           </div>
+        </form>
 
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3 sticky bottom-0 bg-[#141416]/95 py-2">
+        {/* Dedicated Pinned Modal Footer */}
+        <div className="px-6 py-4 border-t border-white/10 bg-[#0A0A0B] flex flex-wrap items-center justify-between gap-3 flex-shrink-0 z-20">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            {isDirty && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Cambios pendientes sin guardar
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              form="edit-media-form"
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-rose-950/40 active:scale-95 transition-all"
             >
               <Save className="w-4 h-4" />
               <span>Guardar cambios</span>
             </button>
           </div>
-        </form>
+        </div>
 
         {/* Discard changes confirmation dialog */}
         {showDiscardConfirm && (
