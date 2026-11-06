@@ -89,6 +89,49 @@ export const AddMediaModal: React.FC = () => {
   const [animeInfo, setAnimeInfo] = useState<{ format?: string; episodes?: string } | null>(null);
   const [similarSuggestions, setSimilarSuggestions] = useState<any[]>([]);
 
+  const resetForm = () => {
+    setTitle('');
+    setOriginalTitle('');
+    setType('pelicula');
+    setYear(new Date().getFullYear());
+    setDirector('');
+    setCastInput('');
+    setDuration('2h 15m');
+    setDefaultPlatform('Netflix');
+    setSynopsis('');
+    setSelectedGenres(['Drama']);
+    setCustomGenre('');
+    setPosterUrl('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80');
+    setBackdropUrl('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80');
+    setTrailerUrl('');
+    setImageTab('url');
+    setSeasonsCount('');
+    setEpisodesCount('');
+    setAnimeFormat('');
+    setReleaseDate('');
+    setCountry('');
+    setLanguage('');
+    setAgeRating('');
+    setIsAutofilling(false);
+    setAutofillSuccess(null);
+    setAutofillWarning(null);
+    setAutofillError(null);
+    setHasAutofilled(false);
+    setAnimeInfo(null);
+    setSimilarSuggestions([]);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    setIsAddModalOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isAddModalOpen) {
+      resetForm();
+    }
+  }, [isAddModalOpen]);
+
   // Live query for similar titles in TMDB/catalog
   useEffect(() => {
     const trimmed = title.trim();
@@ -321,6 +364,7 @@ export const AddMediaModal: React.FC = () => {
         `"${duplicateWarning.title}" (${duplicateWarning.year}) ya forma parte del catálogo y se añadió a tu lista.`,
         'success',
       );
+      resetForm();
       setIsAddModalOpen(false);
       setSelectedMediaId(duplicateWarning.id);
       return;
@@ -365,12 +409,13 @@ export const AddMediaModal: React.FC = () => {
 
     if (!newId) return;
 
+    resetForm();
     setIsAddModalOpen(false);
     setSelectedMediaId(newId);
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div 
         id="add-media-modal-container"
         className="relative w-full max-w-3xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
@@ -392,7 +437,7 @@ export const AddMediaModal: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={handleClose}
             className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -995,7 +1040,7 @@ export const AddMediaModal: React.FC = () => {
         <div className="px-6 py-4 border-t border-white/10 bg-[#0A0A0B] flex items-center justify-end gap-3 flex-shrink-0 z-20">
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={handleClose}
             className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
           >
             Cancelar
