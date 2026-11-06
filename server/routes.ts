@@ -513,18 +513,16 @@ export function createApiRouter(): Router {
     });
   }));
 
-  const TMDB_DEFAULT_KEY = '5aeed13f63f1071425b9ab7815b80949';
-
-  function getValidTmdbKey(): string {
+  // SECURITY FIX: TMDB key must come from env only — no hardcoded fallback.
+  function getValidTmdbKey(): string | null {
     const envKey = (process.env.TMDB_API_KEY || '').trim();
-    if (/^[a-f0-9]{32}$/i.test(envKey)) {
-      return envKey;
-    }
-    return TMDB_DEFAULT_KEY;
+    if (/^[a-f0-9]{32}$/i.test(envKey)) return envKey;
+    return null;
   }
 
   async function searchTMDB(query: string, type?: string): Promise<any[]> {
     const apiKey = getValidTmdbKey();
+    if (!apiKey) return [];
     const baseUrl = 'https://api.themoviedb.org/3';
     try {
       const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(query)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
@@ -605,6 +603,7 @@ export function createApiRouter(): Router {
   // Media lookup / autofill with TMDB/Jikan fallback
   async function fetchFromTMDB(title: string, type?: string, year?: number) {
     const apiKey = getValidTmdbKey();
+    if (!apiKey) return null;
     const baseUrl = 'https://api.themoviedb.org/3';
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
@@ -861,13 +860,10 @@ Responde en español, tono amable y cinéfilo.`;
     res.json({ success: true, reply: fallbackReply });
   }));
 
-  router.post('/media', asyncRoute(async (req, res) => {
+  router.post('/media', requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
-    const user = req.authUser || {
-      id: 'guest',
-      name: 'Invitado Cinéfilo',
-      role: 'user' as const,
-    };
+    const user = req.authUser;
+    if (!user) return;
     if (!sanitizeText(req.body?.title, 200)) {
       return safeError(res, 400, 'El título es obligatorio.', 'INVALID_TITLE');
     }
@@ -968,14 +964,10 @@ Responde en español, tono amable y cinéfilo.`;
     res.json({ success: true, data: items });
   }));
 
-  router.post('/testimonials', asyncRoute(async (req, res) => {
+  router.post('/testimonials', requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
-    const user = req.authUser || {
-      id: 'guest',
-      name: sanitizeText(req.body?.userName, 60) || 'Invitado Cinéfilo',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: 'user' as const,
-    };
+    const user = req.authUser;
+    if (!user) return;
     const content = sanitizeMultiline(req.body?.content, 1200);
     if (!content) return safeError(res, 400, 'Escribe tu opinión.', 'INVALID_CONTENT');
     const rating = Number(req.body?.rating);
@@ -1231,7 +1223,9 @@ Responde en español, tono amable y cinéfilo.`;
 
     let user = findUserByEmail(store, email) || findUserById(store, uid);
     const now = new Date().toISOString();
-    const isBootstrapOwner = email === 'cmigueltorrealba03@gmail.com';
+    // SECURITY FIX: Bootstrap owner email must come from env, not be hardcoded.
+    const bootstrapOwnerEmail = (process.env.BOOTSTRAP_OWNER_EMAIL || '').toLowerCase().trim();
+    const isBootstrapOwner = Boolean(bootstrapOwnerEmail && email === bootstrapOwnerEmail);
 
     const defaultAvatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
     if (!user) {
@@ -1598,14 +1592,10 @@ Responde en español, tono amable y cinéfilo.`;
     res.json({ success: true, data: items });
   }));
 
-  router.post('/community/reviews', asyncRoute(async (req, res) => {
+  router.post('/community/reviews', requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
-    const user = req.authUser || {
-      id: 'guest',
-      name: sanitizeText(req.body?.author, 60) || 'Invitado Cinéfilo',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: 'user' as const,
-    };
+    const user = req.authUser;
+    if (!user) return;
     if (!store.settings.communityCommentsEnabled) {
       return safeError(res, 403, 'Los comentarios de la comunidad están desactivados.', 'COMMENTS_DISABLED');
     }

@@ -32,11 +32,11 @@ service cloud.firestore {
       return isVerifiedUser() && request.auth.uid == userId;
     }
 
+    // SECURITY FIX: Removed hardcoded email from admin check.
+    // Admin access is now determined solely by presence in /admins collection.
     function isAdmin() {
-      return isVerifiedUser() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'cmigueltorrealba03@gmail.com'
-      );
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     // 3. Entity Validation Blueprints

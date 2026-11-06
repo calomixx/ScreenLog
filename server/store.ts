@@ -152,6 +152,9 @@ export interface StoreData {
   settings: PortalSettings;
   secrets: Record<string, string>;
   billing: BillingState;
+  // SECURITY FIX: persisted IP-level rate limit windows (survive restarts)
+  loginAttempts: Record<string, { count: number; firstAt: number; lockedUntil: number }>;
+  forgotAttempts: Record<string, { count: number; firstAt: number; lockedUntil: number }>;
 }
 
 export const DATA_DIR = path.join(process.cwd(), 'server', 'data');
@@ -191,6 +194,8 @@ function emptyStore(): StoreData {
     settings: { ...defaultSettings },
     secrets: {},
     billing: { ...defaultBilling },
+    loginAttempts: {},
+    forgotAttempts: {},
   };
 }
 
@@ -269,6 +274,8 @@ export async function getStore(): Promise<StoreData> {
       logs: parsed.logs || [],
       audit: parsed.audit || [],
       secrets: parsed.secrets || {},
+      loginAttempts: parsed.loginAttempts || {},
+      forgotAttempts: parsed.forgotAttempts || {},
     };
   } catch {
     cache = emptyStore();
