@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogoLockup, LogoMark } from './Logo';
+import { isRealEmail, evaluatePasswordStrength } from '../lib/validation';
 
 type AuthMode = 'login' | 'register' | 'forgot';
 
@@ -97,12 +98,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
       setError('Completa tu nombre, correo y contraseña.');
       return;
     }
-    if (!email.includes('@')) {
-      setError('Ingresa un correo electrónico válido.');
+    const emailValidationCheck = isRealEmail(email);
+    if (!emailValidationCheck.isValid) {
+      setError(emailValidationCheck.error || 'Ingresa un correo electrónico real y válido.');
       return;
     }
     if (password.length < 8) {
       setError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('La contraseña debe contener mayúsculas, minúsculas y al menos un número.');
       return;
     }
     if (password !== confirmPassword) {
@@ -462,49 +468,99 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="tu@correo.com"
-                        className={inputClass}
+                        className={`${inputClass} ${email.length > 0 ? (isRealEmail(email).isValid ? 'border-emerald-500/50' : 'border-rose-500') : ''}`}
                         required
                       />
                     </div>
+                    {email.length > 0 && !isRealEmail(email).isValid && (
+                      <p className="text-[11px] text-rose-400 mt-1.5 flex items-start gap-1 leading-tight animate-in fade-in duration-150">
+                        <span className="font-bold">✕</span> {isRealEmail(email).error}
+                      </p>
+                    )}
+                    {email.length > 0 && isRealEmail(email).isValid && (
+                      <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1 font-medium leading-tight animate-in fade-in duration-150">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" /> Correo válido y verificado
+                      </p>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="register-password" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Contraseña
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                        <input
-                          id="register-password"
-                          type={showPassword ? 'text' : 'password'}
-                          autoComplete="new-password"
-                          value={password}
-                          onChange={(event) => setPassword(event.target.value)}
-                          placeholder="Mínimo 8 caracteres"
-                          className={inputClass}
-                          required
-                        />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="register-password" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                          Contraseña
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                          <input
+                            id="register-password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            placeholder="Mínimo 8 caracteres"
+                            className={inputClass}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="register-confirm" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                          Confirmar
+                        </label>
+                        <div className="relative">
+                          <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                          <input
+                            id="register-confirm"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={confirmPassword}
+                            onChange={(event) => setConfirmPassword(event.target.value)}
+                            placeholder="Repite la contraseña"
+                            className={`${inputClass} ${confirmPassword.length > 0 ? (password === confirmPassword ? 'border-emerald-500/50' : 'border-rose-500') : ''}`}
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label htmlFor="register-confirm" className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Confirmar
-                      </label>
-                      <div className="relative">
-                        <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                        <input
-                          id="register-confirm"
-                          type={showPassword ? 'text' : 'password'}
-                          autoComplete="new-password"
-                          value={confirmPassword}
-                          onChange={(event) => setConfirmPassword(event.target.value)}
-                          placeholder="Repite la contraseña"
-                          className={inputClass}
-                          required
-                        />
-                      </div>
-                    </div>
+
+                    {confirmPassword.length > 0 && password !== confirmPassword && (
+                      <p className="text-[11px] text-rose-400 font-medium">✕ Las contraseñas no coinciden.</p>
+                    )}
+
+                    {password.length > 0 && (() => {
+                      const str = evaluatePasswordStrength(password);
+                      return (
+                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400 font-medium">Seguridad de la contraseña:</span>
+                            <span className={`font-bold ${str.score >= 3 ? 'text-emerald-400' : str.score === 2 ? 'text-amber-400' : 'text-rose-400'}`}>
+                              {str.label}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div className={`h-full transition-all ${str.score >= 1 ? str.color : 'bg-transparent'}`} />
+                            <div className={`h-full transition-all ${str.score >= 2 ? str.color : 'bg-transparent'}`} />
+                            <div className={`h-full transition-all ${str.score >= 3 ? str.color : 'bg-transparent'}`} />
+                            <div className={`h-full transition-all ${str.score >= 4 ? str.color : 'bg-transparent'}`} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-400 pt-0.5">
+                            <span className={str.requirements.minLength ? 'text-emerald-400 font-medium' : ''}>
+                              {str.requirements.minLength ? '✓' : '○'} Mínimo 8 caracteres
+                            </span>
+                            <span className={str.requirements.hasUpper && str.requirements.hasLower ? 'text-emerald-400 font-medium' : ''}>
+                              {str.requirements.hasUpper && str.requirements.hasLower ? '✓' : '○'} Mayúscula y minúscula
+                            </span>
+                            <span className={str.requirements.hasNumber ? 'text-emerald-400 font-medium' : ''}>
+                              {str.requirements.hasNumber ? '✓' : '○'} Al menos un número
+                            </span>
+                            <span className={str.requirements.hasSpecial ? 'text-emerald-400 font-medium' : ''}>
+                              {str.requirements.hasSpecial ? '✓' : '○'} Carácter especial (!@#$)
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div>

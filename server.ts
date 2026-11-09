@@ -19,6 +19,13 @@ try {
 }
 
 async function startServer() {
+  // CONFIG & ENVIRONMENT VALIDATION
+  const rawPort = Number(process.env.PORT);
+  const PORT = !isNaN(rawPort) && rawPort > 0 && rawPort <= 65535 ? rawPort : 3000;
+  if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
+    console.warn('[CONFIG_WARN] SESSION_SECRET no está configurado en entorno de producción.');
+  }
+
   // SECURITY FIX: restore persisted IP-level rate limits from store
   try {
     const store = await getStore();
@@ -26,7 +33,6 @@ async function startServer() {
   } catch { /* ignore — fresh start */ }
 
   const app = express();
-  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
   // Cloud Run / Kubernetes / Docker health check endpoint
   app.get('/healthz', (_req, res) => {

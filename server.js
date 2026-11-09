@@ -1794,6 +1794,189 @@ function getCuratedRecommendations(req) {
   };
 }
 
+// src/lib/validation.ts
+import { z } from "zod";
+var DISPOSABLE_EMAIL_DOMAINS = /* @__PURE__ */ new Set([
+  "mailinator.com",
+  "tempmail.com",
+  "temp-mail.org",
+  "10minutemail.com",
+  "guerrillamail.com",
+  "sharklasers.com",
+  "yopmail.com",
+  "throwawaymail.com",
+  "fake.com",
+  "test.com",
+  "testing.com",
+  "example.com",
+  "sample.com",
+  "dispostable.com",
+  "trashmail.com",
+  "getairmail.com",
+  "generator.email",
+  "fakemail.net",
+  "nada.ltd",
+  "mohmal.com",
+  "mytemp.email",
+  "crazymailing.com",
+  "mailnesia.com",
+  "spam4.me",
+  "bccto.me",
+  "chacuo.net",
+  "0815.ru",
+  "inboxbear.com"
+]);
+var FAKE_LOCAL_PARTS = /* @__PURE__ */ new Set([
+  "test",
+  "testing",
+  "asdf",
+  "asdfgh",
+  "qwerty",
+  "fake",
+  "nobody",
+  "none",
+  "null",
+  "undefined",
+  "123456",
+  "abc",
+  "no-reply",
+  "noreply",
+  "ejemplo",
+  "prueba"
+]);
+function isRealEmail(email) {
+  if (!email || typeof email !== "string") {
+    return { isValid: false, error: "El correo electr\xF3nico es obligatorio." };
+  }
+  const trimmed = email.trim().toLowerCase();
+  if (trimmed.length < 5 || trimmed.length > 254) {
+    return { isValid: false, error: "El correo debe tener entre 5 y 254 caracteres." };
+  }
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(trimmed)) {
+    return { isValid: false, error: "Formato de correo inv\xE1lido (ejemplo: usuario@gmail.com)." };
+  }
+  const parts = trimmed.split("@");
+  if (parts.length !== 2) {
+    return { isValid: false, error: "El correo debe contener exactamente un @." };
+  }
+  const [localPart, domain] = parts;
+  if (localPart.length > 64) {
+    return { isValid: false, error: "La parte previa al @ no puede exceder 64 caracteres." };
+  }
+  if (FAKE_LOCAL_PARTS.has(localPart)) {
+    return { isValid: false, error: "Por favor ingresa un correo personal o corporativo real." };
+  }
+  if (!domain.includes(".")) {
+    return { isValid: false, error: "El dominio del correo debe incluir una extensi\xF3n (.com, .es, etc.)." };
+  }
+  const domainParts = domain.split(".");
+  const tld = domainParts[domainParts.length - 1];
+  if (!tld || tld.length < 2 || !/^[a-z]+$/.test(tld)) {
+    return { isValid: false, error: "La extensi\xF3n de dominio (.com, .org, .es) no es v\xE1lida." };
+  }
+  if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+    return {
+      isValid: false,
+      error: `El dominio "@${domain}" es temporal o desechable. Usa un proveedor real (Gmail, Outlook, Yahoo, Proton, iCloud, etc.).`
+    };
+  }
+  return { isValid: true };
+}
+function getEmailValidationError(email) {
+  const check = isRealEmail(email);
+  return check.isValid ? null : check.error || "El correo electr\xF3nico no es v\xE1lido.";
+}
+var realEmailSchema = z.string().trim().min(5, "El correo electr\xF3nico es requerido.").max(254, "El correo no puede exceder 254 caracteres.").superRefine((val, ctx) => {
+  const check = isRealEmail(val);
+  if (!check.isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: check.error || "Correo no v\xE1lido"
+    });
+  }
+});
+var passwordSchema = z.string().min(8, "La contrase\xF1a debe tener al menos 8 caracteres.").max(128, "La contrase\xF1a no puede exceder 128 caracteres.").regex(/[A-Z]/, "Debe incluir al menos una letra may\xFAscula.").regex(/[a-z]/, "Debe incluir al menos una letra min\xFAscula.").regex(/[0-9]/, "Debe incluir al menos un n\xFAmero.");
+var currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+var mediaFormSchema = z.object({
+  title: z.string().trim().min(2, "El t\xEDtulo debe tener al menos 2 caracteres.").max(200, "El t\xEDtulo no puede exceder 200 caracteres."),
+  originalTitle: z.string().trim().max(200).optional(),
+  type: z.enum(["pelicula", "serie", "anime", "documental"]),
+  year: z.number().int("El a\xF1o debe ser un n\xFAmero entero.").min(1888, "El a\xF1o debe ser 1888 o posterior (nacimiento del cine).").max(currentYear + 2, `El a\xF1o no puede ser superior a ${currentYear + 2}.`),
+  director: z.string().trim().min(2, "El nombre del director debe tener al menos 2 caracteres.").max(160, "El director no puede exceder 160 caracteres."),
+  genres: z.array(z.string().trim().min(1)).min(1, "Debes seleccionar al menos un g\xE9nero cinematogr\xE1fico.").max(12, "M\xE1ximo 12 g\xE9neros permitidos."),
+  synopsis: z.string().trim().max(4e3, "La sinopsis no puede exceder 4000 caracteres.").optional(),
+  duration: z.string().trim().max(60).optional(),
+  posterUrl: z.string().trim().url("La URL del p\xF3ster debe ser una direcci\xF3n web v\xE1lida (ej. https://...).").max(1e3, "La URL del p\xF3ster es demasiado larga.").or(z.literal("")),
+  backdropUrl: z.string().trim().url("La URL del fondo debe ser una direcci\xF3n web v\xE1lida.").max(1e3).optional().or(z.literal("")),
+  trailerUrl: z.string().trim().max(300).optional(),
+  trailerYoutubeId: z.string().trim().max(120).optional(),
+  defaultPlatform: z.string().trim().min(1, "Selecciona una plataforma principal.").max(80)
+});
+var userReviewSchema = z.object({
+  mediaId: z.string().trim().min(1, "ID de t\xEDtulo requerido."),
+  status: z.enum(["pendiente", "en_proceso", "terminada"]),
+  stars: z.number().min(0).max(5).default(0),
+  watchedDate: z.string().trim().optional(),
+  platform: z.string().trim().max(80).optional(),
+  evaluation: z.string().trim().max(80).optional(),
+  critique: z.string().trim().max(4e3).optional(),
+  director: z.string().trim().max(120).optional(),
+  year: z.number().optional(),
+  genres: z.array(z.string()).optional(),
+  wouldRewatch: z.enum(["si_totalmente", "quizas", "no_suficiente", "jamas"]).optional(),
+  favoriteMoment: z.string().trim().max(500).optional()
+}).superRefine((data, ctx) => {
+  if (data.status === "terminada") {
+    if (data.stars < 0.5 || data.stars > 5) {
+      ctx.addIssue({
+        path: ["stars"],
+        code: z.ZodIssueCode.custom,
+        message: "Debes asignar una calificaci\xF3n entre 0.5 y 5 estrellas al terminar la obra."
+      });
+    }
+    if (data.watchedDate) {
+      const parsedDate = new Date(data.watchedDate);
+      if (isNaN(parsedDate.getTime())) {
+        ctx.addIssue({
+          path: ["watchedDate"],
+          code: z.ZodIssueCode.custom,
+          message: "La fecha de visualizaci\xF3n tiene un formato no v\xE1lido (YYYY-MM-DD)."
+        });
+      } else if (parsedDate > /* @__PURE__ */ new Date()) {
+        ctx.addIssue({
+          path: ["watchedDate"],
+          code: z.ZodIssueCode.custom,
+          message: "La fecha de visualizaci\xF3n no puede ser en el futuro."
+        });
+      }
+    }
+  }
+});
+var registerUserSchema = z.object({
+  name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres.").max(80, "El nombre no puede exceder 80 caracteres."),
+  email: realEmailSchema,
+  password: passwordSchema,
+  avatar: z.string().trim().url().optional().or(z.literal("")),
+  favoriteGenres: z.array(z.string()).optional(),
+  bio: z.string().trim().max(500).optional()
+});
+var loginUserSchema = z.object({
+  identifier: z.string().trim().min(3, "Ingresa tu correo o nombre de usuario."),
+  password: z.string().min(1, "Ingresa tu contrase\xF1a.")
+});
+var communityCommentSchema = z.object({
+  mediaId: z.string().trim().min(1, "Media ID requerido."),
+  rating: z.number().min(1, "La calificaci\xF3n m\xEDnima es 1\u2605").max(5, "La calificaci\xF3n m\xE1xima es 5\u2605"),
+  comment: z.string().trim().min(3, "El comentario debe tener al menos 3 caracteres.").max(2e3, "El comentario no puede exceder 2000 caracteres.")
+});
+var contactTicketSchema = z.object({
+  name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres.").max(80),
+  email: realEmailSchema,
+  subject: z.string().trim().min(3, "El asunto debe tener al menos 3 caracteres.").max(160),
+  message: z.string().trim().min(10, "El mensaje debe tener al menos 10 caracteres.").max(4e3)
+});
+
 // server/routes.ts
 var SESSION_COOKIE = "sl_session";
 var SESSION_DAYS_REMEMBER = 30;
@@ -1855,9 +2038,6 @@ function addAudit(store, entry) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   });
   if (store.audit.length > 2e3) store.audit.length = 2e3;
-}
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
 }
 function validatePassword(password) {
   if (typeof password !== "string" || password.length < 8) {
@@ -2631,8 +2811,22 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
-    if (!sanitizeText(req.body?.title, 200)) {
-      return safeError(res, 400, "El t\xEDtulo es obligatorio.", "INVALID_TITLE");
+    const parsedMedia = mediaFormSchema.safeParse({
+      title: req.body?.title,
+      originalTitle: req.body?.originalTitle,
+      type: req.body?.type,
+      year: Number(req.body?.year),
+      director: req.body?.director,
+      genres: Array.isArray(req.body?.genres) ? req.body.genres : [req.body?.genres || "Drama"],
+      synopsis: req.body?.synopsis || "",
+      duration: req.body?.duration,
+      posterUrl: req.body?.posterUrl || "",
+      backdropUrl: req.body?.backdropUrl || "",
+      defaultPlatform: req.body?.defaultPlatform || req.body?.platform || "Netflix"
+    });
+    if (!parsedMedia.success) {
+      const firstIssue = parsedMedia.error.issues[0]?.message || "Datos de obra inv\xE1lidos.";
+      return safeError(res, 400, firstIssue, "VALIDATION_ERROR");
     }
     const item = buildMediaFromBody(req.body);
     const normalizedNewTitle = normalizeTitle(item.title);
@@ -2758,7 +2952,8 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const subject = sanitizeText(req.body?.subject, 160);
     const message = sanitizeMultiline(req.body?.message, 4e3);
     if (!name || !message) return safeError(res, 400, "Nombre y mensaje son obligatorios.", "INVALID_TICKET");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailValidationError = getEmailValidationError(email);
+    if (emailValidationError) return safeError(res, 400, emailValidationError, "INVALID_EMAIL");
     const ticket = {
       id: randomUUID(),
       ticketCode: `SL-${Math.floor(1e4 + Math.random() * 9e4)}`,
@@ -2787,7 +2982,8 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const username = cleanUsername(req.body?.username || "");
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!name) return safeError(res, 400, "Indica tu nombre.", "INVALID_NAME");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
     const user = createUserRecord({ name, username: username || void 0, email, password, role: "owner" });
@@ -2826,7 +3022,8 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const rawUsername = cleanUsername(req.body?.username || "");
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!name) return safeError(res, 400, "Indica tu nombre.", "INVALID_NAME");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
     if (findUserByEmail(store, email)) {
@@ -3914,7 +4111,8 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       const email2 = sanitizeText(req.body?.email, 160).toLowerCase();
       const password = typeof req.body?.password === "string" ? req.body.password : "";
       if (!name) return safeError(res, 400, "Indica el nombre del administrador.", "INVALID_NAME");
-      if (!validateEmail(email2)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+      const emailErr = getEmailValidationError(email2);
+      if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
       const passwordError = validatePassword(password);
       if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
       if (findUserByEmail(store, email2)) {
@@ -4083,13 +4281,17 @@ try {
 } catch {
 }
 async function startServer() {
+  const rawPort = Number(process.env.PORT);
+  const PORT = !isNaN(rawPort) && rawPort > 0 && rawPort <= 65535 ? rawPort : 3e3;
+  if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+    console.warn("[CONFIG_WARN] SESSION_SECRET no est\xE1 configurado en entorno de producci\xF3n.");
+  }
   try {
     const store = await getStore();
     if (store.loginAttempts) syncRateLimitsFromStore(store.loginAttempts);
   } catch {
   }
   const app = express();
-  const PORT = process.env.PORT ? Number(process.env.PORT) : 3e3;
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", uptime: process.uptime(), timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });

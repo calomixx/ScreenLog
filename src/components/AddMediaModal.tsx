@@ -18,6 +18,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
+import { mediaFormSchema, extractYouTubeId } from '../lib/validation';
 import { MediaType } from '../types';
 import { apiRequest } from '../lib/api';
 
@@ -370,12 +371,29 @@ export const AddMediaModal: React.FC = () => {
       return;
     }
 
-    // Parse youtube ID if full URL
-    let ytid = trailerUrl.trim();
-    if (ytid.includes('v=')) {
-      ytid = ytid.split('v=')[1].split('&')[0];
-    } else if (ytid.includes('youtu.be/')) {
-      ytid = ytid.split('youtu.be/')[1].split('?')[0];
+    // Extract YouTube ID using robust validation helper
+    const ytid = extractYouTubeId(trailerUrl);
+
+    // Validate entire form schema with Zod
+    const formValidation = mediaFormSchema.safeParse({
+      title: title.trim(),
+      originalTitle: originalTitle.trim() || undefined,
+      type,
+      year: Number(year),
+      director: director.trim(),
+      genres: selectedGenres,
+      synopsis: synopsis.trim() || undefined,
+      duration: duration.trim() || undefined,
+      posterUrl: posterUrl.trim(),
+      backdropUrl: backdropUrl.trim() || undefined,
+      trailerYoutubeId: ytid || undefined,
+      defaultPlatform,
+    });
+
+    if (!formValidation.success) {
+      const firstIssue = formValidation.error.issues[0]?.message || 'Datos del formulario inválidos.';
+      showToast(firstIssue, 'warning');
+      return;
     }
 
     const castArray = castInput
@@ -496,6 +514,9 @@ export const AddMediaModal: React.FC = () => {
                     : 'border-white/10 focus:border-rose-500'
                 }`}
               />
+              {title.trim().length === 1 && (
+                <p className="text-[11px] text-rose-400 mt-1 font-medium">El título debe tener al menos 2 caracteres.</p>
+              )}
 
               {/* Duplicate Prevention Alert */}
               {duplicateWarning && (
@@ -1032,6 +1053,17 @@ export const AddMediaModal: React.FC = () => {
               placeholder="ej: Way9Dexny3w o https://youtube.com/watch?v=Way9Dexny3w"
               className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
             />
+            {trailerUrl.trim().length > 0 && (
+              extractYouTubeId(trailerUrl) ? (
+                <p className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
+                  <Check className="w-3.5 h-3.5" /> Tráiler detectado (ID: <span className="font-mono bg-black/40 px-1 rounded">{extractYouTubeId(trailerUrl)}</span>)
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-400 mt-1">
+                  Pega un enlace de YouTube o el código de 11 caracteres.
+                </p>
+              )
+            )}
           </div>
 
         </form>

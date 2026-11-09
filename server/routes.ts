@@ -41,6 +41,7 @@ import {
 import type { MediaItem, RewatchChoice, WatchStatus } from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
+import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -123,7 +124,7 @@ function addAudit(
 }
 
 function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
+  return isRealEmail(email).isValid;
 }
 
 function validatePassword(password: string): string | null {
@@ -1059,8 +1060,22 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
-    if (!sanitizeText(req.body?.title, 200)) {
-      return safeError(res, 400, 'El título es obligatorio.', 'INVALID_TITLE');
+    const parsedMedia = mediaFormSchema.safeParse({
+      title: req.body?.title,
+      originalTitle: req.body?.originalTitle,
+      type: req.body?.type,
+      year: Number(req.body?.year),
+      director: req.body?.director,
+      genres: Array.isArray(req.body?.genres) ? req.body.genres : [req.body?.genres || 'Drama'],
+      synopsis: req.body?.synopsis || '',
+      duration: req.body?.duration,
+      posterUrl: req.body?.posterUrl || '',
+      backdropUrl: req.body?.backdropUrl || '',
+      defaultPlatform: req.body?.defaultPlatform || req.body?.platform || 'Netflix',
+    });
+    if (!parsedMedia.success) {
+      const firstIssue = parsedMedia.error.issues[0]?.message || 'Datos de obra inválidos.';
+      return safeError(res, 400, firstIssue, 'VALIDATION_ERROR');
     }
     const item = buildMediaFromBody(req.body);
 
@@ -1195,7 +1210,8 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const subject = sanitizeText(req.body?.subject, 160);
     const message = sanitizeMultiline(req.body?.message, 4000);
     if (!name || !message) return safeError(res, 400, 'Nombre y mensaje son obligatorios.', 'INVALID_TICKET');
-    if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
+    const emailValidationError = getEmailValidationError(email);
+    if (emailValidationError) return safeError(res, 400, emailValidationError, 'INVALID_EMAIL');
     const ticket = {
       id: randomUUID(),
       ticketCode: `SL-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -1225,7 +1241,8 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const username = cleanUsername(req.body?.username || '');
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!name) return safeError(res, 400, 'Indica tu nombre.', 'INVALID_NAME');
-    if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, 'INVALID_EMAIL');
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, 'INVALID_PASSWORD');
 
@@ -1266,7 +1283,8 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const rawUsername = cleanUsername(req.body?.username || '');
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!name) return safeError(res, 400, 'Indica tu nombre.', 'INVALID_NAME');
-    if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, 'INVALID_EMAIL');
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, 'INVALID_PASSWORD');
     if (findUserByEmail(store, email)) {
@@ -2439,7 +2457,8 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       const email = sanitizeText(req.body?.email, 160).toLowerCase();
       const password = typeof req.body?.password === 'string' ? req.body.password : '';
       if (!name) return safeError(res, 400, 'Indica el nombre del administrador.', 'INVALID_NAME');
-      if (!validateEmail(email)) return safeError(res, 400, 'El correo no es válido.', 'INVALID_EMAIL');
+      const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, 'INVALID_EMAIL');
       const passwordError = validatePassword(password);
       if (passwordError) return safeError(res, 400, passwordError, 'INVALID_PASSWORD');
       if (findUserByEmail(store, email)) {
