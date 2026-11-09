@@ -126,7 +126,7 @@ export const ContactSection: React.FC = () => {
   };
 
   return (
-    <section id="contact-section" className="space-y-8 pt-4">
+    <section id="contact-section" className="scroll-mt-24 space-y-8 pt-4">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">

@@ -138,12 +138,17 @@ export function parseCookies(header: string | undefined): Record<string, string>
   }, {});
 }
 
+// SECURITY FIX: Only trust X-Forwarded-For when TRUSTED_PROXY=true is set in env.
+// Without it, clients can spoof their IP to bypass rate limiting.
 export function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
+  const trustProxy = process.env.TRUSTED_PROXY === 'true';
+  if (trustProxy) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string' && forwarded.length > 0) {
+      return forwarded.split(',')[0].trim();
+    }
   }
-  return req.ip || req.socket.remoteAddress || 'desconocida';
+  return req.socket.remoteAddress || req.ip || 'desconocida';
 }
 
 export function parseUserAgent(ua: string): { browser: string; os: string } {
@@ -203,8 +208,32 @@ interface AttemptWindow {
   lockedUntil: number;
 }
 
-const loginAttempts = new Map<string, AttemptWindow>();
-const forgotAttempts = new Map<string, AttemptWindow>();
+// SECURITY FIX: These Maps are initialized from / synced to store.json on startup
+// via syncRateLimitsFromStore() / getRateLimitsSnapshot() so they survive restarts.
+export const loginAttempts = new Map<string, AttemptWindow>();
+export const forgotAttempts = new Map<string, AttemptWindow>();
+
+/** Load persisted rate-limit windows from the store (called on startup). */
+export function syncRateLimitsFromStore(
+  persisted: Record<string, AttemptWindow>
+): void {
+  const now = Date.now();
+  for (const [key, window] of Object.entries(persisted)) {
+    // Only restore windows that are still relevant
+    if (window.lockedUntil > now || now - window.firstAt < 15 * 60 * 1000) {
+      loginAttempts.set(key, window);
+    }
+  }
+}
+
+/** Snapshot current rate-limit state for persistence. */
+export function getRateLimitsSnapshot(): Record<string, AttemptWindow> {
+  const out: Record<string, AttemptWindow> = {};
+  for (const [key, window] of loginAttempts.entries()) {
+    out[key] = window;
+  }
+  return out;
+}
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Clapperboard, 
   Film, 
@@ -21,6 +21,7 @@ import { ContactSection } from './ContactSection';
 
 export const LandingPublicView: React.FC = () => {
   const { 
+    activeTab,
     setActiveTab, 
     openAuthModal, 
     currentUser, 
@@ -28,6 +29,21 @@ export const LandingPublicView: React.FC = () => {
     openTrailer,
     setSelectedMediaId 
   } = useMedia();
+
+  useEffect(() => {
+    if (activeTab === 'opiniones') {
+      const timer = setTimeout(() => {
+        document.getElementById('user-testimonials-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    if (activeTab === 'contacto') {
+      const timer = setTimeout(() => {
+        document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
 
   // Show up to 5 featured titles for a balanced 2->5 columns mobile-first responsive grid
   const previewItems = mediaList.slice(0, 5);

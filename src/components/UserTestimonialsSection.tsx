@@ -134,7 +134,7 @@ export const UserTestimonialsSection: React.FC = () => {
     : null;
 
   return (
-    <section id="user-testimonials-section" className="space-y-8 pt-4">
+    <section id="user-testimonials-section" className="scroll-mt-24 space-y-8 pt-4">
       
       {/* Section Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">

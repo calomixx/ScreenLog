@@ -707,7 +707,9 @@ function emptyStore() {
     audit: [],
     settings: { ...defaultSettings },
     secrets: {},
-    billing: { ...defaultBilling }
+    billing: { ...defaultBilling },
+    loginAttempts: {},
+    forgotAttempts: {}
   };
 }
 var cache = null;
@@ -782,7 +784,9 @@ async function getStore() {
       tickets: parsed.tickets || [],
       logs: parsed.logs || [],
       audit: parsed.audit || [],
-      secrets: parsed.secrets || {}
+      secrets: parsed.secrets || {},
+      loginAttempts: parsed.loginAttempts || {},
+      forgotAttempts: parsed.forgotAttempts || {}
     };
   } catch {
     cache = emptyStore();
@@ -970,11 +974,14 @@ function parseCookies(header) {
   }, {});
 }
 function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.length > 0) {
-    return forwarded.split(",")[0].trim();
+  const trustProxy = process.env.TRUSTED_PROXY === "true";
+  if (trustProxy) {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.length > 0) {
+      return forwarded.split(",")[0].trim();
+    }
   }
-  return req.ip || req.socket.remoteAddress || "desconocida";
+  return req.socket.remoteAddress || req.ip || "desconocida";
 }
 function parseUserAgent(ua) {
   const userAgent = ua || "";
@@ -1021,6 +1028,14 @@ function isOriginAllowed(req) {
 }
 var loginAttempts = /* @__PURE__ */ new Map();
 var forgotAttempts = /* @__PURE__ */ new Map();
+function syncRateLimitsFromStore(persisted) {
+  const now = Date.now();
+  for (const [key, window] of Object.entries(persisted)) {
+    if (window.lockedUntil > now || now - window.firstAt < 15 * 60 * 1e3) {
+      loginAttempts.set(key, window);
+    }
+  }
+}
 var MAX_ATTEMPTS = 5;
 var WINDOW_MS = 15 * 60 * 1e3;
 function checkWindow(map, key) {
@@ -1422,9 +1437,7 @@ function createApiRouter() {
   const TMDB_DEFAULT_KEY = "5aeed13f63f1071425b9ab7815b80949";
   function getValidTmdbKey() {
     const envKey = (process.env.TMDB_API_KEY || "").trim();
-    if (/^[a-f0-9]{32}$/i.test(envKey)) {
-      return envKey;
-    }
+    if (/^[a-f0-9]{32}$/i.test(envKey)) return envKey;
     return TMDB_DEFAULT_KEY;
   }
   async function searchTMDB(query, type) {
@@ -1751,12 +1764,7 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
     if (existing) {
       const isRemakeOfOtherEra = Math.abs(item.year - existing.year) >= 2;
       if (!isRemakeOfOtherEra) {
-        return safeError(
-          res,
-          409,
-          `Ya existe la obra "${existing.title}" (${existing.year}) en el cat\xE1logo. Para registrarla nuevamente, debe tratarse de un remake (a\xF1o distinto) o especificar la variante en el t\xEDtulo (ej: 'Versi\xF3n Extendida', 'Director's Cut').`,
-          "MEDIA_DUPLICATE"
-        );
+        return res.json({ success: true, data: existing, alreadyExisted: true });
       }
     }
     item.createdByUserId = user.id;
@@ -2065,6 +2073,87 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
         session: safeSession(session),
         token,
         mustChangePassword: user.mustChangePassword
+      }
+    });
+  }));
+  router.post("/auth/google", asyncRoute(async (req, res) => {
+    const ip = getClientIp(req);
+    const store = await getStore();
+    const uid = sanitizeText(req.body?.uid, 128);
+    const email = sanitizeText(req.body?.email, 254).toLowerCase();
+    const name = sanitizeText(req.body?.name, 80) || email.split("@")[0] || "Cin\xE9filo";
+    const photoURL = sanitizeText(req.body?.avatar, 1e3);
+    if (!uid || !email || !email.includes("@")) {
+      return safeError(res, 400, "Datos de autenticaci\xF3n de Google incompletos.", "INVALID_GOOGLE_AUTH");
+    }
+    let user = findUserByEmail(store, email) || findUserById(store, uid);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const bootstrapOwnerEmail = (process.env.BOOTSTRAP_OWNER_EMAIL || "").toLowerCase().trim();
+    const isBootstrapOwner = Boolean(bootstrapOwnerEmail && email === bootstrapOwnerEmail);
+    const defaultAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+    if (!user) {
+      const baseUsername = cleanUsername(email.split("@")[0]) || "cinefilo";
+      let finalUsername = baseUsername;
+      let counter = 1;
+      while (findUserByIdentifier(store, finalUsername)) {
+        finalUsername = `${baseUsername}${counter}`;
+        counter += 1;
+      }
+      const { salt, hash } = hashPassword(randomUUID());
+      user = {
+        id: uid,
+        name,
+        username: finalUsername,
+        email,
+        passwordHash: hash,
+        salt,
+        role: isBootstrapOwner || !ownerExists(store) ? "owner" : "user",
+        avatar: photoURL || defaultAvatarUrl,
+        bio: "",
+        favoriteGenres: ["Ciencia Ficci\xF3n", "Drama"],
+        city: "",
+        platforms: ["Netflix", "Prime Video"],
+        socialLinks: {},
+        customFields: [],
+        blocked: false,
+        mustChangePassword: false,
+        createdAt: now,
+        updatedAt: now,
+        lastLoginAt: now,
+        failedLoginCount: 0,
+        lockedUntil: null
+      };
+      store.users.push(user);
+    } else {
+      if (user.blocked) {
+        return safeError(res, 403, "Esta cuenta est\xE1 bloqueada.", "ACCOUNT_BLOCKED");
+      }
+      if (isBootstrapOwner && user.role === "user") {
+        user.role = "owner";
+      }
+      if (photoURL && (!user.avatar || user.avatar === defaultAvatarUrl)) {
+        user.avatar = photoURL;
+      }
+      user.lastLoginAt = now;
+      user.updatedAt = now;
+    }
+    const { session, token } = await createSession(req, res, store, user, true);
+    addLog(store, {
+      level: "info",
+      category: "auth",
+      message: `Inicio de sesi\xF3n con Google Firebase: ${user.email}`,
+      actorId: user.id,
+      actorName: user.name,
+      ip
+    });
+    await saveStore();
+    res.json({
+      success: true,
+      data: {
+        user: publicUser(user),
+        session: safeSession(session),
+        token,
+        mustChangePassword: false
       }
     });
   }));
@@ -3113,6 +3202,11 @@ try {
 } catch {
 }
 async function startServer() {
+  try {
+    const store = await getStore();
+    if (store.loginAttempts) syncRateLimitsFromStore(store.loginAttempts);
+  } catch {
+  }
   const app = express();
   const PORT = process.env.PORT ? Number(process.env.PORT) : 3e3;
   app.get("/healthz", (_req, res) => {
@@ -3131,8 +3225,7 @@ async function startServer() {
     res.status(status).json({ success: false, error: message, code });
   });
   const distPath = path3.resolve(process.cwd(), "dist");
-  const hasDist = fs3.existsSync(path3.join(distPath, "index.html"));
-  const isDev = process.env.NODE_ENV !== "production" && !hasDist;
+  const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({

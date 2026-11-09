@@ -9,3 +9,14 @@ coverage/
 
 server/data/
 .playwright/
+
+# Dev server output logs
+*.err
+*.out
+dev-server*.err
+dev-server*.out
+
+# AI Studio artifacts
+.aistudio/
+assets/.aistudio/
+

@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import { createApiRouter } from './server/routes';
+import { syncRateLimitsFromStore } from './server/security';
+import { getStore } from './server/store';
 
 // Load environment variables safely
 try {
@@ -17,6 +19,12 @@ try {
 }
 
 async function startServer() {
+  // SECURITY FIX: restore persisted IP-level rate limits from store
+  try {
+    const store = await getStore();
+    if (store.loginAttempts) syncRateLimitsFromStore(store.loginAttempts);
+  } catch { /* ignore — fresh start */ }
+
   const app = express();
   const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
