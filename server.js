@@ -1091,6 +1091,893 @@ function generateTemporaryPassword() {
 
 // server/routes.ts
 init_initialMedia();
+
+// server/cinematch.ts
+var AESTHETIC_PRESETS = {
+  cyberpunk_neon: {
+    title: "Est\xE9tica Cyberpunk Neo-Noir & Ne\xF3n",
+    palette: ["#00F0FF", "#FF007F", "#7928CA", "#0A0A12"],
+    summary: "Paleta saturada en cian el\xE9ctrico y magenta sobre asfalto mojado y sombras densas. Refleja soledad existencial, luces de ne\xF3n bajo la lluvia y distop\xEDas tecnol\xF3gicas.",
+    keywords: ["Cyberpunk", "Ne\xF3n", "Neo-Noir", "Sintetizadores", "Distop\xEDa Urbana"],
+    items: [
+      {
+        title: "Blade Runner 2049",
+        originalTitle: "Blade Runner 2049",
+        type: "pelicula",
+        year: 2017,
+        director: "Denis Villeneuve",
+        genres: ["Ciencia Ficci\xF3n", "Misterio", "Drama"],
+        synopsis: "Treinta a\xF1os despu\xE9s de los eventos de la primera pel\xEDcula, un nuevo blade runner descubre un secreto largamente enterrado.",
+        duration: "2h 44m",
+        posterUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "gCcx85zbxz4",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.8,
+        matchPercentage: 99,
+        matchReason: "La fotograf\xEDa de Roger Deakins es el estandarte definitivo del neo-noir con brumas saturadas y siluetas en contraste.",
+        vibeTag: "Ne\xF3n & Soledad Urbana"
+      },
+      {
+        title: "Cyberpunk: Edgerunners",
+        originalTitle: "Cyberpunk: Edgerunners",
+        type: "anime",
+        year: 2022,
+        director: "Hiroyuki Imaishi",
+        genres: ["Anime", "Acci\xF3n", "Ciencia Ficci\xF3n"],
+        synopsis: "En una distop\xEDa plagada de corrupci\xF3n e implantes cibern\xE9ticos, un chico talentoso pero imprudente intenta convertirse en un mercenario forajido.",
+        duration: "1 Temporada (10 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "JtqIas3bYhg",
+        defaultPlatform: "Netflix",
+        communityRating: 4.9,
+        matchPercentage: 97,
+        matchReason: "Estallido crom\xE1tico hiperquin\xE9tico de Studio TRIGGER con amarillos y cianes fosforescentes en Night City.",
+        vibeTag: "Hiperquinesia Ne\xF3n"
+      },
+      {
+        title: "The Matrix",
+        originalTitle: "The Matrix",
+        type: "pelicula",
+        year: 1999,
+        director: "Lana y Lilly Wachowski",
+        genres: ["Ciencia Ficci\xF3n", "Acci\xF3n"],
+        synopsis: "Un programador es guiado por un misterioso rebelde a descubrir la cruda verdad oculta detr\xE1s de la realidad simulada en la que vive.",
+        duration: "2h 16m",
+        posterUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "vKQi3bBA1y8",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 95,
+        matchReason: "Tinte verdoso ic\xF3nico de f\xF3sforo de monitor, gabardinas de cuero negro y coreograf\xEDa revolucionaria.",
+        vibeTag: "Verde F\xF3sforo & Cuero"
+      },
+      {
+        title: "Drive",
+        originalTitle: "Drive",
+        type: "pelicula",
+        year: 2011,
+        director: "Nicolas Winding Refn",
+        genres: ["Acci\xF3n", "Drama", "Crimen"],
+        synopsis: "Un conductor especialista de cine de d\xEDa y chofer de fugas de noche se ve arrastrado a un violento torbellino criminal por proteger a su vecina.",
+        duration: "1h 40m",
+        posterUrl: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "KBiOF3y1W0Y",
+        defaultPlatform: "Prime Video",
+        communityRating: 4.7,
+        matchPercentage: 93,
+        matchReason: "Atm\xF3sfera synthwave nocturna por las autopistas de Los \xC1ngeles con contrastes rosa fucsia y azul el\xE9ctrico.",
+        vibeTag: "Synthwave Nocturno"
+      },
+      {
+        title: "Spider-Man: A Trav\xE9s del Spider-Verso",
+        originalTitle: "Spider-Man: Across the Spider-Verse",
+        type: "pelicula",
+        year: 2023,
+        director: "Joaquim Dos Santos, Kemp Powers, Justin K. Thompson",
+        genres: ["Animaci\xF3n", "Acci\xF3n", "Aventura", "Ciencia Ficci\xF3n"],
+        synopsis: "Miles Morales se catapulta a trav\xE9s del Multiverso, donde se encuentra con un equipo de Spider-People encargados de proteger su propia existencia.",
+        duration: "2h 20m",
+        posterUrl: "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "cqGjhVJWtEg",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 92,
+        matchReason: "La dimensi\xF3n de Gwen Stacy pintada con acuarelas emotivas y la metr\xF3polis de Nueva York 2099 cyberpunk.",
+        vibeTag: "Multiverso Crom\xE1tico"
+      }
+    ]
+  },
+  desert_dune: {
+    title: "\xC9pica Des\xE9rtica, Luz Solar & Brutalismo",
+    palette: ["#D4A373", "#E9C46A", "#BC6C25", "#264653"],
+    summary: "Tonos tierra, calima dorada y horizontes infinitos. Expresa escala colosal, destino \xE9pico, misticismo y arquitectura monol\xEDtica bajo un sol abrasador.",
+    keywords: ["Desierto", "Escala \xC9pica", "Brutalismo", "Horizontes Infinitos", "Monol\xEDtico"],
+    items: [
+      {
+        title: "Dune: Parte Dos",
+        originalTitle: "Dune: Part Two",
+        type: "pelicula",
+        year: 2024,
+        director: "Denis Villeneuve",
+        genres: ["Ciencia Ficci\xF3n", "Aventura", "Drama"],
+        synopsis: "Paul Atreides se une a Chani y a los Fremen mientras busca venganza contra los conspiradores que destruyeron a su familia.",
+        duration: "2h 46m",
+        posterUrl: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1547234935-80c7145ec969?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "Way9Dexny3w",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 99,
+        matchReason: "La fotograf\xEDa de Greig Fraser en arenas de Jordania y la sobrecogedora secuencia infrarroja en Giedi Prime.",
+        vibeTag: "Arenas Doradas & \xC9pica"
+      },
+      {
+        title: "Mad Max: Furia en el Camino",
+        originalTitle: "Mad Max: Fury Road",
+        type: "pelicula",
+        year: 2015,
+        director: "George Miller",
+        genres: ["Acci\xF3n", "Aventura", "Ciencia Ficci\xF3n"],
+        synopsis: "En un desierto postapocal\xEDptico, Max se une a Furiosa para huir de un tirano despiadado a bordo de un cami\xF3n de guerra.",
+        duration: "2h 00m",
+        posterUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "hEJnMQG9ev8",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.8,
+        matchPercentage: 97,
+        matchReason: "Arenas saturadas de Namibia contra cielos turquesa hiperintensos y tormentas de arena incandescentes.",
+        vibeTag: "\xD3pera de Fuego y Arena"
+      },
+      {
+        title: "Oppenheimer",
+        originalTitle: "Oppenheimer",
+        type: "pelicula",
+        year: 2023,
+        director: "Christopher Nolan",
+        genres: ["Drama", "Biograf\xEDa", "Historia"],
+        synopsis: "La historia del f\xEDsico estadounidense J. Robert Oppenheimer y el desarrollo de la bomba at\xF3mica en el desierto de Los \xC1lamos.",
+        duration: "3h 00m",
+        posterUrl: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "uYPbbksJxIg",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.8,
+        matchPercentage: 95,
+        matchReason: "Im\xE1genes monumentales en 70mm IMAX con cielos p\xE1lidos del desierto y claroscuros psicol\xF3gicos intensos.",
+        vibeTag: "Fisi\xF3n & Tensi\xF3n"
+      },
+      {
+        title: "Interestelar",
+        originalTitle: "Interstellar",
+        type: "pelicula",
+        year: 2014,
+        director: "Christopher Nolan",
+        genres: ["Ciencia Ficci\xF3n", "Drama", "Aventura"],
+        synopsis: "Un grupo de exploradores emprende la misi\xF3n m\xE1s importante de la historia de la humanidad: viajar m\xE1s all\xE1 de nuestra galaxia.",
+        duration: "2h 49m",
+        posterUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "zSWdZVtXT7E",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 94,
+        matchReason: "Campos de ma\xEDz cubiertos de polvo terrestre frente a la inmensidad g\xE9lida del cosmos y agujeros de gusano.",
+        vibeTag: "Cosmos & Polvo"
+      },
+      {
+        title: "Gladiador II",
+        originalTitle: "Gladiator II",
+        type: "pelicula",
+        year: 2024,
+        director: "Ridley Scott",
+        genres: ["Acci\xF3n", "Aventura", "Drama"],
+        synopsis: "A\xF1os despu\xE9s de presenciar la muerte del admirado h\xE9roe M\xE1ximo, Lucio debe ingresar al Coliseo para luchar por el futuro de Roma.",
+        duration: "2h 28m",
+        posterUrl: "https://images.unsplash.com/photo-1514539079130-25950c84af65?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "4rgYUipGJNo",
+        defaultPlatform: "Cine / Paramount+",
+        communityRating: 4.6,
+        matchPercentage: 92,
+        matchReason: "La arena del Coliseo te\xF1ida de sangre bajo la luz ocre del sol de Numidia y Roma imperial.",
+        vibeTag: "Arena & Coliseo"
+      }
+    ]
+  },
+  anime_ghibli: {
+    title: "Acuarela, Naturaleza & Nostalgia Ghibli",
+    palette: ["#588157", "#90E0EF", "#FAEDCD", "#E76F51"],
+    summary: "Colores org\xE1nicos y acogedores: verdes de praderas encantadas, cielos azul celeste y luz dorada crepuscular. Evoca serenidad, asombro infantil y belleza po\xE9tica.",
+    keywords: ["Ghibli", "Acuarela", "Naturaleza", "Nostalgia", "Magia Cotidiana"],
+    items: [
+      {
+        title: "El Viaje de Chihiro",
+        originalTitle: "Sen to Chihiro no Kamikakushi",
+        type: "anime",
+        year: 2001,
+        director: "Hayao Miyazaki",
+        genres: ["Anime", "Fantas\xEDa", "Aventura"],
+        synopsis: "Chihiro, una ni\xF1a de diez a\xF1os caprichosa, se ve atrapada en un mundo m\xE1gico habitado por dioses, brujas y esp\xEDritus.",
+        duration: "2h 05m",
+        posterUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "ByXuk9QqQkk",
+        defaultPlatform: "Netflix",
+        communityRating: 4.9,
+        matchPercentage: 99,
+        matchReason: "Fondos pintados al gouache, trenes sobre aguas en calma y una casa de ba\xF1os termales rebosante de magia.",
+        vibeTag: "Magia de Ba\xF1os Termales"
+      },
+      {
+        title: "Your Name (Kimi no Na wa)",
+        originalTitle: "Kimi no Na wa",
+        type: "anime",
+        year: 2016,
+        director: "Makoto Shinkai",
+        genres: ["Anime", "Romance", "Drama", "Fantas\xEDa"],
+        synopsis: "Mitsuha y Taki descubren una extra\xF1a conexi\xF3n: mientras duermen, intercambian sus cuerpos entre Tokio y un pueblo rural.",
+        duration: "1h 46m",
+        posterUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "hRfHcp2GjVI",
+        defaultPlatform: "Prime Video",
+        communityRating: 4.9,
+        matchPercentage: 98,
+        matchReason: 'La hora m\xE1gica crepuscular ("Kataware-doki") y cometas iluminando el cielo estrellado con fotorealismo emotivo.',
+        vibeTag: "Crep\xFAsculo y Destino"
+      },
+      {
+        title: "Arcane",
+        originalTitle: "Arcane",
+        type: "serie",
+        year: 2021,
+        director: "Pascal Charrue, Arnaud Delord",
+        genres: ["Animaci\xF3n", "Acci\xF3n", "Sci-Fi", "Fantas\xEDa"],
+        synopsis: "En medio del conflicto entre las ciudades gemelas de Pilt\xF3ver y Zaun, dos hermanas luchan en bandos opuestos de una guerra tecnol\xF3gica.",
+        duration: "2 Temporadas (18 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "fXmAurh012s",
+        defaultPlatform: "Netflix",
+        communityRating: 4.9,
+        matchPercentage: 95,
+        matchReason: "Pintura digital con pinceladas al \xF3leo visibles, iluminaci\xF3n expresionista y steampunk dorado.",
+        vibeTag: "Pintura en Movimiento"
+      },
+      {
+        title: "FLCL (Fooly Cooly)",
+        originalTitle: "FLCL",
+        type: "anime",
+        year: 2e3,
+        director: "Kazuya Tsurumaki",
+        genres: ["Anime", "Comedia", "Ciencia Ficci\xF3n"],
+        synopsis: "Naota es un chico normal hasta que una mujer en Vespa le golpea con un bajo Rickenbacker, abriendo un portal en su cabeza.",
+        duration: "6 Episodios",
+        posterUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "t9k8F7YF-Uo",
+        defaultPlatform: "Crunchyroll",
+        communityRating: 4.8,
+        matchPercentage: 92,
+        matchReason: "Estilo grunge experimental japon\xE9s con cielos suburbanos de ensue\xF1o y m\xFAsica de The Pillows.",
+        vibeTag: "Grunge Anime & Melancol\xEDa"
+      },
+      {
+        title: "Rurouni Kenshin: Recuerdos (Tsuioku-hen)",
+        originalTitle: "Rurouni Kenshin: Meiji Kenkaku Romantan - Tsuioku-hen",
+        type: "anime",
+        year: 1999,
+        director: "Kazuhiro Furuhashi",
+        genres: ["Anime", "Drama", "Historia", "Acci\xF3n"],
+        synopsis: "La tr\xE1gica historia del pasado de Kenshin Himura como el implacable asesino Hitokiri Battosai durante el ocaso del shogunato Tokugawa.",
+        duration: "4 OVAs",
+        posterUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "dDk5q2aT1mE",
+        defaultPlatform: "Crunchyroll",
+        communityRating: 4.9,
+        matchPercentage: 91,
+        matchReason: "P\xE9talos de cerezo cayendo sobre nieve blanca y sangre, con una partitura eleg\xEDaca de Taku Iwasaki.",
+        vibeTag: "Tragedia en la Nieve"
+      }
+    ]
+  },
+  gothic_dark: {
+    title: "G\xF3tico Urbano, Claroscuro & Dark Academia",
+    palette: ["#0D1B2A", "#1B263B", "#415A77", "#E0E1DD"],
+    summary: "Claroscuros de alto contraste, sombras cinematogr\xE1ficas profundas, piedra h\xFAmeda y bibliotecas en penumbra. Clima de misterio cerebral, intriga moral y belleza l\xFAgubre.",
+    keywords: ["Claroscuro", "Dark Academia", "Sombras Profundas", "Misterio Cerebral", "G\xF3tico"],
+    items: [
+      {
+        title: "The Batman",
+        originalTitle: "The Batman",
+        type: "pelicula",
+        year: 2022,
+        director: "Matt Reeves",
+        genres: ["Acci\xF3n", "Crimen", "Drama", "Misterio"],
+        synopsis: "En su segundo a\xF1o luchando contra el crimen, Batman explora la corrupci\xF3n que asola a Gotham y el v\xEDnculo con su propia familia.",
+        duration: "2h 56m",
+        posterUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "mqqft2x_Aa4",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.8,
+        matchPercentage: 99,
+        matchReason: "La fotograf\xEDa de Greig Fraser en lluvia continua con bengalas rojas rasgando la oscuridad de Gotham.",
+        vibeTag: "Lluvia, Sombras & Venganza"
+      },
+      {
+        title: "El Caballero de la Noche",
+        originalTitle: "The Dark Knight",
+        type: "pelicula",
+        year: 2008,
+        director: "Christopher Nolan",
+        genres: ["Acci\xF3n", "Crimen", "Drama", "Suspense"],
+        synopsis: "Batman debe aceptar una de las mayores pruebas psicol\xF3gicas y f\xEDsicas cuando el Guas\xF3n desata la anarqu\xEDa en Gotham.",
+        duration: "2h 32m",
+        posterUrl: "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "EXeTwQWrcwY",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 97,
+        matchReason: "Brutalismo urbano nocturno, cristales de rascacielos y tensi\xF3n psicol\xF3gica sin tregua.",
+        vibeTag: "Anarqu\xEDa en la Noche"
+      },
+      {
+        title: "Severance (Separaci\xF3n)",
+        originalTitle: "Severance",
+        type: "serie",
+        year: 2022,
+        director: "Dan Erickson, Ben Stiller",
+        genres: ["Serie", "Drama", "Misterio", "Ciencia Ficci\xF3n"],
+        synopsis: "Mark lidera un equipo en Lumon Industries cuyos empleados han pasado por un procedimiento de separaci\xF3n quir\xFArgica entre sus recuerdos laborales y personales.",
+        duration: "2 Temporadas (19 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "xEQP4VVuyrY",
+        defaultPlatform: "Apple TV+",
+        communityRating: 4.9,
+        matchPercentage: 96,
+        matchReason: "Pasillos infinitos de blanco quir\xFArgico, moquetas verdes y encuadres desasosegantes de simetr\xEDa opresiva.",
+        vibeTag: "Minimalismo Cl\xEDnico Inquietante"
+      },
+      {
+        title: "El Padrino",
+        originalTitle: "The Godfather",
+        type: "pelicula",
+        year: 1972,
+        director: "Francis Ford Coppola",
+        genres: ["Drama", "Crimen"],
+        synopsis: "El patriarca envejecido de una dinast\xEDa del crimen organizado transfiere el control de su imperio clandestino a su hijo reacio.",
+        duration: "2h 55m",
+        posterUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "sY1S34973zA",
+        defaultPlatform: "Paramount+",
+        communityRating: 4.9,
+        matchPercentage: 94,
+        matchReason: 'Gordon Willis ("El Pr\xEDncipe de las Tinieblas") oculta los ojos de los personajes bajo sombras cenitales doradas.',
+        vibeTag: "Poder & Sombras Cenitales"
+      },
+      {
+        title: "The Last of Us",
+        originalTitle: "The Last of Us",
+        type: "serie",
+        year: 2023,
+        director: "Craig Mazin, Neil Druckmann",
+        genres: ["Serie", "Drama", "Aventura", "Ciencia Ficci\xF3n"],
+        synopsis: "Veinte a\xF1os despu\xE9s de que una pandemia de hongos destruya la civilizaci\xF3n, Joel debe escoltar a Ellie a trav\xE9s de unos Estados Unidos desolados.",
+        duration: "1 Temporada (9 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "uLtkt8BonwM",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 92,
+        matchReason: "Naturaleza reclamando ciudades en ruinas, sombras melanc\xF3licas y fogatas en medio de la desolaci\xF3n.",
+        vibeTag: "Ruinas & Supervivencia"
+      }
+    ]
+  },
+  wes_anderson: {
+    title: "Pastel Sim\xE9trico, Vintage & Wes Anderson",
+    palette: ["#F4A261", "#E76F51", "#2A9D8F", "#E9C46A"],
+    summary: "Planos centrados milim\xE9tricos, colores pastel saturados con encanto vintage y dise\xF1o de producci\xF3n artesanal. Transmite ternura c\xF3mica, elegancia retro y meticulosidad visual.",
+    keywords: ["Simetr\xEDa", "Colores Pastel", "Vintage", "Wes Anderson", "Encuadre Centrado"],
+    items: [
+      {
+        title: "El Gran Hotel Budapest",
+        originalTitle: "The Grand Budapest Hotel",
+        type: "pelicula",
+        year: 2014,
+        director: "Wes Anderson",
+        genres: ["Comedia", "Aventura", "Drama"],
+        synopsis: "Las aventuras de Gustave H, el legendario conserje de un famoso hotel europeo de entreguerras, y Zero Moustafa, el botones.",
+        duration: "1h 39m",
+        posterUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "1Fg5iWmQjwk",
+        defaultPlatform: "Disney+",
+        communityRating: 4.9,
+        matchPercentage: 99,
+        matchReason: "La fachada rosa pastel en los Alpes, simetr\xEDa rigurosa y las cajas de pasteles de Mendl confeccionadas a mano.",
+        vibeTag: "Rosa Pastel & Simetr\xEDa Pura"
+      },
+      {
+        title: "Am\xE9lie",
+        originalTitle: "Le Fabuleux Destin d'Am\xE9lie Poulain",
+        type: "pelicula",
+        year: 2001,
+        director: "Jean-Pierre Jeunet",
+        genres: ["Comedia", "Romance"],
+        synopsis: "Am\xE9lie es una camarera ingenua y so\xF1adora de Par\xEDs con un agudo sentido de la justicia que decide cambiar la vida de quienes la rodean.",
+        duration: "2h 02m",
+        posterUrl: "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "HUECWi5pX7o",
+        defaultPlatform: "Prime Video",
+        communityRating: 4.8,
+        matchPercentage: 96,
+        matchReason: "Saturaci\xF3n c\xE1lida de verdes y rojos en un Par\xEDs id\xEDlico con detalles cotidianos elevados a poes\xEDa visual.",
+        vibeTag: "Calidez Parisina & Rojo Rub\xED"
+      },
+      {
+        title: "La La Land",
+        originalTitle: "La La Land",
+        type: "pelicula",
+        year: 2016,
+        director: "Damien Chazelle",
+        genres: ["Comedia", "Drama", "M\xFAsica", "Romance"],
+        synopsis: "Un pianista de jazz y una aspirante a actriz se enamoran mientras persiguen sus sue\xF1os en Los \xC1ngeles.",
+        duration: "2h 08m",
+        posterUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "0pdqf4P9MB8",
+        defaultPlatform: "Prime Video",
+        communityRating: 4.8,
+        matchPercentage: 95,
+        matchReason: "Vestidos monocrom\xE1ticos en azul y amarillo sobre los cielos crepusculares violetas del observatorio Griffith.",
+        vibeTag: "Atardecer Violeta & Jazz"
+      },
+      {
+        title: "El Viaje de Chihiro",
+        originalTitle: "Sen to Chihiro no Kamikakushi",
+        type: "anime",
+        year: 2001,
+        director: "Hayao Miyazaki",
+        genres: ["Anime", "Fantas\xEDa", "Aventura"],
+        synopsis: "Chihiro debe trabajar en una fant\xE1stica casa de ba\xF1os para esp\xEDritus para liberar a sus padres transformados en cerdos.",
+        duration: "2h 05m",
+        posterUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "ByXuk9QqQkk",
+        defaultPlatform: "Netflix",
+        communityRating: 4.9,
+        matchPercentage: 93,
+        matchReason: "Composici\xF3n pict\xF3rica artesanal con detalles minuciosos y un fest\xEDn visual en cada rinc\xF3n.",
+        vibeTag: "Fantas\xEDa Visual Pura"
+      },
+      {
+        title: "Spider-Man: A Trav\xE9s del Spider-Verso",
+        originalTitle: "Spider-Man: Across the Spider-Verse",
+        type: "pelicula",
+        year: 2023,
+        director: "Joaquim Dos Santos, Kemp Powers",
+        genres: ["Animaci\xF3n", "Acci\xF3n", "Aventura"],
+        synopsis: "Una celebraci\xF3n visual del arte del c\xF3mic con estilos art\xEDsticos que cambian din\xE1micamente entre universos.",
+        duration: "2h 20m",
+        posterUrl: "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "cqGjhVJWtEg",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 91,
+        matchReason: "Innovaci\xF3n gr\xE1fica radical con texturas de semitonos Ben-Day y paletas pasteles audaces.",
+        vibeTag: "Arte C\xF3mic Pop"
+      }
+    ]
+  },
+  noir_thriller: {
+    title: "Thriller Nocturno A\xF1os 90 & Tensi\xF3n Psicol\xF3gica",
+    palette: ["#14213D", "#000000", "#FCA311", "#E5E5E5"],
+    summary: "Iluminaci\xF3n de vapor de sodio, grano cinematogr\xE1fico de 35mm, asfalto empapado y habitaciones en penumbra. Despierta adrenalina cruda, suspense moral y di\xE1logos electrizantes.",
+    keywords: ["Thriller 90s", "Tensi\xF3n a Fuego Lento", "Plot Twist", "Noche Urbana", "Atm\xF3sfera Densa"],
+    items: [
+      {
+        title: "Pulp Fiction",
+        originalTitle: "Pulp Fiction",
+        type: "pelicula",
+        year: 1994,
+        director: "Quentin Tarantino",
+        genres: ["Crimen", "Drama"],
+        synopsis: "Las vidas de dos sicarios de la mafia, un boxeador, la esposa de un g\xE1ngster y dos bandidos de poca monta se entrelazan.",
+        duration: "2h 34m",
+        posterUrl: "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "s7EdQ4FqbhY",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 99,
+        matchReason: "Luz c\xE1lida de diners de medianoche, el resplandor dorado del malet\xEDn y el grano anal\xF3gico de pel\xEDcula.",
+        vibeTag: "Diners, Ne\xF3n & Malet\xEDn Dorado"
+      },
+      {
+        title: "Breaking Bad",
+        originalTitle: "Breaking Bad",
+        type: "serie",
+        year: 2008,
+        director: "Vince Gilligan",
+        genres: ["Serie", "Drama", "Crimen", "Suspense"],
+        synopsis: "Un profesor de qu\xEDmica con c\xE1ncer terminal se asocia con un antiguo alumno para asegurar el futuro financiero de su familia.",
+        duration: "5 Temporadas (62 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1547234935-80c7145ec969?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "HhesaQXLuRY",
+        defaultPlatform: "Netflix",
+        communityRating: 4.9,
+        matchPercentage: 97,
+        matchReason: "Cielos de Nuevo M\xE9xico, el filtro \xE1mbar de M\xE9xico y una degradaci\xF3n moral reflejada en el vestuario.",
+        vibeTag: "Desierto de Albuquerque & Humo"
+      },
+      {
+        title: "Severance (Separaci\xF3n)",
+        originalTitle: "Severance",
+        type: "serie",
+        year: 2022,
+        director: "Ben Stiller",
+        genres: ["Serie", "Drama", "Misterio", "Ciencia Ficci\xF3n"],
+        synopsis: "Una inquietante conspiraci\xF3n corporativa filmada con precisi\xF3n milim\xE9trica donde nada es lo que parece.",
+        duration: "2 Temporadas (19 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "xEQP4VVuyrY",
+        defaultPlatform: "Apple TV+",
+        communityRating: 4.9,
+        matchPercentage: 95,
+        matchReason: "Tensi\xF3n psicol\xF3gica asfixiante con iluminaci\xF3n cenital cl\xEDnica y revelaciones impactantes.",
+        vibeTag: "Tensi\xF3n Psicol\xF3gica Pura"
+      },
+      {
+        title: "The Batman",
+        originalTitle: "The Batman",
+        type: "pelicula",
+        year: 2022,
+        director: "Matt Reeves",
+        genres: ["Acci\xF3n", "Crimen", "Drama"],
+        synopsis: "Investigaci\xF3n detectivesca de cr\xEDmenes en serie bajo la lluvia nocturna con est\xE9tica de thriller de Fincher.",
+        duration: "2h 56m",
+        posterUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "mqqft2x_Aa4",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.8,
+        matchPercentage: 94,
+        matchReason: "Atm\xF3sfera sucia inspirada en Se7en y Klute con sombras de \xE1mbar y lluvia incesante.",
+        vibeTag: "Detective Bajo la Lluvia"
+      },
+      {
+        title: "El Caballero de la Noche",
+        originalTitle: "The Dark Knight",
+        type: "pelicula",
+        year: 2008,
+        director: "Christopher Nolan",
+        genres: ["Acci\xF3n", "Crimen", "Drama"],
+        synopsis: "El enfrentamiento moral definitivo entre Batman y el Guas\xF3n en las calles de Gotham.",
+        duration: "2h 32m",
+        posterUrl: "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "EXeTwQWrcwY",
+        defaultPlatform: "Max (HBO)",
+        communityRating: 4.9,
+        matchPercentage: 92,
+        matchReason: "Thriller policiaco de gran escala con persecuciones nocturnas en t\xFAneles subterr\xE1neos.",
+        vibeTag: "Caos & Dilema Moral"
+      }
+    ]
+  }
+};
+var VIBE_MAPPINGS = {
+  plot_twist: {
+    presetKey: "noir_thriller",
+    reason: "Historias laber\xEDnticas dise\xF1adas con meticulosidad para mantenerte al filo del asiento hasta el \xFAltimo plano.",
+    vibeTag: "Plot Twist Inolvidable"
+  },
+  adrenaline: {
+    presetKey: "cyberpunk_neon",
+    reason: "Ritmo implacable, secuencias de acci\xF3n coreografiadas y adrenalina pura sin descansos.",
+    vibeTag: "Adrenalina Pura"
+  },
+  melancholy: {
+    presetKey: "cyberpunk_neon",
+    reason: "Poes\xEDa visual, contemplaci\xF3n nocturna y resonancia emocional para momentos de reflexi\xF3n \xEDntima.",
+    vibeTag: "Melancol\xEDa y Reflexi\xF3n"
+  },
+  existential_scifi: {
+    presetKey: "desert_dune",
+    reason: "Preguntas fundamentales sobre el cosmos, la conciencia humana y horizontes colosales.",
+    vibeTag: "Ciencia Ficci\xF3n Existencial"
+  },
+  pure_fun: {
+    presetKey: "wes_anderson",
+    reason: "Placer cinematogr\xE1fico puro, humor inteligente, dise\xF1o de arte brillante y personajes inolvidables.",
+    vibeTag: "Diversi\xF3n & Estilo"
+  },
+  mystery: {
+    presetKey: "gothic_dark",
+    reason: "Secretos a fuego lento, sombras densas y una atm\xF3sfera g\xF3tica donde cada detalle cuenta.",
+    vibeTag: "Misterio a Fuego Lento"
+  },
+  emotional_comfort: {
+    presetKey: "anime_ghibli",
+    reason: "Abrazo emocional para el alma: belleza natural, magia cotidiana y calidez reconfortante.",
+    vibeTag: "Confort Emocional"
+  },
+  epic: {
+    presetKey: "desert_dune",
+    reason: "Grandes epopeyas cinematogr\xE1ficas de escala sobrehumana, partituras atronadoras y leyenda.",
+    vibeTag: "\xC9pica Monumental"
+  }
+};
+function getCuratedRecommendations(req) {
+  let presetKey = "cyberpunk_neon";
+  let customReason = "";
+  let vibeTag = "Est\xE9tica Cinematogr\xE1fica";
+  let mode = "preset";
+  if (req.image) {
+    mode = "visual";
+    const keys = Object.keys(AESTHETIC_PRESETS);
+    const hash = req.image.length % keys.length;
+    presetKey = keys[hash] || "cyberpunk_neon";
+    customReason = "An\xE1lisis de paleta y composici\xF3n: detectada afinidad con esta atm\xF3sfera cinematogr\xE1fica.";
+  } else if (req.vibe && VIBE_MAPPINGS[req.vibe]) {
+    mode = "vibe";
+    const mapping = VIBE_MAPPINGS[req.vibe];
+    presetKey = mapping.presetKey;
+    customReason = mapping.reason;
+    vibeTag = mapping.vibeTag;
+  } else if (req.visualPreset && AESTHETIC_PRESETS[req.visualPreset]) {
+    mode = "preset";
+    presetKey = req.visualPreset;
+  } else if (req.userFavorites && req.userFavorites.length > 0) {
+    mode = "favorites";
+    presetKey = "desert_dune";
+    customReason = "Basado en tus t\xEDtulos favoritos y calificaciones m\xE1s altas de tu colecci\xF3n.";
+    vibeTag = "Tus Favoritos 5\u2605";
+  }
+  const preset = AESTHETIC_PRESETS[presetKey] || AESTHETIC_PRESETS.cyberpunk_neon;
+  let items = [...preset.items];
+  if (req.mediaType && req.mediaType !== "all") {
+    const filtered = items.filter((it) => it.type === req.mediaType);
+    if (filtered.length >= 2) items = filtered;
+  }
+  if (req.platform && req.platform !== "all") {
+    const pNorm = req.platform.toLowerCase();
+    const platformMatches = items.filter((it) => it.defaultPlatform.toLowerCase().includes(pNorm));
+    if (platformMatches.length >= 2) items = platformMatches;
+  }
+  const recommendations = items.map((it, idx) => ({
+    id: `cinematch-${presetKey}-${idx}`,
+    title: it.title,
+    originalTitle: it.originalTitle,
+    type: it.type,
+    year: it.year,
+    director: it.director,
+    genres: it.genres,
+    synopsis: it.synopsis,
+    duration: it.duration,
+    posterUrl: it.posterUrl,
+    backdropUrl: it.backdropUrl,
+    trailerYoutubeId: it.trailerYoutubeId,
+    defaultPlatform: it.defaultPlatform,
+    communityRating: it.communityRating,
+    matchPercentage: Math.max(90, it.matchPercentage - idx),
+    matchReason: customReason || it.matchReason,
+    vibeTag: vibeTag || it.vibeTag
+  }));
+  return {
+    success: true,
+    mode,
+    aestheticAnalysis: {
+      title: preset.title,
+      palette: preset.palette,
+      summary: preset.summary,
+      keywords: preset.keywords
+    },
+    recommendations
+  };
+}
+
+// src/lib/validation.ts
+import { z } from "zod";
+var DISPOSABLE_EMAIL_DOMAINS = /* @__PURE__ */ new Set([
+  "mailinator.com",
+  "tempmail.com",
+  "temp-mail.org",
+  "10minutemail.com",
+  "guerrillamail.com",
+  "sharklasers.com",
+  "yopmail.com",
+  "throwawaymail.com",
+  "fake.com",
+  "test.com",
+  "testing.com",
+  "example.com",
+  "sample.com",
+  "dispostable.com",
+  "trashmail.com",
+  "getairmail.com",
+  "generator.email",
+  "fakemail.net",
+  "nada.ltd",
+  "mohmal.com",
+  "mytemp.email",
+  "crazymailing.com",
+  "mailnesia.com",
+  "spam4.me",
+  "bccto.me",
+  "chacuo.net",
+  "0815.ru",
+  "inboxbear.com"
+]);
+var FAKE_LOCAL_PARTS = /* @__PURE__ */ new Set([
+  "test",
+  "testing",
+  "asdf",
+  "asdfgh",
+  "qwerty",
+  "fake",
+  "nobody",
+  "none",
+  "null",
+  "undefined",
+  "123456",
+  "abc",
+  "no-reply",
+  "noreply",
+  "ejemplo",
+  "prueba"
+]);
+function isRealEmail(email) {
+  if (!email || typeof email !== "string") {
+    return { isValid: false, error: "El correo electr\xF3nico es obligatorio." };
+  }
+  const trimmed = email.trim().toLowerCase();
+  if (trimmed.length < 5 || trimmed.length > 254) {
+    return { isValid: false, error: "El correo debe tener entre 5 y 254 caracteres." };
+  }
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(trimmed)) {
+    return { isValid: false, error: "Formato de correo inv\xE1lido (ejemplo: usuario@gmail.com)." };
+  }
+  const parts = trimmed.split("@");
+  if (parts.length !== 2) {
+    return { isValid: false, error: "El correo debe contener exactamente un @." };
+  }
+  const [localPart, domain] = parts;
+  if (localPart.length > 64) {
+    return { isValid: false, error: "La parte previa al @ no puede exceder 64 caracteres." };
+  }
+  if (FAKE_LOCAL_PARTS.has(localPart)) {
+    return { isValid: false, error: "Por favor ingresa un correo personal o corporativo real." };
+  }
+  if (!domain.includes(".")) {
+    return { isValid: false, error: "El dominio del correo debe incluir una extensi\xF3n (.com, .es, etc.)." };
+  }
+  const domainParts = domain.split(".");
+  const tld = domainParts[domainParts.length - 1];
+  if (!tld || tld.length < 2 || !/^[a-z]+$/.test(tld)) {
+    return { isValid: false, error: "La extensi\xF3n de dominio (.com, .org, .es) no es v\xE1lida." };
+  }
+  if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+    return {
+      isValid: false,
+      error: `El dominio "@${domain}" es temporal o desechable. Usa un proveedor real (Gmail, Outlook, Yahoo, Proton, iCloud, etc.).`
+    };
+  }
+  return { isValid: true };
+}
+function getEmailValidationError(email) {
+  const check = isRealEmail(email);
+  return check.isValid ? null : check.error || "El correo electr\xF3nico no es v\xE1lido.";
+}
+var realEmailSchema = z.string().trim().min(5, "El correo electr\xF3nico es requerido.").max(254, "El correo no puede exceder 254 caracteres.").superRefine((val, ctx) => {
+  const check = isRealEmail(val);
+  if (!check.isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: check.error || "Correo no v\xE1lido"
+    });
+  }
+});
+var passwordSchema = z.string().min(8, "La contrase\xF1a debe tener al menos 8 caracteres.").max(128, "La contrase\xF1a no puede exceder 128 caracteres.").regex(/[A-Z]/, "Debe incluir al menos una letra may\xFAscula.").regex(/[a-z]/, "Debe incluir al menos una letra min\xFAscula.").regex(/[0-9]/, "Debe incluir al menos un n\xFAmero.");
+var currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+var mediaFormSchema = z.object({
+  title: z.string().trim().min(2, "El t\xEDtulo debe tener al menos 2 caracteres.").max(200, "El t\xEDtulo no puede exceder 200 caracteres."),
+  originalTitle: z.string().trim().max(200).optional(),
+  type: z.enum(["pelicula", "serie", "anime", "documental"]),
+  year: z.number().int("El a\xF1o debe ser un n\xFAmero entero.").min(1888, "El a\xF1o debe ser 1888 o posterior (nacimiento del cine).").max(currentYear + 2, `El a\xF1o no puede ser superior a ${currentYear + 2}.`),
+  director: z.string().trim().min(2, "El nombre del director debe tener al menos 2 caracteres.").max(160, "El director no puede exceder 160 caracteres."),
+  genres: z.array(z.string().trim().min(1)).min(1, "Debes seleccionar al menos un g\xE9nero cinematogr\xE1fico.").max(12, "M\xE1ximo 12 g\xE9neros permitidos."),
+  synopsis: z.string().trim().max(4e3, "La sinopsis no puede exceder 4000 caracteres.").optional(),
+  duration: z.string().trim().max(60).optional(),
+  posterUrl: z.string().trim().url("La URL del p\xF3ster debe ser una direcci\xF3n web v\xE1lida (ej. https://...).").max(1e3, "La URL del p\xF3ster es demasiado larga.").or(z.literal("")),
+  backdropUrl: z.string().trim().url("La URL del fondo debe ser una direcci\xF3n web v\xE1lida.").max(1e3).optional().or(z.literal("")),
+  trailerUrl: z.string().trim().max(300).optional(),
+  trailerYoutubeId: z.string().trim().max(120).optional(),
+  defaultPlatform: z.string().trim().min(1, "Selecciona una plataforma principal.").max(80)
+});
+var userReviewSchema = z.object({
+  mediaId: z.string().trim().min(1, "ID de t\xEDtulo requerido."),
+  status: z.enum(["pendiente", "en_proceso", "terminada"]),
+  stars: z.number().min(0).max(5).default(0),
+  watchedDate: z.string().trim().optional(),
+  platform: z.string().trim().max(80).optional(),
+  evaluation: z.string().trim().max(80).optional(),
+  critique: z.string().trim().max(4e3).optional(),
+  director: z.string().trim().max(120).optional(),
+  year: z.number().optional(),
+  genres: z.array(z.string()).optional(),
+  wouldRewatch: z.enum(["si_totalmente", "quizas", "no_suficiente", "jamas"]).optional(),
+  favoriteMoment: z.string().trim().max(500).optional()
+}).superRefine((data, ctx) => {
+  if (data.status === "terminada") {
+    if (data.stars < 0.5 || data.stars > 5) {
+      ctx.addIssue({
+        path: ["stars"],
+        code: z.ZodIssueCode.custom,
+        message: "Debes asignar una calificaci\xF3n entre 0.5 y 5 estrellas al terminar la obra."
+      });
+    }
+    if (data.watchedDate) {
+      const parsedDate = new Date(data.watchedDate);
+      if (isNaN(parsedDate.getTime())) {
+        ctx.addIssue({
+          path: ["watchedDate"],
+          code: z.ZodIssueCode.custom,
+          message: "La fecha de visualizaci\xF3n tiene un formato no v\xE1lido (YYYY-MM-DD)."
+        });
+      } else if (parsedDate > /* @__PURE__ */ new Date()) {
+        ctx.addIssue({
+          path: ["watchedDate"],
+          code: z.ZodIssueCode.custom,
+          message: "La fecha de visualizaci\xF3n no puede ser en el futuro."
+        });
+      }
+    }
+  }
+});
+var registerUserSchema = z.object({
+  name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres.").max(80, "El nombre no puede exceder 80 caracteres."),
+  email: realEmailSchema,
+  password: passwordSchema,
+  avatar: z.string().trim().url().optional().or(z.literal("")),
+  favoriteGenres: z.array(z.string()).optional(),
+  bio: z.string().trim().max(500).optional()
+});
+var loginUserSchema = z.object({
+  identifier: z.string().trim().min(3, "Ingresa tu correo o nombre de usuario."),
+  password: z.string().min(1, "Ingresa tu contrase\xF1a.")
+});
+var communityCommentSchema = z.object({
+  mediaId: z.string().trim().min(1, "Media ID requerido."),
+  rating: z.number().min(1, "La calificaci\xF3n m\xEDnima es 1\u2605").max(5, "La calificaci\xF3n m\xE1xima es 5\u2605"),
+  comment: z.string().trim().min(3, "El comentario debe tener al menos 3 caracteres.").max(2e3, "El comentario no puede exceder 2000 caracteres.")
+});
+var contactTicketSchema = z.object({
+  name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres.").max(80),
+  email: realEmailSchema,
+  subject: z.string().trim().min(3, "El asunto debe tener al menos 3 caracteres.").max(160),
+  message: z.string().trim().min(10, "El mensaje debe tener al menos 10 caracteres.").max(4e3)
+});
+
+// server/routes.ts
 var SESSION_COOKIE = "sl_session";
 var SESSION_DAYS_REMEMBER = 30;
 var SESSION_DAYS_DEFAULT = 7;
@@ -1151,9 +2038,6 @@ function addAudit(store, entry) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   });
   if (store.audit.length > 2e3) store.audit.length = 2e3;
-}
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
 }
 function validatePassword(password) {
   if (typeof password !== "string" || password.length < 8) {
@@ -1704,7 +2588,7 @@ function createApiRouter() {
     }
     res.json({ success: true, data: result });
   }));
-  router.post("/assistant", requireAuth, asyncRoute(async (req, res) => {
+  router.post("/assistant", asyncRoute(async (req, res) => {
     const { message, history = [], context = {} } = req.body;
     if (!message || typeof message !== "string") {
       return safeError(res, 400, "Mensaje requerido.", "INVALID_MESSAGE");
@@ -1746,12 +2630,203 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
     }
     res.json({ success: true, reply: fallbackReply });
   }));
+  router.post("/recommendations", asyncRoute(async (req, res) => {
+    const {
+      image,
+      visualPreset,
+      vibe,
+      mediaType = "all",
+      platform = "all",
+      userFavorites = [],
+      queryText = ""
+    } = req.body || {};
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const findInCatalog = (title) => {
+      const norm = normalizeTitle(title);
+      return INITIAL_MEDIA_LIST.find((m) => normalizeTitle(m.title) === norm || normalizeTitle(m.originalTitle || "") === norm);
+    };
+    if (geminiApiKey) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        const systemInstruction = `Eres "CineMatch AI", el motor de recomendaci\xF3n visual y cin\xE9fila de ScreenLog.
+Tu especialidad es analizar la est\xE9tica visual (fotograf\xEDa, paleta de colores, iluminaci\xF3n, encuadres, atm\xF3sfera, sombras, grano o arquitectura) de fotos/im\xE1genes que el usuario sube, o sus estados de \xE1nimo cinematogr\xE1ficos.
+Debes devolver SIEMPRE un JSON v\xE1lido con la siguiente estructura:
+{
+  "aestheticAnalysis": {
+    "title": "Nombre evocador del estilo visual o vibra (ej: 'Claroscuro Ne\xF3n & Soledad Urbana')",
+    "palette": ["#hex1", "#hex2", "#hex3", "#hex4"],
+    "summary": "Explicaci\xF3n de 2-3 frases analizando la est\xE9tica de la imagen/vibra detectada.",
+    "keywords": ["Palabra1", "Palabra2", "Palabra3", "Palabra4"]
+  },
+  "recommendations": [
+    {
+      "title": "T\xEDtulo en espa\xF1ol o internacional conocido",
+      "originalTitle": "T\xEDtulo original",
+      "year": 2023,
+      "type": "pelicula",
+      "director": "Nombre del director/creador",
+      "genres": ["G\xE9nero 1", "G\xE9nero 2"],
+      "synopsis": "Breve sinopsis atrapante de 2 l\xEDneas.",
+      "defaultPlatform": "Netflix",
+      "matchPercentage": 97,
+      "matchReason": "Explicaci\xF3n de por qu\xE9 coincide con la paleta, atm\xF3sfera o foto analizada.",
+      "vibeTag": "Tag breve (ej: 'Paleta Ne\xF3n & Lluvia')"
+    }
+  ]
+}
+Recomienda entre 4 y 6 obras que encajen con precisi\xF3n visual y tem\xE1tica. Si se solicit\xF3 filtrar por tipo (ej: solo pel\xEDculas o anime), resp\xE9talo.`;
+        const parts = [];
+        if (typeof image === "string" && image.length > 50) {
+          const match = image.match(/^data:([^;]+);base64,(.+)$/);
+          const mimeType = match ? match[1] : "image/jpeg";
+          const base64Data = match ? match[2] : image;
+          parts.push({
+            inlineData: {
+              mimeType,
+              data: base64Data
+            }
+          });
+        }
+        const promptText = `Analiza la imagen adjunta o las preferencias del usuario:
+- Preset visual: ${visualPreset || "Ninguno"}
+- Estado de \xE1nimo / Vibe: ${vibe || "Ninguno"}
+- Tipo de medio preferido: ${mediaType || "todos"}
+- Plataforma preferida: ${platform || "cualquiera"}
+- Favoritos del usuario: ${Array.isArray(userFavorites) ? userFavorites.join(", ") : "Ninguno"}
+- Nota / Petici\xF3n del usuario: ${queryText || "Ninguna"}
+
+Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr\xE1ficas en formato JSON puro.`;
+        parts.push({ text: promptText });
+        const geminiRes = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: [{ role: "user", parts }],
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+            responseMimeType: "application/json"
+          }
+        });
+        const rawText = geminiRes.text || "";
+        const cleanedText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleanedText);
+        if (parsed && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+          const enriched = await Promise.all(
+            parsed.recommendations.map(async (rec, idx) => {
+              const catMatch = findInCatalog(rec.title);
+              if (catMatch) {
+                return {
+                  id: catMatch.id,
+                  title: catMatch.title,
+                  originalTitle: catMatch.originalTitle || rec.originalTitle,
+                  type: catMatch.type,
+                  year: catMatch.year,
+                  director: catMatch.director,
+                  genres: catMatch.genres,
+                  synopsis: catMatch.synopsis || rec.synopsis,
+                  duration: catMatch.duration,
+                  posterUrl: catMatch.posterUrl,
+                  backdropUrl: catMatch.backdropUrl,
+                  trailerYoutubeId: catMatch.trailerYoutubeId || "",
+                  defaultPlatform: catMatch.defaultPlatform || rec.defaultPlatform || "Netflix",
+                  communityRating: catMatch.communityRating || 4.7,
+                  matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                  matchReason: rec.matchReason || "Gran afinidad visual con la est\xE9tica analizada.",
+                  vibeTag: rec.vibeTag || "Afinidad Cinematogr\xE1fica"
+                };
+              }
+              try {
+                const tmdbData = await fetchFromTMDB(rec.title, rec.type, rec.year);
+                if (tmdbData) {
+                  return {
+                    id: `cinematch-${Date.now()}-${idx}`,
+                    title: tmdbData.title,
+                    originalTitle: tmdbData.originalTitle || rec.originalTitle,
+                    type: tmdbData.type,
+                    year: tmdbData.year,
+                    director: tmdbData.director || rec.director,
+                    genres: tmdbData.genres,
+                    synopsis: tmdbData.synopsis || rec.synopsis,
+                    duration: tmdbData.duration,
+                    posterUrl: tmdbData.posterUrl,
+                    backdropUrl: tmdbData.backdropUrl,
+                    trailerYoutubeId: tmdbData.trailerYoutubeId || "",
+                    defaultPlatform: tmdbData.defaultPlatform || rec.defaultPlatform || "Netflix",
+                    communityRating: 4.5,
+                    matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                    matchReason: rec.matchReason || "Coincidencia con la atm\xF3sfera detectada.",
+                    vibeTag: rec.vibeTag || "Match Visual"
+                  };
+                }
+              } catch {
+              }
+              return {
+                id: `cinematch-${Date.now()}-${idx}`,
+                title: rec.title,
+                originalTitle: rec.originalTitle,
+                type: rec.type || "pelicula",
+                year: rec.year || 2023,
+                director: rec.director || "Director de cine",
+                genres: rec.genres || ["Drama"],
+                synopsis: rec.synopsis || "Obra cinematogr\xE1fica recomendada por su direcci\xF3n visual.",
+                posterUrl: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80",
+                backdropUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80",
+                trailerYoutubeId: "",
+                defaultPlatform: rec.defaultPlatform || "Netflix",
+                communityRating: 4.6,
+                matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                matchReason: rec.matchReason || "Armon\xEDa est\xE9tica con tu selecci\xF3n.",
+                vibeTag: rec.vibeTag || "Est\xE9tica Visual"
+              };
+            })
+          );
+          return res.json({
+            success: true,
+            mode: image ? "visual" : visualPreset ? "preset" : vibe ? "vibe" : "favorites",
+            aestheticAnalysis: parsed.aestheticAnalysis || {
+              title: "An\xE1lisis Visual CineMatch",
+              palette: ["#E11D48", "#FB7185", "#F59E0B", "#0F172A"],
+              summary: "Se detect\xF3 una composici\xF3n cinematogr\xE1fica de alto impacto con contrastes definidos.",
+              keywords: ["Cinematogr\xE1fico", "Atm\xF3sfera", "Color", "Emoci\xF3n"]
+            },
+            recommendations: enriched
+          });
+        }
+      } catch (err) {
+        console.warn("Gemini recommendation error (falling back to curated engine):", err);
+      }
+    }
+    const result = getCuratedRecommendations({
+      image,
+      visualPreset,
+      vibe,
+      mediaType,
+      platform,
+      userFavorites,
+      queryText
+    });
+    res.json(result);
+  }));
   router.post("/media", requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
-    if (!sanitizeText(req.body?.title, 200)) {
-      return safeError(res, 400, "El t\xEDtulo es obligatorio.", "INVALID_TITLE");
+    const parsedMedia = mediaFormSchema.safeParse({
+      title: req.body?.title,
+      originalTitle: req.body?.originalTitle,
+      type: req.body?.type,
+      year: Number(req.body?.year),
+      director: req.body?.director,
+      genres: Array.isArray(req.body?.genres) ? req.body.genres : [req.body?.genres || "Drama"],
+      synopsis: req.body?.synopsis || "",
+      duration: req.body?.duration,
+      posterUrl: req.body?.posterUrl || "",
+      backdropUrl: req.body?.backdropUrl || "",
+      defaultPlatform: req.body?.defaultPlatform || req.body?.platform || "Netflix"
+    });
+    if (!parsedMedia.success) {
+      const firstIssue = parsedMedia.error.issues[0]?.message || "Datos de obra inv\xE1lidos.";
+      return safeError(res, 400, firstIssue, "VALIDATION_ERROR");
     }
     const item = buildMediaFromBody(req.body);
     const normalizedNewTitle = normalizeTitle(item.title);
@@ -1877,7 +2952,8 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
     const subject = sanitizeText(req.body?.subject, 160);
     const message = sanitizeMultiline(req.body?.message, 4e3);
     if (!name || !message) return safeError(res, 400, "Nombre y mensaje son obligatorios.", "INVALID_TICKET");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailValidationError = getEmailValidationError(email);
+    if (emailValidationError) return safeError(res, 400, emailValidationError, "INVALID_EMAIL");
     const ticket = {
       id: randomUUID(),
       ticketCode: `SL-${Math.floor(1e4 + Math.random() * 9e4)}`,
@@ -1906,7 +2982,8 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
     const username = cleanUsername(req.body?.username || "");
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!name) return safeError(res, 400, "Indica tu nombre.", "INVALID_NAME");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
     const user = createUserRecord({ name, username: username || void 0, email, password, role: "owner" });
@@ -1945,7 +3022,8 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
     const rawUsername = cleanUsername(req.body?.username || "");
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!name) return safeError(res, 400, "Indica tu nombre.", "INVALID_NAME");
-    if (!validateEmail(email)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
     const passwordError = validatePassword(password);
     if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
     if (findUserByEmail(store, email)) {
@@ -3033,7 +4111,8 @@ Responde en espa\xF1ol, tono amable y cin\xE9filo.`;
       const email2 = sanitizeText(req.body?.email, 160).toLowerCase();
       const password = typeof req.body?.password === "string" ? req.body.password : "";
       if (!name) return safeError(res, 400, "Indica el nombre del administrador.", "INVALID_NAME");
-      if (!validateEmail(email2)) return safeError(res, 400, "El correo no es v\xE1lido.", "INVALID_EMAIL");
+      const emailErr = getEmailValidationError(email2);
+      if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
       const passwordError = validatePassword(password);
       if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
       if (findUserByEmail(store, email2)) {
@@ -3202,13 +4281,17 @@ try {
 } catch {
 }
 async function startServer() {
+  const rawPort = Number(process.env.PORT);
+  const PORT = !isNaN(rawPort) && rawPort > 0 && rawPort <= 65535 ? rawPort : 3e3;
+  if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+    console.warn("[CONFIG_WARN] SESSION_SECRET no est\xE1 configurado en entorno de producci\xF3n.");
+  }
   try {
     const store = await getStore();
     if (store.loginAttempts) syncRateLimitsFromStore(store.loginAttempts);
   } catch {
   }
   const app = express();
-  const PORT = process.env.PORT ? Number(process.env.PORT) : 3e3;
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", uptime: process.uptime(), timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });

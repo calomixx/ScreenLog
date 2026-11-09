@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useMedia } from '../context/MediaContext';
+import { isRealEmail } from '../lib/validation';
 
 const SITE_SOCIALS = [
   { id: 'email', label: 'Email', href: 'mailto:contacto@screenlog.app', icon: Mail, visible: true },
@@ -35,7 +36,7 @@ const SITE_SOCIALS = [
 ];
 
 export const ContactSection: React.FC = () => {
-  const { currentUser } = useMedia();
+  const { currentUser, showToast } = useMedia();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -64,6 +65,11 @@ export const ContactSection: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !email.trim()) return;
+    const emailCheck = isRealEmail(email);
+    if (!emailCheck.isValid) {
+      showToast(emailCheck.error || 'Por favor ingresa un correo electrónico real y válido.', 'warning');
+      return;
+    }
 
     setIsSending(true);
 

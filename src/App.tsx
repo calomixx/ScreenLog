@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { LandingPublicView } from './components/LandingPublicView';
 import { SystemDashboardView } from './components/SystemDashboardView';
 import { CatalogView } from './components/CatalogView';
+import { CineMatchView } from './components/CineMatchView';
 import { MyListView } from './components/MyListView';
 import { UserStatsPanel } from './components/UserStatsPanel';
 import { DetailModal } from './components/DetailModal';
@@ -40,6 +41,7 @@ const MainAppContent: React.FC = () => {
   const renderTab = () => {
     if (activeTab === 'sistema') return <SystemDashboardView />;
     if (activeTab === 'explorar') return <CatalogView />;
+    if (activeTab === 'recomendados') return <CineMatchView />;
     if (activeTab === 'mi_lista') return <MyListView />;
     if (activeTab === 'estadisticas') return <UserStatsPanel standalone />;
     if (activeTab === 'admin') {

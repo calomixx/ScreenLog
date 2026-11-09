@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Search,
   ShieldCheck,
+  Sparkles,
   Star,
   User as UserIcon,
   UserCog,
@@ -79,6 +80,7 @@ export const Navbar: React.FC = () => {
     ? [
         { id: 'sistema', label: 'Inicio', icon: Home },
         { id: 'explorar', label: 'Explorar', icon: Compass },
+        { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
         { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
         { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
         ...(isStaffUser ? [{ id: 'admin' as AppTab, label: 'Admin', icon: UserCog, staffOnly: true }] : []),
@@ -87,6 +89,7 @@ export const Navbar: React.FC = () => {
     : [
         { id: 'landing', label: 'Inicio', icon: Home },
         { id: 'explorar', label: 'Explorar', icon: Compass },
+        { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
         { id: 'opiniones', label: 'Opiniones', icon: MessageSquare },
         { id: 'contacto', label: 'Contacto', icon: Mail },
       ];
@@ -129,6 +132,12 @@ export const Navbar: React.FC = () => {
       setActiveTab('explorar');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       try { window.history.replaceState(null, '', '#explorar'); } catch {}
+      return;
+    }
+    if (tabId === 'recomendados') {
+      setActiveTab('recomendados');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try { window.history.replaceState(null, '', '#recomendados'); } catch {}
       return;
     }
     if (tabId === 'opiniones') {

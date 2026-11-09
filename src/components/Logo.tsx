@@ -9,6 +9,11 @@ interface LogoMarkProps {
   title?: string;
 }
 
+/**
+ * ScreenLog Pro Identity Mark: "Prisma Cinemático & S"
+ * Un monograma 'S' continuo en perspectiva anamórfica que evoca
+ * tres facetas de luz proyectada y un núcleo óptico de Play en el centro.
+ */
 export const LogoMark: React.FC<LogoMarkProps> = ({
   size = 40,
   variant = 'gradient',
@@ -16,8 +21,10 @@ export const LogoMark: React.FC<LogoMarkProps> = ({
   title = 'ScreenLog Pro',
 }) => {
   const rawId = useId().replace(/[:]/g, '');
-  const gradientId = `sl-grad-${rawId}`;
-  const accentId = `sl-accent-${rawId}`;
+  const bgId = `sl-bg-${rawId}`;
+  const g1Id = `sl-g1-${rawId}`;
+  const g2Id = `sl-g2-${rawId}`;
+  const g3Id = `sl-g3-${rawId}`;
   const isMono = variant === 'mono';
   const isLight = variant === 'light';
 
@@ -33,69 +40,60 @@ export const LogoMark: React.FC<LogoMarkProps> = ({
     >
       <title>{title}</title>
       <defs>
-        <linearGradient id={gradientId} x1="8" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+        <linearGradient id={bgId} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#1E1724" />
+          <stop offset="100%" stopColor="#0B0910" />
+        </linearGradient>
+        <linearGradient id={g1Id} x1="8" y1="12" x2="48" y2="32" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#FB7185" />
-          <stop offset="48%" stopColor="#F43F5E" />
+          <stop offset="100%" stopColor="#E11D48" />
+        </linearGradient>
+        <linearGradient id={g2Id} x1="16" y1="24" x2="56" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#F43F5E" />
           <stop offset="100%" stopColor="#F59E0B" />
         </linearGradient>
-        <linearGradient id={accentId} x1="20" y1="32" x2="46" y2="54" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={isMono ? 'currentColor' : '#FDE68A'} />
-          <stop offset="100%" stopColor={isMono ? 'currentColor' : '#FB7185'} />
+        <linearGradient id={g3Id} x1="16" y1="36" x2="48" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#FBBF24" />
         </linearGradient>
       </defs>
 
+      {/* Outer Squircle Container */}
       <rect
         x="2"
         y="2"
         width="60"
         height="60"
         rx="16"
-        fill={isMono ? 'none' : `url(#${gradientId})`}
-        stroke={isMono ? 'currentColor' : isLight ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.22)'}
-        strokeWidth={isMono ? 2.5 : 1}
+        fill={isMono ? 'none' : isLight ? '#F8FAFC' : `url(#${bgId})`}
+        stroke={isMono ? 'currentColor' : isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.14)'}
+        strokeWidth={isMono ? 2.5 : 1.5}
       />
 
+      {/* S Top Face (Prism Fold) */}
       <path
-        d="M14 19.5h36a3 3 0 0 1 3 3V28H11v-5.5a3 3 0 0 1 3-3Z"
-        fill={isMono ? 'none' : '#0A0A0B'}
-        stroke={isMono ? 'currentColor' : 'rgba(255,255,255,0.18)'}
-        strokeWidth={isMono ? 2 : 1}
-        opacity={isMono ? 1 : 0.9}
-      />
-      <path
-        d="M18.5 19.5 14 27M28.5 19.5 24 27M38.5 19.5 34 27M48.5 19.5 44 27"
-        stroke={isMono ? 'currentColor' : `url(#${accentId})`}
-        strokeWidth="2.6"
-        strokeLinecap="round"
+        d="M46 16H24c-4.4 0-8 3.6-8 8v3c0 4.4 3.6 8 8 8h10l-6-6h-4c-1.1 0-2-.9-2-2v-1c0-1.1.9-2 2-2h22l-6-8Z"
+        fill={isMono ? 'currentColor' : `url(#${g1Id})`}
       />
 
-      <rect
-        x="11"
-        y="28.5"
-        width="42"
-        height="25.5"
-        rx="5.5"
-        fill={isMono ? 'none' : '#0A0A0B'}
-        stroke={isMono ? 'currentColor' : 'rgba(255,255,255,0.25)'}
-        strokeWidth={isMono ? 2 : 1}
-        opacity={isMono ? 1 : 0.92}
+      {/* Central Diagonal Prism Beam */}
+      <path
+        d="M46 16 20 45h8l20-23v-6Z"
+        fill={isMono ? 'currentColor' : `url(#${g2Id})`}
+        opacity={isMono ? 0.75 : 0.95}
       />
 
+      {/* S Bottom Face (Prism Fold) */}
       <path
-        d="M32 31.5l8.5 3.2v6.1c0 5.1-4.1 8.4-8.5 10.2-4.4-1.8-8.5-5.1-8.5-10.2v-6.1l8.5-3.2Z"
-        fill={isMono ? 'none' : `url(#${accentId})`}
-        stroke={isMono ? 'currentColor' : 'rgba(255,255,255,0.35)'}
-        strokeWidth={isMono ? 2 : 1}
+        d="M18 48h22c4.4 0 8-3.6 8-8v-3c0-4.4-3.6-8-8-8H30l6 6h4c1.1 0 2 .9 2 2v1c0 1.1-.9 2-2 2H18l-6 8h6Z"
+        fill={isMono ? 'currentColor' : `url(#${g3Id})`}
       />
-      <circle cx="32" cy="40" r="2.7" fill={isMono ? 'currentColor' : '#0A0A0B'} />
-      <path d="M30.9 41.4h2.2l.8 4.1h-3.8l.8-4.1Z" fill={isMono ? 'currentColor' : '#0A0A0B'} />
 
-      <circle cx="49.5" cy="13.5" r="2.4" fill={isMono ? 'currentColor' : '#FDE68A'} />
-      <path
-        d="M49.5 8.8v2.2M49.5 16v2.2M44.8 13.5h2.2M52 13.5h2.2"
-        stroke={isMono ? 'currentColor' : '#FDE68A'}
-        strokeWidth="1.4"
-        strokeLinecap="round"
+      {/* Optical Play Triangle at Center */}
+      <polygon
+        points="30,28 38,32 30,36"
+        fill={isMono ? '#0B0910' : '#FFFFFF'}
+        opacity={isMono ? 1 : 0.96}
       />
     </svg>
   );
