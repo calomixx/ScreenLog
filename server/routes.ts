@@ -40,6 +40,7 @@ import {
 } from './security';
 import type { MediaItem, RewatchChoice, WatchStatus } from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
+import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -809,7 +810,7 @@ export function createApiRouter(): Router {
   }));
 
   // POST /api/assistant - AI Assistant (Gemini)
-  router.post('/assistant', requireAuth, asyncRoute(async (req, res) => {
+  router.post('/assistant', asyncRoute(async (req, res) => {
     const { message, history = [], context = {} } = req.body;
     if (!message || typeof message !== 'string') {
       return safeError(res, 400, 'Mensaje requerido.', 'INVALID_MESSAGE');
@@ -859,6 +860,199 @@ Responde en español, tono amable y cinéfilo.`;
     }
 
     res.json({ success: true, reply: fallbackReply });
+  }));
+
+  // POST /api/recommendations - CineMatch AI Visual & Mood Recommender
+  router.post('/recommendations', asyncRoute(async (req, res) => {
+    const {
+      image,
+      visualPreset,
+      vibe,
+      mediaType = 'all',
+      platform = 'all',
+      userFavorites = [],
+      queryText = '',
+    } = req.body || {};
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    const findInCatalog = (title: string) => {
+      const norm = normalizeTitle(title);
+      return INITIAL_MEDIA_LIST.find((m) => normalizeTitle(m.title) === norm || normalizeTitle(m.originalTitle || '') === norm);
+    };
+
+    if (geminiApiKey) {
+      try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
+        const systemInstruction = `Eres "CineMatch AI", el motor de recomendación visual y cinéfila de ScreenLog.
+Tu especialidad es analizar la estética visual (fotografía, paleta de colores, iluminación, encuadres, atmósfera, sombras, grano o arquitectura) de fotos/imágenes que el usuario sube, o sus estados de ánimo cinematográficos.
+Debes devolver SIEMPRE un JSON válido con la siguiente estructura:
+{
+  "aestheticAnalysis": {
+    "title": "Nombre evocador del estilo visual o vibra (ej: 'Claroscuro Neón & Soledad Urbana')",
+    "palette": ["#hex1", "#hex2", "#hex3", "#hex4"],
+    "summary": "Explicación de 2-3 frases analizando la estética de la imagen/vibra detectada.",
+    "keywords": ["Palabra1", "Palabra2", "Palabra3", "Palabra4"]
+  },
+  "recommendations": [
+    {
+      "title": "Título en español o internacional conocido",
+      "originalTitle": "Título original",
+      "year": 2023,
+      "type": "pelicula",
+      "director": "Nombre del director/creador",
+      "genres": ["Género 1", "Género 2"],
+      "synopsis": "Breve sinopsis atrapante de 2 líneas.",
+      "defaultPlatform": "Netflix",
+      "matchPercentage": 97,
+      "matchReason": "Explicación de por qué coincide con la paleta, atmósfera o foto analizada.",
+      "vibeTag": "Tag breve (ej: 'Paleta Neón & Lluvia')"
+    }
+  ]
+}
+Recomienda entre 4 y 6 obras que encajen con precisión visual y temática. Si se solicitó filtrar por tipo (ej: solo películas o anime), respétalo.`;
+
+        const parts: any[] = [];
+        if (typeof image === 'string' && image.length > 50) {
+          const match = image.match(/^data:([^;]+);base64,(.+)$/);
+          const mimeType = match ? match[1] : 'image/jpeg';
+          const base64Data = match ? match[2] : image;
+          parts.push({
+            inlineData: {
+              mimeType,
+              data: base64Data,
+            },
+          });
+        }
+
+        const promptText = `Analiza la imagen adjunta o las preferencias del usuario:
+- Preset visual: ${visualPreset || 'Ninguno'}
+- Estado de ánimo / Vibe: ${vibe || 'Ninguno'}
+- Tipo de medio preferido: ${mediaType || 'todos'}
+- Plataforma preferida: ${platform || 'cualquiera'}
+- Favoritos del usuario: ${Array.isArray(userFavorites) ? userFavorites.join(', ') : 'Ninguno'}
+- Nota / Petición del usuario: ${queryText || 'Ninguna'}
+
+Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográficas en formato JSON puro.`;
+
+        parts.push({ text: promptText });
+
+        const geminiRes = await ai.models.generateContent({
+          model: 'gemini-1.5-flash',
+          contents: [{ role: 'user', parts }],
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const rawText = geminiRes.text || '';
+        const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanedText);
+
+        if (parsed && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+          const enriched = await Promise.all(
+            parsed.recommendations.map(async (rec: any, idx: number) => {
+              const catMatch = findInCatalog(rec.title);
+              if (catMatch) {
+                return {
+                  id: catMatch.id,
+                  title: catMatch.title,
+                  originalTitle: catMatch.originalTitle || rec.originalTitle,
+                  type: catMatch.type,
+                  year: catMatch.year,
+                  director: catMatch.director,
+                  genres: catMatch.genres,
+                  synopsis: catMatch.synopsis || rec.synopsis,
+                  duration: catMatch.duration,
+                  posterUrl: catMatch.posterUrl,
+                  backdropUrl: catMatch.backdropUrl,
+                  trailerYoutubeId: catMatch.trailerYoutubeId || '',
+                  defaultPlatform: catMatch.defaultPlatform || rec.defaultPlatform || 'Netflix',
+                  communityRating: catMatch.communityRating || 4.7,
+                  matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                  matchReason: rec.matchReason || 'Gran afinidad visual con la estética analizada.',
+                  vibeTag: rec.vibeTag || 'Afinidad Cinematográfica',
+                };
+              }
+
+              try {
+                const tmdbData = await fetchFromTMDB(rec.title, rec.type, rec.year);
+                if (tmdbData) {
+                  return {
+                    id: `cinematch-${Date.now()}-${idx}`,
+                    title: tmdbData.title,
+                    originalTitle: tmdbData.originalTitle || rec.originalTitle,
+                    type: tmdbData.type,
+                    year: tmdbData.year,
+                    director: tmdbData.director || rec.director,
+                    genres: tmdbData.genres,
+                    synopsis: tmdbData.synopsis || rec.synopsis,
+                    duration: tmdbData.duration,
+                    posterUrl: tmdbData.posterUrl,
+                    backdropUrl: tmdbData.backdropUrl,
+                    trailerYoutubeId: tmdbData.trailerYoutubeId || '',
+                    defaultPlatform: tmdbData.defaultPlatform || rec.defaultPlatform || 'Netflix',
+                    communityRating: 4.5,
+                    matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                    matchReason: rec.matchReason || 'Coincidencia con la atmósfera detectada.',
+                    vibeTag: rec.vibeTag || 'Match Visual',
+                  };
+                }
+              } catch {}
+
+              return {
+                id: `cinematch-${Date.now()}-${idx}`,
+                title: rec.title,
+                originalTitle: rec.originalTitle,
+                type: rec.type || 'pelicula',
+                year: rec.year || 2023,
+                director: rec.director || 'Director de cine',
+                genres: rec.genres || ['Drama'],
+                synopsis: rec.synopsis || 'Obra cinematográfica recomendada por su dirección visual.',
+                posterUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80',
+                backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
+                trailerYoutubeId: '',
+                defaultPlatform: rec.defaultPlatform || 'Netflix',
+                communityRating: 4.6,
+                matchPercentage: rec.matchPercentage || Math.max(90, 98 - idx * 2),
+                matchReason: rec.matchReason || 'Armonía estética con tu selección.',
+                vibeTag: rec.vibeTag || 'Estética Visual',
+              };
+            })
+          );
+
+          return res.json({
+            success: true,
+            mode: image ? 'visual' : (visualPreset ? 'preset' : (vibe ? 'vibe' : 'favorites')),
+            aestheticAnalysis: parsed.aestheticAnalysis || {
+              title: 'Análisis Visual CineMatch',
+              palette: ['#E11D48', '#FB7185', '#F59E0B', '#0F172A'],
+              summary: 'Se detectó una composición cinematográfica de alto impacto con contrastes definidos.',
+              keywords: ['Cinematográfico', 'Atmósfera', 'Color', 'Emoción'],
+            },
+            recommendations: enriched,
+          });
+        }
+      } catch (err) {
+        console.warn('Gemini recommendation error (falling back to curated engine):', err);
+      }
+    }
+
+    const result = getCuratedRecommendations({
+      image,
+      visualPreset,
+      vibe,
+      mediaType,
+      platform,
+      userFavorites,
+      queryText,
+    });
+
+    res.json(result);
   }));
 
   router.post('/media', requireAuth, asyncRoute(async (req, res) => {

@@ -163,3 +163,38 @@ export interface LocalBackupData {
   mediaList: MediaItem[];
   userReviews: Record<string, UserReview>;
 }
+
+export interface CineMatchItem {
+  id: string;
+  title: string;
+  originalTitle?: string;
+  type: MediaType;
+  year: number;
+  director: string;
+  genres: string[];
+  synopsis: string;
+  duration?: string;
+  posterUrl: string;
+  backdropUrl: string;
+  trailerYoutubeId?: string;
+  defaultPlatform: string;
+  communityRating: number;
+  matchPercentage: number;
+  matchReason: string;
+  vibeTag: string;
+}
+
+export interface CineMatchAestheticAnalysis {
+  title: string;
+  palette: string[];
+  summary: string;
+  keywords: string[];
+}
+
+export interface CineMatchResponse {
+  success: boolean;
+  mode: 'visual' | 'preset' | 'vibe' | 'favorites';
+  aestheticAnalysis: CineMatchAestheticAnalysis;
+  recommendations: CineMatchItem[];
+  message?: string;
+}

@@ -47,7 +47,7 @@ const ALL_PLATFORMS = [
 ];
 
 export const CatalogView: React.FC = () => {
-  const { mediaList, setIsAddModalOpen } = useMedia();
+  const { mediaList, setIsAddModalOpen, setActiveTab } = useMedia();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'todos' | MediaType>('todos');
@@ -162,6 +162,32 @@ export const CatalogView: React.FC = () => {
         >
           <Plus className="w-4 h-4" />
           Añadir Nuevo Título
+        </button>
+      </div>
+
+      {/* CineMatch AI Discovery Banner */}
+      <div className="relative rounded-2xl bg-gradient-to-r from-rose-950/40 via-purple-950/30 to-[#121118] border border-rose-500/30 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 to-amber-500 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <Sparkles className="w-5 h-5 text-amber-200" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-white text-sm">¿No sabes qué ver hoy?</span>
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold uppercase tracking-wider">CineMatch AI</span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Sube una foto de tu estética favorita o elige tu estado de ánimo para recibir recomendaciones visuales personalizadas.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setActiveTab('recomendados')}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all active:scale-95 flex-shrink-0 self-start sm:self-auto cursor-pointer"
+        >
+          <span>Probar Recomendador por Fotos</span>
+          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
         </button>
       </div>
 

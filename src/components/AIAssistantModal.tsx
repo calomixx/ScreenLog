@@ -37,7 +37,8 @@ const QUICK_QUESTIONS = [
   '¿Dónde veo mis estadísticas de películas vistas?',
   '¿Cómo calificar una película con estrellas y crítica?',
   '¿Cómo añadir una nueva película a la app?',
-  'Recomiéndame una película destacada'
+  'Recomiéndame una película destacada',
+  '📸 Recomiéndame películas por foto o estética (CineMatch)'
 ];
 
 export const AIAssistantModal: React.FC = () => {
@@ -107,7 +108,15 @@ export const AIAssistantModal: React.FC = () => {
     let suggestedAction: ChatMessage['suggestedAction'] = undefined;
     const qLower = query.toLowerCase();
 
-    if (qLower.includes('filtro') || qLower.includes('catalogo') || qLower.includes('buscar')) {
+    if (qLower.includes('recomiend') || qLower.includes('cinematch') || qLower.includes('foto') || qLower.includes('estetica') || qLower.includes('estética') || qLower.includes('vibe')) {
+      suggestedAction = {
+        label: '✨ Abrir Recomendador CineMatch AI',
+        action: () => {
+          setActiveTab('recomendados');
+          closeAssistant();
+        }
+      };
+    } else     if (qLower.includes('filtro') || qLower.includes('catalogo') || qLower.includes('buscar')) {
       suggestedAction = {
         label: 'Ir al Catálogo y probar filtros',
         action: () => {

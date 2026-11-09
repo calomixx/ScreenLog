@@ -11,6 +11,7 @@ import {
   Layers, 
   Compass,
   ChevronRight,
+  Sparkles,
   Tv
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -336,6 +337,77 @@ export const LandingPublicView: React.FC = () => {
             </p>
           </div>
         )}
+      </section>
+
+      {/* CINEMATCH AI SPOTLIGHT SECTION */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#161424] via-[#12111A] to-[#0D0C12] border border-rose-500/30 p-8 sm:p-10 shadow-2xl space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="space-y-4 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>Nuevo: CineMatch AI Multimodal</span>
+            </div>
+
+            <h3 className="text-2xl sm:text-4xl font-black font-display text-white tracking-tight leading-tight">
+              ¿Tienes una foto o una vibra en mente?{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-amber-400">
+                Encuentra tu película perfecta
+              </span>
+            </h3>
+
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Sube fotos de paisajes, atardeceres, cyberpunk, anime o estética gótica. Nuestra inteligencia artificial analiza la iluminación, paleta cromática y atmósfera para recomendarte obras con la misma vibra visual.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('recomendados');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-bold text-sm shadow-xl shadow-rose-950/50 transition-all active:scale-95 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-200" />
+                <span>Probar CineMatch AI Ahora</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-2xl p-4 self-center lg:self-auto shadow-inner">
+            <div className="w-24 h-32 rounded-xl overflow-hidden border border-white/20 relative shadow-lg">
+              <img
+                src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80"
+                alt="Cyberpunk"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-1.5">
+                <span className="text-[9px] font-bold text-white">99% Match</span>
+              </div>
+            </div>
+            <div className="w-24 h-32 rounded-xl overflow-hidden border border-white/20 relative shadow-lg">
+              <img
+                src="https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=80"
+                alt="Dune"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-1.5">
+                <span className="text-[9px] font-bold text-white">98% Match</span>
+              </div>
+            </div>
+            <div className="w-24 h-32 rounded-xl overflow-hidden border border-white/20 relative shadow-lg">
+              <img
+                src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80"
+                alt="Ghibli"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-1.5">
+                <span className="text-[9px] font-bold text-white">97% Match</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* 3. ¿QUÉ OFRECEMOS EN SCREENLOG? Y ¿CÓMO LO HACEMOS? */}

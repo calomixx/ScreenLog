@@ -27,6 +27,7 @@ export type AppTab =
   | 'landing'
   | 'sistema'
   | 'explorar'
+  | 'recomendados'
   | 'mi_lista'
   | 'estadisticas'
   | 'opiniones'
