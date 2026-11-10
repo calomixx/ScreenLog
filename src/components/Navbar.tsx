@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMedia, AppTab } from '../context/MediaContext';
-import { ROLE_LABELS } from '../context/AuthContext';
+import { ROLE_LABELS, useAuth } from '../context/AuthContext';
 import { LogoLockup } from './Logo';
 
 interface TabDef {
@@ -60,6 +60,7 @@ export const Navbar: React.FC = () => {
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const { exitToPublic } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export const Navbar: React.FC = () => {
 
   const tabs: TabDef[] = currentUser
     ? [
-        { id: 'sistema', label: 'Inicio', icon: Home },
+        { id: 'sistema', label: 'Mi Sala', icon: Home },
         { id: 'explorar', label: 'Explorar', icon: Compass },
         { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
         { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
@@ -87,11 +88,11 @@ export const Navbar: React.FC = () => {
         { id: 'cuenta', label: 'Cuenta', icon: UserIcon, authOnly: true },
       ]
     : [
-        { id: 'landing', label: 'Inicio', icon: Home },
+        { id: 'sistema', label: 'Mi Sala', icon: Home },
         { id: 'explorar', label: 'Explorar', icon: Compass },
         { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
-        { id: 'opiniones', label: 'Opiniones', icon: MessageSquare },
-        { id: 'contacto', label: 'Contacto', icon: Mail },
+        { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
+        { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
       ];
 
   const searchResults =
@@ -114,7 +115,7 @@ export const Navbar: React.FC = () => {
   };
 
   const handleGoHome = () => {
-    setActiveTab(currentUser ? 'sistema' : 'landing');
+    setActiveTab('sistema');
     setSelectedMediaId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try { window.history.replaceState(null, '', window.location.pathname); } catch {}
@@ -123,7 +124,7 @@ export const Navbar: React.FC = () => {
   const handleTabClick = (tabId: AppTab) => {
     setSelectedMediaId(null);
     if (tabId === 'landing' || tabId === 'sistema') {
-      setActiveTab(currentUser ? 'sistema' : 'landing');
+      setActiveTab('sistema');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       try { window.history.replaceState(null, '', window.location.pathname); } catch {}
       return;
@@ -333,6 +334,7 @@ export const Navbar: React.FC = () => {
               )}
 
               {currentUser ? (
+                <>
                 <div ref={profileRef} className="relative">
                   <button
                     type="button"
@@ -446,6 +448,16 @@ export const Navbar: React.FC = () => {
                     </div>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
+                  title="Cerrar sesión y salir afuera"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">Salir</span>
+                </button>
+                </>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <button
@@ -463,6 +475,15 @@ export const Navbar: React.FC = () => {
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     Únete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exitToPublic(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
+                    title="Salir a la portada pública"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="hidden lg:inline">Salir</span>
                   </button>
                 </div>
               )}

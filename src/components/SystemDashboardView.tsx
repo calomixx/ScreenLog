@@ -4,9 +4,13 @@ import {
   Trophy, 
   Plus, 
   Bookmark, 
-  Compass
+  Compass,
+  LogOut,
+  CheckCircle2,
+  Film
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
+import { useAuth } from '../context/AuthContext';
 import { HeroSlider } from './HeroSlider';
 import { MediaCard } from './MediaCard';
 import { UserStatsPanel } from './UserStatsPanel';
@@ -19,8 +23,14 @@ export const SystemDashboardView: React.FC = () => {
     mostAddedMedia, 
     mediaList, 
     setActiveTab, 
-    setIsAddModalOpen
+    setIsAddModalOpen,
+    currentUser,
+    userAvatar,
+    myListEntries,
+    statusCounts,
+    logout
   } = useMedia();
+  const { exitToPublic } = useAuth();
 
   const [topTypeFilter, setTopTypeFilter] = useState<'todos' | MediaType>('todos');
   const [addedTypeFilter, setAddedTypeFilter] = useState<'todos' | MediaType>('todos');
@@ -37,7 +47,70 @@ export const SystemDashboardView: React.FC = () => {
 
   return (
     <div id="system-dashboard-view" className="space-y-12 pb-16 scroll-mt-20">
-      {/* Animated Hero Carousel with Dynamic Moving Backdrops & Trailers */}
+            {/* WORKSPACE ACTIVE STATUS BAR (Claramente dentro del sistema) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#16161B] via-[#131317] to-[#1A1216] border border-white/10 shadow-lg">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="relative shrink-0">
+            <img
+              src={userAvatar}
+              alt={currentUser?.name || 'Invitado'}
+              className="w-11 h-11 rounded-xl object-cover ring-2 ring-rose-500/40"
+              referrerPolicy="no-referrer"
+            />
+            <span
+              className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#16161B] ${
+                currentUser ? 'bg-emerald-500' : 'bg-amber-400'
+              }`}
+              title={currentUser ? 'Sesión activa' : 'Modo invitado'}
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                currentUser
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}>
+                {currentUser ? 'Sala Privada Activa' : 'Modo Invitado (Demo)'}
+              </span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">• Panel de Control Interno</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-display font-extrabold text-white truncate mt-0.5">
+              {currentUser ? `Bienvenido a tu sala, ${currentUser.name}` : 'Explorando el Sistema Cinéfilo'}
+            </h2>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
+            <Bookmark className="w-3.5 h-3.5 text-rose-400" />
+            <span className="text-slate-400">Mi Lista:</span>
+            <strong className="text-white">{myListEntries.length}</strong>
+          </div>
+          <div className="flex items-center gap-2 text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-400">Terminadas:</span>
+            <strong className="text-white">{statusCounts.terminada}</strong>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
+            <Film className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-slate-400">Catálogo:</span>
+            <strong className="text-white">{mediaList.length}</strong>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => (currentUser ? logout() : exitToPublic(true))}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-950/50 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/35 text-xs font-bold transition-all"
+            title="Salir del sistema y regresar a la portada pública"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Salir Afuera</span>
+          </button>
+        </div>
+      </div>
+
+{/* Animated Hero Carousel with Dynamic Moving Backdrops & Trailers */}
       <HeroSlider items={mediaList.length > 0 ? mediaList : featuredMedia} />
 
       {/* USER GENRE STATISTICS PANEL (RECHARTS) */}

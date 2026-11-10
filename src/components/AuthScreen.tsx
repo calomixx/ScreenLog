@@ -38,7 +38,7 @@ const inputClass =
   'w-full bg-[#0A0A0B] border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 focus:outline-none transition-colors';
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' }) => {
-  const { login, loginWithGoogle, register, settings, continueAsGuest } = useAuth();
+  const { login, loginWithGoogle, register, settings, continueAsGuest, enterGuestWorkspace } = useAuth();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -234,7 +234,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Volver al inicio
+                  Volver a la portada pública
                 </button>
               </div>
               {mode !== 'forgot' ? (
@@ -651,11 +651,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                 {mode !== 'forgot' && (
                   <button
                     type="button"
-                    onClick={continueAsGuest}
+                    onClick={enterGuestWorkspace}
                     className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600/20 to-amber-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold transition-colors flex items-center justify-center gap-2 hover:bg-rose-600/30"
                   >
                     <Clapperboard className="w-3.5 h-3.5 text-amber-400" />
-                    Explorar como invitado
+                    Entrar al sistema como invitado (Demo)
                   </button>
                 )}
                 <p className="text-[10px] text-center text-slate-500 leading-relaxed">

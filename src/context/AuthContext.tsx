@@ -116,6 +116,9 @@ export interface AuthContextType {
   currentUser: UserAccount | null;
   sessionInfo: SessionInfo | null;
   isGuest: boolean;
+  isWorkspaceGuest: boolean;
+  pendingLoginMode: 'login' | 'register';
+  justLoggedOut: boolean;
   settings: PublicSettings;
   login: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
   loginWithGoogle: () => Promise<AuthResult>;
@@ -128,6 +131,9 @@ export interface AuthContextType {
   refresh: () => Promise<void>;
   requestLogin: (mode?: 'login' | 'register', pendingAction?: string) => void;
   continueAsGuest: () => void;
+  enterGuestWorkspace: () => void;
+  exitToPublic: (markLoggedOut?: boolean) => void;
+  clearLogoutNotice: () => void;
   clearErrorState: () => void;
 }
 
@@ -138,6 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [isGuest, setIsGuest] = useState(true);
+  const [isWorkspaceGuest, setIsWorkspaceGuest] = useState(false);
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
   const [settings, setSettings] = useState<PublicSettings>(defaultSettings);
   const [pendingLoginMode, setPendingLoginMode] = useState<'login' | 'register'>('login');
 
@@ -153,6 +161,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSettings({ ...defaultSettings, ...data.settings });
     if (data.user) {
       setIsGuest(false);
+      setIsWorkspaceGuest(false);
+      setJustLoggedOut(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
     }
   }, []);
@@ -231,6 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
+      setIsWorkspaceGuest(false);
+      setJustLoggedOut(false);
       setNeedsSetup(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
@@ -271,6 +283,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
+      setIsWorkspaceGuest(false);
+      setJustLoggedOut(false);
       setNeedsSetup(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
@@ -302,6 +316,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
+      setIsWorkspaceGuest(false);
+      setJustLoggedOut(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
     } catch (error) {
@@ -330,6 +346,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSessionInfo(response.data.session);
       setNeedsSetup(false);
       setIsGuest(false);
+      setIsWorkspaceGuest(false);
+      setJustLoggedOut(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
       return { success: true };
     } catch (error) {
@@ -353,7 +371,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     setSessionInfo(null);
     setIsGuest(true);
+    setIsWorkspaceGuest(false);
+    setJustLoggedOut(true);
     try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }, []);
 
   const logoutAll = useCallback(async () => {
@@ -369,7 +390,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     setSessionInfo(null);
     setIsGuest(true);
+    setIsWorkspaceGuest(false);
+    setJustLoggedOut(true);
     try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<AuthResult> => {
@@ -414,12 +438,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const requestLogin = useCallback((mode: 'login' | 'register' = 'login', _pendingAction?: string) => {
     setPendingLoginMode(mode);
     setIsGuest(false);
+    setIsWorkspaceGuest(false);
+    setJustLoggedOut(false);
   }, []);
 
   const continueAsGuest = useCallback(() => {
     setIsGuest(true);
+    setIsWorkspaceGuest(false);
     setPendingLoginMode('login');
     try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
+  }, []);
+
+  const enterGuestWorkspace = useCallback(() => {
+    setIsGuest(true);
+    setIsWorkspaceGuest(true);
+    setJustLoggedOut(false);
+    try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+  }, []);
+
+  const exitToPublic = useCallback((markLoggedOut = false) => {
+    setIsGuest(true);
+    setIsWorkspaceGuest(false);
+    if (markLoggedOut) setJustLoggedOut(true);
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+  }, []);
+
+  const clearLogoutNotice = useCallback(() => {
+    setJustLoggedOut(false);
   }, []);
 
   const clearErrorState = useCallback(() => undefined, []);
@@ -431,6 +477,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser,
     sessionInfo,
     isGuest,
+    isWorkspaceGuest,
+    pendingLoginMode,
+    justLoggedOut,
     settings,
     login,
     loginWithGoogle,
@@ -443,6 +492,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refresh,
     requestLogin,
     continueAsGuest,
+    enterGuestWorkspace,
+    exitToPublic,
+    clearLogoutNotice,
     clearErrorState,
   }), [
     loading,
@@ -451,6 +503,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser,
     sessionInfo,
     isGuest,
+    isWorkspaceGuest,
+    pendingLoginMode,
+    justLoggedOut,
     settings,
     login,
     loginWithGoogle,
@@ -463,6 +518,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refresh,
     requestLogin,
     continueAsGuest,
+    enterGuestWorkspace,
+    exitToPublic,
+    clearLogoutNotice,
     clearErrorState,
   ]);
 
