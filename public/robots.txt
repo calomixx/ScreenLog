@@ -4,10 +4,11 @@ Allow: /
 Allow: /favicon.svg
 Allow: /brand/
 Allow: /assets/
+Allow: /googledbe499a3cf0cda1a.html
 
 # Disallow private server endpoints from crawler noise
 Disallow: /api/admin/
 Disallow: /api/owner/
 
 # Sitemap location for Google Search Console
-Sitemap: https://screenlog.pro/sitemap.xml
+Sitemap: https://screenlogproc.ai.studio/sitemap.xml
