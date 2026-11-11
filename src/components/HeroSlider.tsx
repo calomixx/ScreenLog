@@ -189,9 +189,30 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
   };
 
   return (
-    <section 
-      id="hero-cinematic-slider"
-      className="relative w-full min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A0B] shadow-2xl my-4"
+    <div className="relative my-4">
+      {/* DYNAMIC AMBILIGHT AURA: Proyecta los colores reales del póster/escena fuera del marco */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`ambilight-${activeMedia.id}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.55 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
+          className="pointer-events-none absolute -inset-3 sm:-inset-6 z-0 overflow-hidden rounded-[2.5rem]"
+          aria-hidden="true"
+        >
+          <img
+            src={activeMedia.backdropUrl || activeMedia.posterUrl}
+            alt=""
+            className="w-full h-full object-cover scale-110 blur-[65px] sm:blur-[95px] saturate-200 brightness-110"
+            referrerPolicy="no-referrer"
+          />
+        </motion.div>
+      </AnimatePresence>
+
+      <section 
+        id="hero-cinematic-slider"
+        className="relative z-10 w-full min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-3xl border border-white/15 bg-[#0A0A0B]/95 shadow-[0_25px_75px_-15px_rgba(0,0,0,0.85)]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -608,5 +629,6 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
       </div>
     </section>
+    </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MediaItem,
   UserReview,
@@ -22,6 +22,7 @@ import {
   subscribeToUserLibrary,
 } from '../lib/firebase';
 import confetti from 'canvas-confetti';
+import { computeCinephileStats } from '../lib/cinephileRanks';
 
 export type AppTab =
   | 'landing'
@@ -264,6 +265,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const libraryHydratedRef = useRef(false);
+  const unlockedBadgesRef = useRef<Set<string> | null>(null);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToastMessage({ text, type });
@@ -299,10 +302,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   useEffect(() => {
+    unlockedBadgesRef.current = null;
     if (!authUser) {
+      libraryHydratedRef.current = true;
       setUserReviews({});
       return;
     }
+    libraryHydratedRef.current = false;
     let cancelled = false;
     (async () => {
       try {
@@ -310,6 +316,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!cancelled) setUserReviews((prev) => ({ ...(response.data || {}), ...prev }));
       } catch {
         if (!cancelled) setUserReviews((prev) => prev);
+      } finally {
+        if (!cancelled) libraryHydratedRef.current = true;
       }
     })();
 
@@ -1164,6 +1172,24 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }),
     [myListEntries],
   );
+
+  useEffect(() => {
+    if (!libraryHydratedRef.current) return;
+    const stats = computeCinephileStats(myListEntries, mediaList);
+    const currentSet = new Set(stats.badges.filter((b) => b.unlocked).map((b) => b.id));
+    if (unlockedBadgesRef.current === null) {
+      unlockedBadgesRef.current = currentSet;
+      return;
+    }
+    const newlyUnlocked = stats.badges.filter((b) => b.unlocked && !unlockedBadgesRef.current!.has(b.id));
+    unlockedBadgesRef.current = currentSet;
+    if (newlyUnlocked.length > 0 && myListEntries.length > 0) {
+      try {
+        confetti({ particleCount: 55, spread: 70, origin: { y: 0.72 } });
+      } catch {}
+      showToast(`${newlyUnlocked[0].icon} ¡Insignia desbloqueada: ${newlyUnlocked[0].title}!`, 'success');
+    }
+  }, [myListEntries, mediaList, showToast]);
 
   const selectedMedia = mediaList.find((media) => media.id === selectedMediaId) || null;
   const userName = currentUser?.name || 'Invitado';

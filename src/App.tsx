@@ -1,27 +1,65 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { MediaProvider, useMedia } from './context/MediaContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { LandingPublicView } from './components/LandingPublicView';
-import { SystemDashboardView } from './components/SystemDashboardView';
-import { CatalogView } from './components/CatalogView';
-import { CineMatchView } from './components/CineMatchView';
-import { MyListView } from './components/MyListView';
-import { UserStatsPanel } from './components/UserStatsPanel';
-import { DetailModal } from './components/DetailModal';
-import { AddMediaModal } from './components/AddMediaModal';
-import { TrailerModal } from './components/TrailerModal';
-import { EditProfileModal } from './components/EditProfileModal';
-import { EditMediaModal } from './components/EditMediaModal';
-import { AIAssistantModal } from './components/AIAssistantModal';
-import { AdminPanelView } from './components/AdminPanelView';
-import { AccountView } from './components/AccountView';
-import { AuthScreen } from './components/AuthScreen';
-import { SetupScreen } from './components/SetupScreen';
-import { ForcedPasswordChange } from './components/ForcedPasswordChange';
-import { ForbiddenView } from './components/ForbiddenView';
 import { LogoLockup, LogoMark } from './components/Logo';
 import { Loader2, ShieldAlert } from 'lucide-react';
+
+// Lazy-loaded Views (Code Splitting for instant initial page load)
+const SystemDashboardView = lazy(() =>
+  import('./components/SystemDashboardView').then((m) => ({ default: m.SystemDashboardView })),
+);
+const CatalogView = lazy(() =>
+  import('./components/CatalogView').then((m) => ({ default: m.CatalogView })),
+);
+const CineMatchView = lazy(() =>
+  import('./components/CineMatchView').then((m) => ({ default: m.CineMatchView })),
+);
+const MyListView = lazy(() =>
+  import('./components/MyListView').then((m) => ({ default: m.MyListView })),
+);
+const UserStatsPanel = lazy(() =>
+  import('./components/UserStatsPanel').then((m) => ({ default: m.UserStatsPanel })),
+);
+const AdminPanelView = lazy(() =>
+  import('./components/AdminPanelView').then((m) => ({ default: m.AdminPanelView })),
+);
+const AccountView = lazy(() =>
+  import('./components/AccountView').then((m) => ({ default: m.AccountView })),
+);
+const AuthScreen = lazy(() =>
+  import('./components/AuthScreen').then((m) => ({ default: m.AuthScreen })),
+);
+const SetupScreen = lazy(() =>
+  import('./components/SetupScreen').then((m) => ({ default: m.SetupScreen })),
+);
+const ForcedPasswordChange = lazy(() =>
+  import('./components/ForcedPasswordChange').then((m) => ({ default: m.ForcedPasswordChange })),
+);
+const ForbiddenView = lazy(() =>
+  import('./components/ForbiddenView').then((m) => ({ default: m.ForbiddenView })),
+);
+
+// Lazy-loaded Modals (Downloaded only when opened)
+const DetailModal = lazy(() =>
+  import('./components/DetailModal').then((m) => ({ default: m.DetailModal })),
+);
+const AddMediaModal = lazy(() =>
+  import('./components/AddMediaModal').then((m) => ({ default: m.AddMediaModal })),
+);
+const TrailerModal = lazy(() =>
+  import('./components/TrailerModal').then((m) => ({ default: m.TrailerModal })),
+);
+const EditProfileModal = lazy(() =>
+  import('./components/EditProfileModal').then((m) => ({ default: m.EditProfileModal })),
+);
+const EditMediaModal = lazy(() =>
+  import('./components/EditMediaModal').then((m) => ({ default: m.EditMediaModal })),
+);
+const AIAssistantModal = lazy(() =>
+  import('./components/AIAssistantModal').then((m) => ({ default: m.AIAssistantModal })),
+);
 
 const Splash: React.FC = () => (
   <div className="min-h-dvh bg-[#0A0A0B] flex flex-col items-center justify-center gap-5">
@@ -33,26 +71,49 @@ const Splash: React.FC = () => (
   </div>
 );
 
+const ViewLoader: React.FC = () => (
+  <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 text-slate-400">
+    <Loader2 className="w-6 h-6 animate-spin text-rose-500" />
+    <span className="text-xs font-medium tracking-wide">Preparando vista...</span>
+  </div>
+);
+
 /**
  * Portal Público ("AFUERA"):
  * Diseño editorial independiente con su propia barra de portada, mural cinemático y footer amplio.
  * No comparte el Navbar operativo ni el aspecto interno del sistema.
  */
-const PublicPortalShell: React.FC = () => (
-  <>
-    <LandingPublicView />
-    <DetailModal />
-    <TrailerModal />
-    <AIAssistantModal />
-  </>
-);
+const PublicPortalShell: React.FC = () => {
+  const { selectedMediaId, isTrailerModalOpen, isAssistantOpen } = useMedia();
+  return (
+    <>
+      <LandingPublicView />
+      <Suspense fallback={null}>
+        {selectedMediaId && <DetailModal />}
+        {isTrailerModalOpen && <TrailerModal />}
+        {isAssistantOpen && <AIAssistantModal />}
+      </Suspense>
+    </>
+  );
+};
 
 /**
  * Espacio de Trabajo Privado ("ADENTRO"):
  * Entorno de aplicación operativo con Navbar de herramientas, buscador, IA, estadísticas y dashboard privado.
  */
 const MainAppContent: React.FC = () => {
-  const { activeTab, setActiveTab, mediaList, toastMessage } = useMedia();
+  const {
+    activeTab,
+    setActiveTab,
+    mediaList,
+    toastMessage,
+    selectedMediaId,
+    isAddModalOpen,
+    isTrailerModalOpen,
+    isEditProfileModalOpen,
+    isEditMediaModalOpen,
+    isAssistantOpen,
+  } = useMedia();
   const { currentUser, isWorkspaceGuest, exitToPublic } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
@@ -73,11 +134,7 @@ const MainAppContent: React.FC = () => {
       );
     }
     if (activeTab === 'cuenta') {
-      return currentUser ? (
-        <AccountView />
-      ) : (
-        <SystemDashboardView />
-      );
+      return currentUser ? <AccountView /> : <SystemDashboardView />;
     }
     return <SystemDashboardView />;
   };
@@ -104,7 +161,7 @@ const MainAppContent: React.FC = () => {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
-        {renderTab()}
+        <Suspense fallback={<ViewLoader />}>{renderTab()}</Suspense>
       </main>
 
       {toastMessage && (
@@ -113,12 +170,14 @@ const MainAppContent: React.FC = () => {
         </div>
       )}
 
-      <DetailModal />
-      <AddMediaModal />
-      <TrailerModal />
-      <EditProfileModal />
-      <EditMediaModal />
-      <AIAssistantModal />
+      <Suspense fallback={null}>
+        {selectedMediaId && <DetailModal />}
+        {isAddModalOpen && <AddMediaModal />}
+        {isTrailerModalOpen && <TrailerModal />}
+        {isEditProfileModalOpen && <EditProfileModal />}
+        {isEditMediaModalOpen && <EditMediaModal />}
+        {isAssistantOpen && <AIAssistantModal />}
+      </Suspense>
 
       <footer className="border-t border-white/5 bg-[#121215] text-slate-400 py-6 mt-auto mb-16 md:mb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -157,9 +216,27 @@ const AppGate: React.FC = () => {
   const { loading, needsSetup, currentUser, isGuest, isWorkspaceGuest, pendingLoginMode } = useAuth();
 
   if (loading) return <Splash />;
-  if (needsSetup) return <SetupScreen />;
-  if (currentUser?.mustChangePassword) return <ForcedPasswordChange />;
-  if (!currentUser && !isGuest) return <AuthScreen key={pendingLoginMode} initialMode={pendingLoginMode} />;
+  if (needsSetup) {
+    return (
+      <Suspense fallback={<Splash />}>
+        <SetupScreen />
+      </Suspense>
+    );
+  }
+  if (currentUser?.mustChangePassword) {
+    return (
+      <Suspense fallback={<Splash />}>
+        <ForcedPasswordChange />
+      </Suspense>
+    );
+  }
+  if (!currentUser && !isGuest) {
+    return (
+      <Suspense fallback={<Splash />}>
+        <AuthScreen key={pendingLoginMode} initialMode={pendingLoginMode} />
+      </Suspense>
+    );
+  }
   if (!currentUser && !isWorkspaceGuest) return <PublicPortalShell />;
   return <MainAppContent />;
 };

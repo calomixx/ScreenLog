@@ -329,10 +329,24 @@ export const DetailModal: React.FC = () => {
         }
       }}
     >
-      <div 
-        id="detail-modal-container"
-        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
-      >
+      <div className="relative w-full max-w-4xl">
+        {/* DYNAMIC AMBILIGHT AURA PARA LA FICHA */}
+        <div
+          className="pointer-events-none fixed sm:absolute -inset-6 sm:-inset-10 z-0 overflow-hidden rounded-[3rem] opacity-55 transition-opacity duration-500"
+          aria-hidden="true"
+        >
+          <img
+            src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
+            alt=""
+            className="w-full h-full object-cover scale-125 blur-[80px] sm:blur-[110px] saturate-200 brightness-110"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+
+        <div 
+          id="detail-modal-container"
+          className="relative z-10 w-full bg-[#141416]/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
+        >
         {/* Floating Top-Right Action Controls (Close, Share, Admin Edit) - Always accessible */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-40 pointer-events-auto">
           {isCatalogAdmin && (
@@ -389,7 +403,7 @@ export const DetailModal: React.FC = () => {
           <div 
             ref={heroRef}
             id="detail-modal-header"
-            className="relative w-full bg-[#0A0A0B] min-h-[200px] sm:min-h-[230px] p-4 sm:p-6 pb-5 flex flex-col justify-end"
+            className="relative w-full overflow-hidden bg-[#0A0A0B] min-h-[200px] sm:min-h-[230px] p-4 sm:p-6 pb-5 flex flex-col justify-end"
           >
             {/* Backdrop Image */}
             <img
@@ -398,7 +412,13 @@ export const DetailModal: React.FC = () => {
               className="absolute inset-0 w-full h-full object-cover filter brightness-40 pointer-events-none"
               referrerPolicy="no-referrer"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/85 to-[#0A0A0B]/60 pointer-events-none" />
+            <img
+              src={selectedMedia.posterUrl}
+              alt=""
+              className="absolute -bottom-10 -left-10 w-64 h-64 object-cover blur-[55px] saturate-200 opacity-35 pointer-events-none"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/80 to-[#0A0A0B]/55 pointer-events-none" />
 
             {/* Banner Details (Poster + Title + Status Selector) */}
             <div className="relative z-10 flex items-start sm:items-end gap-3.5 sm:gap-5 pt-8 sm:pt-6 pr-24 sm:pr-40">
@@ -1212,6 +1232,7 @@ export const DetailModal: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
