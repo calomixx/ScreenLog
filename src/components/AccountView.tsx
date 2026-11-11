@@ -23,6 +23,7 @@ import {
 import { ROLE_LABELS, isOwner, isStaff, useAuth } from '../context/AuthContext';
 import { useMedia } from '../context/MediaContext';
 import { formatDate, formatDateShort } from '../lib/api';
+import { CinephileBadgesSection } from './CinephileBadgesSection';
 
 const inputClass =
   'w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 focus:outline-none transition-colors';
@@ -183,6 +184,8 @@ export const AccountView: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <CinephileBadgesSection />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="rounded-3xl bg-[#141416] border border-white/10 p-6 space-y-5">

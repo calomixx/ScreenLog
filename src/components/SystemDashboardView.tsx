@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { 
   Sparkles, 
   Trophy, 
@@ -13,7 +13,9 @@ import { useMedia } from '../context/MediaContext';
 import { useAuth } from '../context/AuthContext';
 import { HeroSlider } from './HeroSlider';
 import { MediaCard } from './MediaCard';
-import { UserStatsPanel } from './UserStatsPanel';
+import { computeCinephileStats } from '../lib/cinephileRanks';
+import { CinephileBadgesSection } from './CinephileBadgesSection';
+const UserStatsPanel = lazy(() => import('./UserStatsPanel').then((m) => ({ default: m.UserStatsPanel })));
 import { MediaType } from '../types';
 
 export const SystemDashboardView: React.FC = () => {
@@ -34,6 +36,11 @@ export const SystemDashboardView: React.FC = () => {
 
   const [topTypeFilter, setTopTypeFilter] = useState<'todos' | MediaType>('todos');
   const [addedTypeFilter, setAddedTypeFilter] = useState<'todos' | MediaType>('todos');
+
+  const cinephileStats = useMemo(
+    () => computeCinephileStats(myListEntries, mediaList),
+    [myListEntries, mediaList],
+  );
 
   const filteredTopClassified = topClassifiedMedia
     .filter((m) => (topTypeFilter === 'todos' ? true : m.type === topTypeFilter))
@@ -73,7 +80,16 @@ export const SystemDashboardView: React.FC = () => {
               }`}>
                 {currentUser ? 'Sala Privada Activa' : 'Modo Invitado (Demo)'}
               </span>
-              <span className="text-[11px] text-slate-500 hidden sm:inline">• Panel de Control Interno</span>
+              <button
+                type="button"
+                onClick={() => setActiveTab('estadisticas')}
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r ${cinephileStats.level.gradient} border ${cinephileStats.level.border} text-[10px] font-bold ${cinephileStats.level.textColor} hover:brightness-125 transition-all`}
+                title="Ver tus insignias y progreso cinéfilo"
+              >
+                <span>{cinephileStats.level.icon}</span>
+                <span>Nv.{cinephileStats.level.level} {cinephileStats.level.title}</span>
+                <span className="opacity-75">· {cinephileStats.xp} XP</span>
+              </button>
             </div>
             <h2 className="text-base sm:text-lg font-display font-extrabold text-white truncate mt-0.5">
               {currentUser ? `Bienvenido a tu sala, ${currentUser.name}` : 'Explorando el Sistema Cinéfilo'}
@@ -114,7 +130,11 @@ export const SystemDashboardView: React.FC = () => {
       <HeroSlider items={mediaList.length > 0 ? mediaList : featuredMedia} />
 
       {/* USER GENRE STATISTICS PANEL (RECHARTS) */}
-      <UserStatsPanel />
+      <CinephileBadgesSection />
+
+      <Suspense fallback={<div className="h-56 rounded-3xl bg-[#161618] border border-white/10 animate-pulse" />}>
+        <UserStatsPanel />
+      </Suspense>
 
       {/* SECTION 1: MÁS CLASIFICADAS (Top Rated) */}
       <section id="section-top-clasificadas" className="space-y-4">

@@ -23,6 +23,7 @@ import {
   Bookmark
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
+import { CinephileBadgesSection } from './CinephileBadgesSection';
 
 interface GenreStatItem {
   genre: string;
@@ -259,6 +260,10 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
           </div>
         </div>
       )}
+
+      {standalone && <CinephileBadgesSection />}
+
+
 
       {/* Standalone Cinephile Profile Card */}
       {standalone && currentUser && (
