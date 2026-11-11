@@ -7,6 +7,7 @@ import {
   Compass,
   LogOut,
   CheckCircle2,
+  Dices,
   Film
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
@@ -30,6 +31,7 @@ export const SystemDashboardView: React.FC = () => {
     userAvatar,
     myListEntries,
     statusCounts,
+    openRoulette,
     logout
   } = useMedia();
   const { exitToPublic } = useAuth();
@@ -113,6 +115,16 @@ export const SystemDashboardView: React.FC = () => {
             <span className="text-slate-400">Catálogo:</span>
             <strong className="text-white">{mediaList.length}</strong>
           </div>
+
+          <button
+            type="button"
+            onClick={() => openRoulette()}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-rose-500/30 text-amber-300 hover:text-white border border-amber-500/40 text-xs font-bold transition-all shadow-md active:scale-95"
+            title="Girar la ruleta: ¿Qué veo hoy?"
+          >
+            <Dices className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
+            <span>¿Qué Veo Hoy? 🎲</span>
+          </button>
 
           <button
             type="button"

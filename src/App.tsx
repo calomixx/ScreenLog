@@ -60,6 +60,9 @@ const EditMediaModal = lazy(() =>
 const AIAssistantModal = lazy(() =>
   import('./components/AIAssistantModal').then((m) => ({ default: m.AIAssistantModal })),
 );
+const CineRouletteModal = lazy(() =>
+  import('./components/CineRouletteModal').then((m) => ({ default: m.CineRouletteModal })),
+);
 
 const Splash: React.FC = () => (
   <div className="min-h-dvh bg-[#0A0A0B] flex flex-col items-center justify-center gap-5">
@@ -84,7 +87,7 @@ const ViewLoader: React.FC = () => (
  * No comparte el Navbar operativo ni el aspecto interno del sistema.
  */
 const PublicPortalShell: React.FC = () => {
-  const { selectedMediaId, isTrailerModalOpen, isAssistantOpen } = useMedia();
+  const { selectedMediaId, isTrailerModalOpen, isAssistantOpen, isRouletteOpen } = useMedia();
   return (
     <>
       <LandingPublicView />
@@ -92,6 +95,7 @@ const PublicPortalShell: React.FC = () => {
         {selectedMediaId && <DetailModal />}
         {isTrailerModalOpen && <TrailerModal />}
         {isAssistantOpen && <AIAssistantModal />}
+        {isRouletteOpen && <CineRouletteModal />}
       </Suspense>
     </>
   );
@@ -113,6 +117,7 @@ const MainAppContent: React.FC = () => {
     isEditProfileModalOpen,
     isEditMediaModalOpen,
     isAssistantOpen,
+    isRouletteOpen,
   } = useMedia();
   const { currentUser, isWorkspaceGuest, exitToPublic } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
@@ -177,6 +182,7 @@ const MainAppContent: React.FC = () => {
         {isEditProfileModalOpen && <EditProfileModal />}
         {isEditMediaModalOpen && <EditMediaModal />}
         {isAssistantOpen && <AIAssistantModal />}
+        {isRouletteOpen && <CineRouletteModal />}
       </Suspense>
 
       <footer className="border-t border-white/5 bg-[#121215] text-slate-400 py-6 mt-auto mb-16 md:mb-0">
