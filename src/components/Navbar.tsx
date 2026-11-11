@@ -85,7 +85,6 @@ export const Navbar: React.FC = () => {
         { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
         { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
         ...(isStaffUser ? [{ id: 'admin' as AppTab, label: 'Admin', icon: UserCog, staffOnly: true }] : []),
-        { id: 'cuenta', label: 'Cuenta', icon: UserIcon, authOnly: true },
       ]
     : [
         { id: 'sistema', label: 'Mi Sala', icon: Home },
@@ -94,6 +93,10 @@ export const Navbar: React.FC = () => {
         { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
         { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
       ];
+
+  const mobileTabs: TabDef[] = currentUser
+    ? [...tabs, { id: 'cuenta', label: 'Cuenta', icon: UserIcon, authOnly: true }]
+    : tabs;
 
   const searchResults =
     searchQuery.trim() === ''
@@ -225,7 +228,7 @@ export const Navbar: React.FC = () => {
               <LogoLockup size={36} showTagline={false} />
             </button>
 
-            <nav className="hidden xl:flex items-center gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/10 min-w-0" aria-label="Navegación principal">
+            <nav className="hidden xl:flex items-center gap-0.5 2xl:gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/10 min-w-0 max-w-full overflow-x-auto shrink" aria-label="Navegación principal">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -233,14 +236,21 @@ export const Navbar: React.FC = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => handleTabClick(tab.id)}
-                    className={`relative inline-flex items-center gap-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
+                    className={`relative inline-flex items-center gap-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap shrink-0 transition-all ${
                       isActive
                         ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30 font-bold'
                         : 'text-slate-300 hover:text-white hover:bg-white/5'
                     }`}
                   >
-                    <tab.icon className="w-3.5 h-3.5" />
-                    {tab.label}
+                    <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                    {tab.shortLabel ? (
+                      <>
+                        <span className="2xl:hidden">{tab.shortLabel}</span>
+                        <span className="hidden 2xl:inline">{tab.label}</span>
+                      </>
+                    ) : (
+                      tab.label
+                    )}
                     {tab.badge !== undefined && tab.badge > 0 && (
                       <span className="ml-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-black/30 text-rose-100">
                         {tab.badge}
@@ -262,7 +272,7 @@ export const Navbar: React.FC = () => {
                     onChange={(event) => handleSearchChange(event.target.value)}
                     placeholder="Buscar..."
                     aria-label="Buscar títulos"
-                    className="w-36 lg:w-44 xl:w-44 2xl:w-56 bg-white/5 text-xs text-slate-100 placeholder-slate-400 pl-8 pr-7 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/20 transition-all"
+                    className="w-32 lg:w-40 xl:w-36 2xl:w-52 bg-white/5 text-xs text-slate-100 placeholder-slate-400 pl-8 pr-7 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/20 transition-all"
                   />
                   {searchQuery && (
                     <button
@@ -318,7 +328,7 @@ export const Navbar: React.FC = () => {
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span className="hidden 2xl:inline">Añadir Título</span>
-                  <span className="hidden xl:inline 2xl:hidden">Añadir</span>
+                  
                 </button>
               ) : (
                 <button
@@ -329,7 +339,7 @@ export const Navbar: React.FC = () => {
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span className="hidden 2xl:inline">Añadir Título</span>
-                  <span className="hidden xl:inline 2xl:hidden">Añadir</span>
+                  
                 </button>
               )}
 
@@ -339,7 +349,7 @@ export const Navbar: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsProfileOpen((value) => !value)}
-                    className="flex items-center gap-1.5 p-1 rounded-full bg-white/5 border border-white/10 hover:border-rose-500/40 transition-colors"
+                    className={`flex items-center gap-1.5 p-1 rounded-full bg-white/5 border transition-colors ${activeTab === 'cuenta' ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-white/10 hover:border-rose-500/40'}`}
                     aria-label="Menú de perfil"
                     aria-expanded={isProfileOpen}
                   >
@@ -455,7 +465,7 @@ export const Navbar: React.FC = () => {
                   title="Cerrar sesión y salir afuera"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden lg:inline">Salir</span>
+                  <span className="hidden 2xl:inline">Salir</span>
                 </button>
                 </>
               ) : (
@@ -483,7 +493,7 @@ export const Navbar: React.FC = () => {
                     title="Salir a la portada pública"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span className="hidden lg:inline">Salir</span>
+                    <span className="hidden 2xl:inline">Salir</span>
                   </button>
                 </div>
               )}
@@ -494,7 +504,7 @@ export const Navbar: React.FC = () => {
             className="hidden md:flex xl:hidden items-center gap-1 pb-2.5 overflow-x-auto"
             aria-label="Navegación secundaria"
           >
-            {tabs.map((tab) => {
+            {mobileTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -573,9 +583,9 @@ export const Navbar: React.FC = () => {
       >
         <div
           className="grid px-1 pt-1.5 pb-1.5"
-          style={{ gridTemplateColumns: `repeat(${Math.max(tabs.length, 1)}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${Math.max(mobileTabs.length, 1)}, minmax(0, 1fr))` }}
         >
-          {tabs.map((tab) => {
+          {mobileTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
