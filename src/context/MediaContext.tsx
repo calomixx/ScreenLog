@@ -61,6 +61,11 @@ interface MediaContextType {
   closeAssistant: () => void;
   assistantInitialPrompt: string | null;
 
+  isRouletteOpen: boolean;
+  setIsRouletteOpen: (open: boolean) => void;
+  openRoulette: () => void;
+  closeRoulette: () => void;
+
   currentUser: UserProfile | null;
   usersList: UserProfile[];
   isAuthModalOpen: boolean;
@@ -255,6 +260,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState<string | null>(null);
 
+  const [isRouletteOpen, setIsRouletteOpen] = useState(false);
+
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isEditMediaModalOpen, setIsEditMediaModalOpen] = useState(false);
   const [mediaToEdit, setMediaToEdit] = useState<MediaItem | null>(null);
@@ -376,6 +383,14 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const closeAssistant = useCallback(() => {
     setIsAssistantOpen(false);
     setAssistantInitialPrompt(null);
+  }, []);
+
+  const openRoulette = useCallback(() => {
+    setIsRouletteOpen(true);
+  }, []);
+
+  const closeRoulette = useCallback(() => {
+    setIsRouletteOpen(false);
   }, []);
 
   const setAddModalOpen = useCallback(
@@ -1217,6 +1232,10 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     openAssistant,
     closeAssistant,
     assistantInitialPrompt,
+    isRouletteOpen,
+    setIsRouletteOpen,
+    openRoulette,
+    closeRoulette,
     currentUser,
     usersList: currentUser ? [currentUser] : [],
     isAuthModalOpen: false,

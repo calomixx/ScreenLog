@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Clapperboard,
   Compass,
+  Dices,
   Home,
   LogIn,
   LogOut,
@@ -47,6 +48,7 @@ export const Navbar: React.FC = () => {
     currentUser,
     openAuthModal,
     openAssistant,
+    openRoulette,
     logout,
     userAvatar,
     setIsEditProfileModalOpen,
@@ -319,6 +321,17 @@ export const Navbar: React.FC = () => {
                 <Bot className="w-4 h-4" />
               </button>
 
+              <button
+                type="button"
+                onClick={() => openRoulette()}
+                className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-rose-500/25 text-amber-300 hover:text-white border border-amber-500/35 text-xs font-bold transition-all shadow-sm active:scale-95"
+                title="¿Qué Veo Hoy? Ruleta de azar cinéfilo"
+                aria-label="Abrir ruleta ¿Qué Veo Hoy?"
+              >
+                <Dices className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="hidden 2xl:inline">¿Qué veo hoy?</span>
+              </button>
+
               {currentUser ? (
                 <button
                   type="button"
@@ -439,6 +452,17 @@ export const Navbar: React.FC = () => {
                         >
                           <Bot className="w-3.5 h-3.5 text-sky-400" />
                           Asistente IA
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openRoulette();
+                            setIsProfileOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-xs font-semibold text-amber-300 transition-colors"
+                        >
+                          <Dices className="w-3.5 h-3.5 text-amber-400" />
+                          Ruleta "¿Qué Veo Hoy?"
                         </button>
                       </div>
 

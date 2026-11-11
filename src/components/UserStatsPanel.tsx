@@ -20,10 +20,13 @@ import {
   Layers,
   Clapperboard,
   Plus,
-  Bookmark
+  Bookmark,
+  Download
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { CinephileBadgesSection } from './CinephileBadgesSection';
+import { computeCinephileStats } from '../lib/cinephileRanks';
+import { downloadCinephilePassport } from '../lib/exportPassportPNG';
 
 interface GenreStatItem {
   genre: string;
@@ -66,7 +69,9 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
     setSelectedMediaId,
     setActiveTab,
     setIsAddModalOpen,
-    setIsEditProfileModalOpen
+    setIsEditProfileModalOpen,
+    mediaList,
+    showToast,
   } = useMedia();
 
   const [scopeFilter, setScopeFilter] = useState<'terminadas' | 'solo_peliculas' | 'toda_lista'>('terminadas');
@@ -152,6 +157,33 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
     return genreStats.find((g) => g.genre === selectedGenre) || null;
   }, [selectedGenre, genreStats]);
 
+  const cinephileStats = useMemo(
+    () => computeCinephileStats(myListEntries, mediaList),
+    [myListEntries, mediaList],
+  );
+
+  const handleDownloadPassport = () => {
+    const ratedReviews = myListEntries.filter((e) => e.review.rating > 0);
+    const avgRating = ratedReviews.length > 0
+      ? (ratedReviews.reduce((sum, e) => sum + e.review.rating, 0) / ratedReviews.length).toFixed(1)
+      : '5.0';
+
+    downloadCinephilePassport({
+      userName: currentUser?.name || userName || 'Cinéfilo',
+      totalWatched,
+      totalHours: Math.max(1, Math.round(totalWatched * 2.1)),
+      avgRating,
+      topGenre: topGenreItem?.genre || 'Cine de Autor',
+      levelTitle: cinephileStats.level.title,
+      levelNum: cinephileStats.level.level,
+      xp: cinephileStats.xp,
+      badgesUnlocked: cinephileStats.unlockedCount,
+      totalBadges: cinephileStats.badges.length,
+    });
+
+    showToast('¡Pasaporte Cinéfilo exportado con éxito!', 'success');
+  };
+
   // Custom Recharts Tooltip
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length > 0) {
@@ -236,6 +268,15 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleDownloadPassport}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-rose-500/30 text-amber-300 hover:text-white text-xs font-bold border border-amber-500/40 transition-all shadow-sm active:scale-95"
+              title="Descargar mi Pasaporte Cinéfilo en imagen PNG de alta calidad"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Exportar Pasaporte (PNG)</span>
+            </button>
             <button
               onClick={() => setIsEditProfileModalOpen(true)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600/20 to-amber-500/20 hover:from-rose-600/30 hover:to-amber-500/30 text-rose-300 text-xs font-bold border border-rose-500/30 transition-all shadow-sm"
@@ -413,6 +454,16 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
             >
               <Layers className="w-3.5 h-3.5" />
               Toda la Lista ({myListEntries.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPassport}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/30 transition-all shadow-sm active:scale-95"
+              title="Descargar mi Pasaporte Cinéfilo en imagen PNG"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Pasaporte PNG</span>
             </button>
           </div>
         </div>

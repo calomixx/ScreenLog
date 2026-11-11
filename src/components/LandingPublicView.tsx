@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clapperboard,
   Compass,
+  Dices,
   Film,
   LogIn,
   Play,
@@ -26,7 +27,7 @@ import { ContactSection } from './ContactSection';
 import { LogoLockup } from './Logo';
 
 export const LandingPublicView: React.FC = () => {
-  const { mediaList, openTrailer, setSelectedMediaId, toastMessage } = useMedia();
+  const { mediaList, openTrailer, setSelectedMediaId, toastMessage, openRoulette } = useMedia();
   const { requestLogin, enterGuestWorkspace, justLoggedOut, clearLogoutNotice } = useAuth();
 
   useEffect(() => {
@@ -98,7 +99,17 @@ export const LandingPublicView: React.FC = () => {
           </nav>
 
           {/* Clean Auth Doorways */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => openRoulette()}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all active:scale-95"
+              title="¿Qué veo hoy? Ruleta cinéfila"
+            >
+              <Dices className="w-3.5 h-3.5 text-amber-400" />
+              <span>¿Qué Veo Hoy?</span>
+            </button>
+
             <button
               type="button"
               onClick={() => requestLogin('login')}
