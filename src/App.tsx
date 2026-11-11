@@ -21,7 +21,7 @@ import { SetupScreen } from './components/SetupScreen';
 import { ForcedPasswordChange } from './components/ForcedPasswordChange';
 import { ForbiddenView } from './components/ForbiddenView';
 import { LogoLockup, LogoMark } from './components/Logo';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 
 const Splash: React.FC = () => (
   <div className="min-h-dvh bg-[#0A0A0B] flex flex-col items-center justify-center gap-5">
@@ -33,13 +33,30 @@ const Splash: React.FC = () => (
   </div>
 );
 
+/**
+ * Portal Público ("AFUERA"):
+ * Diseño editorial independiente con su propia barra de portada, mural cinemático y footer amplio.
+ * No comparte el Navbar operativo ni el aspecto interno del sistema.
+ */
+const PublicPortalShell: React.FC = () => (
+  <>
+    <LandingPublicView />
+    <DetailModal />
+    <TrailerModal />
+    <AIAssistantModal />
+  </>
+);
+
+/**
+ * Espacio de Trabajo Privado ("ADENTRO"):
+ * Entorno de aplicación operativo con Navbar de herramientas, buscador, IA, estadísticas y dashboard privado.
+ */
 const MainAppContent: React.FC = () => {
-  const { activeTab, setActiveTab, mediaList } = useMedia();
-  const { currentUser } = useAuth();
+  const { activeTab, setActiveTab, mediaList, toastMessage } = useMedia();
+  const { currentUser, isWorkspaceGuest, exitToPublic } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
   const renderTab = () => {
-    if (activeTab === 'sistema') return <SystemDashboardView />;
     if (activeTab === 'explorar') return <CatalogView />;
     if (activeTab === 'recomendados') return <CineMatchView />;
     if (activeTab === 'mi_lista') return <MyListView />;
@@ -48,20 +65,53 @@ const MainAppContent: React.FC = () => {
       return isStaffUser ? (
         <AdminPanelView />
       ) : (
-        <ForbiddenView section="Panel de administración" onBack={() => setActiveTab('sistema')} onHome={() => setActiveTab('sistema')} />
+        <ForbiddenView
+          section="Panel de administración"
+          onBack={() => setActiveTab('sistema')}
+          onHome={() => setActiveTab('sistema')}
+        />
       );
     }
-    if (activeTab === 'cuenta') return <AccountView />;
-    return <LandingPublicView />;
+    if (activeTab === 'cuenta') {
+      return currentUser ? (
+        <AccountView />
+      ) : (
+        <SystemDashboardView />
+      );
+    }
+    return <SystemDashboardView />;
   };
 
   return (
     <div className="min-h-dvh bg-[#0A0A0B] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
       <Navbar />
 
+      {/* Subtle indicator when browsing workspace as guest */}
+      {!currentUser && isWorkspaceGuest && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-[11px] sm:text-xs text-amber-200 flex items-center justify-center gap-3 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+            Estás en vista de <strong>Invitado</strong> dentro del sistema. Crea una cuenta para guardar tu lista de forma permanente.
+          </span>
+          <button
+            type="button"
+            onClick={() => exitToPublic(true)}
+            className="underline font-bold text-amber-300 hover:text-white"
+          >
+            Salir a la portada
+          </button>
+        </div>
+      )}
+
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
         {renderTab()}
       </main>
+
+      {toastMessage && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-[#161618] border border-white/15 text-xs sm:text-sm font-semibold text-white shadow-2xl">
+          {toastMessage.text}
+        </div>
+      )}
 
       <DetailModal />
       <AddMediaModal />
@@ -70,29 +120,32 @@ const MainAppContent: React.FC = () => {
       <EditMediaModal />
       <AIAssistantModal />
 
-      <footer className="border-t border-white/5 bg-[#161618]/90 text-slate-400 py-8 mt-auto mb-16 md:mb-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <LogoLockup size={38} showTagline />
+      <footer className="border-t border-white/5 bg-[#121215] text-slate-400 py-6 mt-auto mb-16 md:mb-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <LogoLockup size={34} showTagline={false} />
 
-          <nav className="flex items-center gap-5 text-xs font-semibold" aria-label="Enlaces del pie">
+          <nav className="flex items-center gap-5 text-xs font-semibold" aria-label="Navegación interna">
+            <button type="button" onClick={() => setActiveTab('sistema')} className="hover:text-white transition-colors">
+              Mi Sala
+            </button>
             <button type="button" onClick={() => setActiveTab('explorar')} className="hover:text-white transition-colors">
               Explorar
+            </button>
+            <button type="button" onClick={() => setActiveTab('recomendados')} className="hover:text-white transition-colors">
+              CineMatch
             </button>
             <button type="button" onClick={() => setActiveTab('mi_lista')} className="hover:text-white transition-colors">
               Mi Lista
             </button>
-            <button type="button" onClick={() => setActiveTab('opiniones')} className="hover:text-white transition-colors">
-              Opiniones
-            </button>
-            <button type="button" onClick={() => setActiveTab('contacto')} className="hover:text-white transition-colors">
-              Contacto
+            <button type="button" onClick={() => setActiveTab('estadisticas')} className="hover:text-white transition-colors">
+              Estadísticas
             </button>
           </nav>
 
-          <div className="text-xs text-slate-500 text-center md:text-right">
+          <div className="text-[11px] text-slate-500 text-center md:text-right">
             <span>{mediaList.length} títulos catalogados</span>
             <span className="mx-2 text-slate-700">•</span>
-            <span>© {new Date().getFullYear()} ScreenLog Pro</span>
+            <span>Espacio de Trabajo · ScreenLog Pro</span>
           </div>
         </div>
       </footer>
@@ -100,26 +153,23 @@ const MainAppContent: React.FC = () => {
   );
 };
 
-const AuthenticatedApp: React.FC = () => (
-  <MediaProvider>
-    <MainAppContent />
-  </MediaProvider>
-);
-
 const AppGate: React.FC = () => {
-  const { loading, needsSetup, currentUser, isGuest } = useAuth();
+  const { loading, needsSetup, currentUser, isGuest, isWorkspaceGuest, pendingLoginMode } = useAuth();
 
   if (loading) return <Splash />;
   if (needsSetup) return <SetupScreen />;
-  if (!currentUser && !isGuest) return <AuthScreen initialMode="login" />;
   if (currentUser?.mustChangePassword) return <ForcedPasswordChange />;
-  return <AuthenticatedApp />;
+  if (!currentUser && !isGuest) return <AuthScreen key={pendingLoginMode} initialMode={pendingLoginMode} />;
+  if (!currentUser && !isWorkspaceGuest) return <PublicPortalShell />;
+  return <MainAppContent />;
 };
 
 export default function App() {
   return (
     <AuthProvider>
-      <AppGate />
+      <MediaProvider>
+        <AppGate />
+      </MediaProvider>
     </AuthProvider>
   );
 }

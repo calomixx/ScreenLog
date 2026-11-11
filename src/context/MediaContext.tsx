@@ -240,12 +240,12 @@ function attachCommunityReviews(items: MediaItem[], reviews: ServerReview[]): Me
 }
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser: authUser, isAuthReady, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
+  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
   const currentUser = authUser as UserProfile | null;
 
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => INITIAL_MEDIA_LIST);
   const [userReviews, setUserReviews] = useState<Record<string, UserReview>>({});
-  const [activeTab, setActiveTab] = useState<AppTab>(() => (currentUser ? 'sistema' : 'landing'));
+  const [activeTab, setActiveTab] = useState<AppTab>(() => (currentUser || isWorkspaceGuest ? 'sistema' : 'landing'));
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpenState] = useState(false);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
@@ -344,12 +344,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   useEffect(() => {
-    if (authUser) {
+    if (authUser || isWorkspaceGuest) {
       setActiveTab((prev) => (prev === 'landing' ? 'sistema' : prev));
     } else {
       setActiveTab('landing');
     }
-  }, [authUser?.id]);
+  }, [authUser?.id, isWorkspaceGuest]);
 
   const openAuthModal = useCallback(
     (mode: 'login' | 'register' = 'login') => {
