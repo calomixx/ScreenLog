@@ -211,7 +211,7 @@ export const LandingPublicView: React.FC = () => {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/10 backdrop-blur-md text-xs font-bold uppercase tracking-widest text-rose-300"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Portal Cinéfilo · Cine, Series y Anime</span>
+            <span>Clasificador de Películas · Cine, Series y Anime</span>
           </motion.div>
 
           <motion.h1
@@ -232,7 +232,7 @@ export const LandingPublicView: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.16 }}
             className="text-base sm:text-xl text-slate-300 font-normal leading-relaxed max-w-2xl mx-auto"
           >
-            Lleva el diario definitivo de todo lo que ves, puntúa con crítica técnica en 5 dimensiones y deja que nuestra IA visual te recomiende tu próxima obra maestra.
+            El clasificador de películas y series definitivo. Lleva el registro completo de todo lo que ves, puntúa con crítica técnica en 5 dimensiones y deja que nuestra IA visual te recomiende tu próxima obra maestra.
           </motion.p>
 
           {/* Primary Doorway Buttons (Leads into Auth / Login) */}

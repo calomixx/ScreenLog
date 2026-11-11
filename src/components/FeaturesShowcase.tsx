@@ -37,9 +37,9 @@ export const FeaturesShowcase: React.FC = () => {
     },
     {
       icon: Star,
-      title: 'Clasificación y Reseñas Pro',
-      desc: 'Sistema de 1 a 5 estrellas con medios puntos, etiquetas cualitativas ("Obra Maestra", "Excelente"), fecha de visionado y opción de rewatch.',
-      badge: 'Criterio Crítico',
+      title: 'Clasificador y Reseñas Pro',
+      desc: 'Clasificador avanzado de películas y series de 1 a 5 estrellas con medios puntos, etiquetas de evaluación ("Obra Maestra", "Excelente") y bitácora de visionado.',
+      badge: 'Clasificador',
       accent: 'from-amber-500/20 to-amber-600/5 text-amber-400 border-amber-500/30'
     },
     {

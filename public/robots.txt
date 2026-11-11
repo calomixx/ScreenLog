@@ -1,0 +1,13 @@
+# Googlebot & Web Crawlers Rules for ScreenLog Pro
+User-agent: *
+Allow: /
+Allow: /favicon.svg
+Allow: /brand/
+Allow: /assets/
+
+# Disallow private server endpoints from crawler noise
+Disallow: /api/admin/
+Disallow: /api/owner/
+
+# Sitemap location for Google Search Console
+Sitemap: https://screenlog.pro/sitemap.xml
