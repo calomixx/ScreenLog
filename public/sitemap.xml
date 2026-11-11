@@ -4,25 +4,25 @@
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <url>
-    <loc>https://screenlog.pro/</loc>
+    <loc>https://screenlogproc.ai.studio/</loc>
     <lastmod>2026-11-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://screenlog.pro/#explorar</loc>
+    <loc>https://screenlogproc.ai.studio/#explorar</loc>
     <lastmod>2026-11-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://screenlog.pro/#cinematch</loc>
+    <loc>https://screenlogproc.ai.studio/#cinematch</loc>
     <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
   <url>
-    <loc>https://screenlog.pro/#comunidad</loc>
+    <loc>https://screenlogproc.ai.studio/#comunidad</loc>
     <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.70</priority>
