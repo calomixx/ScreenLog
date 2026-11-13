@@ -397,6 +397,24 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
 }
 
 /**
+ * Seeds a list of media items into Firestore catalog_media collection.
+ */
+export async function seedCatalogToFirestore(items: MediaItem[]): Promise<{ success: number; failed: number }> {
+  let success = 0;
+  let failed = 0;
+  for (const item of items) {
+    try {
+      await saveCatalogMediaToFirestore(item);
+      success++;
+    } catch (err) {
+      console.warn('Failed to seed item to Firestore:', item.title, err);
+      failed++;
+    }
+  }
+  return { success, failed };
+}
+
+/**
  * Deletes a catalog item from Firestore.
  */
 export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<void> {

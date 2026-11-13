@@ -58,7 +58,7 @@ import {
 import { useMedia } from '../context/MediaContext';
 import type { MediaItem, MediaType } from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
-import { pingFirestore } from '../lib/firebase';
+import { pingFirestore, seedCatalogToFirestore } from '../lib/firebase';
 
 type AdminTab =
   | 'summary'
@@ -268,6 +268,22 @@ export const AdminPanelView: React.FC = () => {
       });
     }
   }, []);
+
+  const [isSeedingFirestore, setIsSeedingFirestore] = useState(false);
+
+  const handleSeedFirestore = async () => {
+    if (isSeedingFirestore) return;
+    setIsSeedingFirestore(true);
+    try {
+      const res = await seedCatalogToFirestore(mediaList);
+      flash(`Se sincronizaron ${res.success} de ${mediaList.length} títulos a Firebase Firestore.`);
+      await checkFirestore();
+    } catch (err: any) {
+      setError(err?.message || 'Error al subir catálogo a Firestore');
+    } finally {
+      setIsSeedingFirestore(false);
+    }
+  };
 
   const isOwnerUser = isOwner(currentUser?.role);
   const tabs = useMemo(() => {
@@ -974,6 +990,18 @@ export const AdminPanelView: React.FC = () => {
                     <span className="text-amber-400 font-semibold text-[11px]">Exclusivo Administrador</span>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSeedFirestore()}
+                  disabled={isSeedingFirestore || firestoreStatus.loading}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 transition-colors disabled:opacity-50"
+                >
+                  <Cloud className={`w-4 h-4 ${isSeedingFirestore ? 'animate-bounce' : ''}`} />
+                  {isSeedingFirestore
+                    ? 'Subiendo catálogo a Firestore...'
+                    : `Subir catálogo actual a Firebase (${mediaList.length} títulos)`}
+                </button>
 
                 <div className="pt-2 border-t border-white/5">
                   <p className="text-[10px] text-slate-500 leading-relaxed">
