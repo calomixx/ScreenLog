@@ -139,7 +139,8 @@ const STORAGE_MEDIA_KEY = 'cinetrack_media_items_v1';
 const STORAGE_REVIEWS_KEY = 'cinetrack_user_reviews_v1';
 const STORAGE_SYNC_QUEUE_KEY = 'cinetrack_offline_sync_queue_v1';
 const STORAGE_LAST_SYNC_KEY = 'cinetrack_last_sync_timestamp';
-const STORAGE_OVERRIDES_KEY = 'cinetrack_title_overrides_v1';
+const STORAGE_OVERRIDES_KEY = 'cinetrack_title_overrides_v2';
+const STORAGE_CUSTOM_MEDIA_KEY = 'cinetrack_custom_media_v2';
 
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
@@ -295,6 +296,29 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch {
         items = INITIAL_MEDIA_LIST;
       }
+
+      // Merge local customizations and custom media so edits survive any server restart
+      try {
+        const savedCustom = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
+        if (savedCustom) {
+          const parsedCustom = JSON.parse(savedCustom) as MediaItem[];
+          if (Array.isArray(parsedCustom)) {
+            parsedCustom.forEach((c) => {
+              if (!items.some((it) => it.id === c.id)) {
+                items.unshift(c);
+              }
+            });
+          }
+        }
+        const savedOverrides = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+        if (savedOverrides) {
+          const overridesMap = JSON.parse(savedOverrides) as Record<string, Partial<MediaItem>>;
+          items = items.map((it) => (overridesMap[it.id] ? { ...it, ...overridesMap[it.id] } : it));
+        }
+      } catch (err) {
+        console.warn('Could not restore local media overrides:', err);
+      }
+
       try {
         const reviewResponse = await apiRequest<{ success: boolean; data: ServerReview[] }>('/api/community/reviews');
         if (Array.isArray(reviewResponse.data)) reviews = reviewResponse.data;
@@ -706,6 +730,17 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           : [historyEntry],
       };
       setMediaList((prev) => prev.map((media) => (media.id === item.id ? updated : media)));
+
+      // Always save override locally to withstand ephemeral container restarts
+      try {
+        const raw = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        map[item.id] = updated;
+        localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(map));
+      } catch (e) {
+        console.warn('Could not save override to localStorage:', e);
+      }
+
       apiRequest(`/api/media/${encodeURIComponent(item.id)}`, {
         method: 'PATCH',
         body: JSON.stringify(updated),
@@ -800,6 +835,21 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (selectedMediaId === id) {
           setSelectedMediaId(null);
         }
+        try {
+          const raw = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+          if (raw) {
+            const map = JSON.parse(raw);
+            delete map[id];
+            localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(map));
+          }
+          const rawCustom = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
+          if (rawCustom) {
+            const list = (JSON.parse(rawCustom) as any[]).filter((m: any) => m.id !== id);
+            localStorage.setItem(STORAGE_CUSTOM_MEDIA_KEY, JSON.stringify(list));
+          }
+        } catch (e) {
+          console.warn('Could not remove media from local storage:', e);
+        }
         showToast(`"${title}" ha sido eliminado del catálogo.`, 'info');
         return { success: true };
       } catch (err: any) {
@@ -890,6 +940,18 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setMediaList((prev) => [newMedia, ...prev]);
       updateMediaStatus(newMedia.id, 'pendiente');
+
+      // Keep custom titles in local storage so they are immediately available regardless of network or container reboots
+      try {
+        const raw = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
+        const list = raw ? (JSON.parse(raw) as any[]) : [];
+        if (!list.some((m: any) => m.id === newMedia.id)) {
+          list.unshift(newMedia);
+          localStorage.setItem(STORAGE_CUSTOM_MEDIA_KEY, JSON.stringify(list));
+        }
+      } catch (err) {
+        console.warn('Could not save custom media to localStorage:', err);
+      }
 
       apiRequest('/api/media', {
         method: 'POST',
@@ -1135,7 +1197,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearLocalData = useCallback(() => {
     try {
-      [STORAGE_MEDIA_KEY, STORAGE_REVIEWS_KEY, STORAGE_SYNC_QUEUE_KEY, STORAGE_LAST_SYNC_KEY, STORAGE_OVERRIDES_KEY].forEach(
+      [STORAGE_MEDIA_KEY, STORAGE_REVIEWS_KEY, STORAGE_SYNC_QUEUE_KEY, STORAGE_LAST_SYNC_KEY, STORAGE_OVERRIDES_KEY, STORAGE_CUSTOM_MEDIA_KEY].forEach(
         (key) => localStorage.removeItem(key),
       );
     } catch {
