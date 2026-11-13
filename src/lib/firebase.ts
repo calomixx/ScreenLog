@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
+  getDocs,
   setDoc,
   deleteDoc,
   collection,
@@ -395,6 +396,85 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
 }
 
 /**
+ * Deletes a catalog item from Firestore.
+ */
+export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<void> {
+  const fbUser = auth.currentUser;
+  if (!fbUser?.uid || !fbUser.emailVerified) return;
+  const safeId = sanitizeFirestoreId(mediaId);
+  const path = `catalog_media/${safeId}`;
+  try {
+    await deleteDoc(doc(db, 'catalog_media', safeId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Subscribes to the shared cloud catalog in real-time.
+ * Anyone can read (valid year between 1888 and 2100).
+ */
+export function subscribeToCatalogMedia(
+  onMediaList: (items: MediaItem[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, 'catalog_media'),
+    where('year', '>=', 1888),
+    where('year', '<=', 2100),
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const items: MediaItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        if (d && d.title) {
+          items.push({
+            id: docSnap.id,
+            title: d.title,
+            originalTitle: d.originalTitle || d.title,
+            type: d.type || 'pelicula',
+            year: Number(d.year) || new Date().getFullYear(),
+            genres: Array.isArray(d.genres) && d.genres.length > 0 ? d.genres : ['Drama'],
+            director: d.director || 'Desconocido',
+            cast: Array.isArray(d.cast) ? d.cast : [],
+            synopsis: d.synopsis || '',
+            duration: d.duration || '2h 00m',
+            posterUrl: d.posterUrl || '',
+            backdropUrl: d.backdropUrl || d.posterUrl || '',
+            trailerYoutubeId: d.trailerUrl || d.trailerYoutubeId || '',
+            defaultPlatform: d.defaultPlatform || 'Cine / Sala',
+            streamingPlatforms: Array.isArray(d.streamingPlatforms) ? d.streamingPlatforms : [d.defaultPlatform || 'Cine'],
+            communityRating: Number(d.communityRating ?? d.rating) || 0,
+            communityVotesCount: Number(d.communityVotesCount ?? d.ratingCount) || 0,
+            addedToListCount: Number(d.addedToListCount) || 0,
+            isFeatured: Boolean(d.isFeatured),
+            isTrending: Boolean(d.isTrending),
+            isTopClassified: Boolean(d.isTopClassified),
+            createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
+            comments: [],
+            detailedVotes: {
+              script: 0,
+              acting: 0,
+              soundtrack: 0,
+              visuals: 0,
+              direction: 0,
+              totalVotes: 0,
+              ratingDistribution: {},
+            },
+            isCustomUserCreated: true,
+          } as MediaItem);
+        }
+      });
+      onMediaList(items);
+    },
+    (err) => {
+      console.warn('Firestore catalog_media subscription error:', err);
+    },
+  );
+}
+
+/**
  * Subscribes to the current Firebase user's personal library in real time.
  */
 export function subscribeToUserLibrary(
@@ -438,6 +518,36 @@ export function subscribeToUserLibrary(
       handleFirestoreError(error, OperationType.LIST, 'user_library');
     },
   );
+}
+
+/**
+ * Quick diagnostic ping to verify live connectivity to Firestore.
+ */
+export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number; message: string; docCount: number }> {
+  const start = Date.now();
+  try {
+    const q = query(
+      collection(db, 'catalog_media'),
+      where('year', '>=', 1888),
+      where('year', '<=', 2100),
+    );
+    const snap = await getDocs(q);
+    const latency = Date.now() - start;
+    return {
+      ok: true,
+      latencyMs: latency,
+      message: 'Conectado a Firebase Firestore en tiempo real.',
+      docCount: snap.size,
+    };
+  } catch (err: any) {
+    const latency = Date.now() - start;
+    return {
+      ok: false,
+      latencyMs: latency,
+      message: err?.message || 'Error al conectar con Firestore.',
+      docCount: 0,
+    };
+  }
 }
 
 export { signInWithPopup, signOut, onAuthStateChanged, type FirebaseUser };
