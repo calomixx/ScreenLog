@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
+  getDocs,
   setDoc,
   deleteDoc,
   collection,
@@ -517,6 +518,36 @@ export function subscribeToUserLibrary(
       handleFirestoreError(error, OperationType.LIST, 'user_library');
     },
   );
+}
+
+/**
+ * Quick diagnostic ping to verify live connectivity to Firestore.
+ */
+export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number; message: string; docCount: number }> {
+  const start = Date.now();
+  try {
+    const q = query(
+      collection(db, 'catalog_media'),
+      where('year', '>=', 1888),
+      where('year', '<=', 2100),
+    );
+    const snap = await getDocs(q);
+    const latency = Date.now() - start;
+    return {
+      ok: true,
+      latencyMs: latency,
+      message: 'Conectado a Firebase Firestore en tiempo real.',
+      docCount: snap.size,
+    };
+  } catch (err: any) {
+    const latency = Date.now() - start;
+    return {
+      ok: false,
+      latencyMs: latency,
+      message: err?.message || 'Error al conectar con Firestore.',
+      docCount: 0,
+    };
+  }
 }
 
 export { signInWithPopup, signOut, onAuthStateChanged, type FirebaseUser };

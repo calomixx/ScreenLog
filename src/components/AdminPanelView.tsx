@@ -10,6 +10,7 @@ import {
   Copy,
   CreditCard,
   Crown,
+  Cloud,
   Database,
   Eye,
   EyeOff,
@@ -57,6 +58,7 @@ import {
 import { useMedia } from '../context/MediaContext';
 import type { MediaItem, MediaType } from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
+import { pingFirestore } from '../lib/firebase';
 
 type AdminTab =
   | 'summary'
@@ -228,6 +230,45 @@ export const AdminPanelView: React.FC = () => {
   const [transferForm, setTransferForm] = useState({ email: '', password: '', confirmation: '', doubleConfirm: false });
   const [showTransferPassword, setShowTransferPassword] = useState(false);
 
+  const [firestoreStatus, setFirestoreStatus] = useState<{
+    checked: boolean;
+    loading: boolean;
+    ok: boolean;
+    latencyMs?: number;
+    message?: string;
+    docCount?: number;
+  }>({
+    checked: false,
+    loading: false,
+    ok: true,
+    latencyMs: undefined,
+    message: '',
+    docCount: 0,
+  });
+
+  const checkFirestore = useCallback(async () => {
+    setFirestoreStatus((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await pingFirestore();
+      setFirestoreStatus({
+        checked: true,
+        loading: false,
+        ok: res.ok,
+        latencyMs: res.latencyMs,
+        message: res.message,
+        docCount: res.docCount,
+      });
+    } catch (e: any) {
+      setFirestoreStatus({
+        checked: true,
+        loading: false,
+        ok: false,
+        message: e?.message || 'Error al conectar con Firestore',
+        docCount: 0,
+      });
+    }
+  }, []);
+
   const isOwnerUser = isOwner(currentUser?.role);
   const tabs = useMemo(() => {
     const base: { id: AdminTab; label: string; icon: React.ElementType }[] = [
@@ -280,7 +321,8 @@ export const AdminPanelView: React.FC = () => {
 
   useEffect(() => {
     void loadCore();
-  }, [loadCore]);
+    void checkFirestore();
+  }, [loadCore, checkFirestore]);
 
   useEffect(() => {
     if (!activeTab) return;
@@ -712,14 +754,40 @@ export const AdminPanelView: React.FC = () => {
             Gestiona usuarios, modera la comunidad y supervisa la seguridad de ScreenLog Pro.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+          <div
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+              firestoreStatus.ok
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+            }`}
+            title={firestoreStatus.message || 'Firebase Firestore Cloud Database'}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span
+              className={`w-2 h-2 rounded-full ${
+                firestoreStatus.ok ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
+              }`}
+            />
+            <span>
+              Firebase:{' '}
+              {firestoreStatus.loading
+                ? 'Comprobando...'
+                : firestoreStatus.ok
+                ? 'En línea'
+                : 'Error'}
+            </span>
+          </div>
           <RolePill role={currentUser.role} />
           <button
             type="button"
-            onClick={() => void loadCore()}
+            onClick={() => {
+              void loadCore();
+              void checkFirestore();
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || firestoreStatus.loading ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
         </div>
@@ -815,43 +883,101 @@ export const AdminPanelView: React.FC = () => {
               </div>
             </section>
 
-            <section className={`${cardClass} p-5 space-y-4`}>
-              <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-amber-400" />
-                <h2 className="font-display text-lg font-black tracking-tight">Estado del portal</h2>
-              </div>
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Títulos en catálogo</span>
-                  <span className="text-slate-200 font-bold">{mediaList.length}</span>
+            <div className="space-y-4">
+              <section className={`${cardClass} p-5 space-y-4`}>
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-amber-400" />
+                  <h2 className="font-display text-lg font-black tracking-tight">Estado del portal</h2>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Películas</span>
-                  <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'movie').length}</span>
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Títulos en catálogo</span>
+                    <span className="text-slate-200 font-bold">{mediaList.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Películas</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'movie').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Series</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'tv').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Administradores</span>
+                    <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'admin').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Owner</span>
+                    <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'owner').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Reseñas comunitarias</span>
+                    <span className="text-slate-200 font-bold">{summary.reviews}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Series</span>
-                  <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'tv').length}</span>
+                <div className="pt-3 border-t border-white/5">
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Los administradores y el owner tienen permisos completos CRUD sobre el catálogo (añadir por TMDB o manual, editar ficha técnica y quitar títulos).
+                  </p>
                 </div>
+              </section>
+
+              <section className={`${cardClass} p-5 space-y-4`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Administradores</span>
-                  <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'admin').length}</span>
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-emerald-400" />
+                    <h2 className="font-display text-lg font-black tracking-tight">Conexión Firebase Firestore</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void checkFirestore()}
+                    disabled={firestoreStatus.loading}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${firestoreStatus.loading ? 'animate-spin' : ''}`} />
+                    Probar ping
+                  </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Owner</span>
-                  <span className="text-slate-200 font-bold">{users.filter((user) => user.role === 'owner').length}</span>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Estado del servicio</span>
+                    <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      {firestoreStatus.ok ? 'Conectado en Tiempo Real' : 'Desconectado'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Base de datos Cloud</span>
+                    <span className="text-slate-200 font-mono text-[11px]">Firestore NoSQL</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Colección remota</span>
+                    <span className="text-slate-200 font-mono text-[11px]">catalog_media</span>
+                  </div>
+                  {firestoreStatus.latencyMs !== undefined && (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                      <span className="text-slate-400">Latencia de respuesta</span>
+                      <span className="text-emerald-400 font-mono text-[11px] font-bold">{firestoreStatus.latencyMs} ms</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Títulos en Firestore</span>
+                    <span className="text-slate-200 font-bold">{firestoreStatus.docCount} en nube</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Visibilidad</span>
+                    <span className="text-amber-400 font-semibold text-[11px]">Exclusivo Administrador</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Reseñas comunitarias</span>
-                  <span className="text-slate-200 font-bold">{summary.reviews}</span>
+
+                <div className="pt-2 border-t border-white/5">
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Toda película o serie agregada o editada se almacena en Firebase Firestore. Al abrir el sitio desde tu casa, trabajo o móvil, el catálogo se descarga automáticamente de la nube sin perder cambios.
+                  </p>
                 </div>
-              </div>
-              <div className="pt-3 border-t border-white/5">
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Los administradores y el owner tienen permisos completos CRUD sobre el catálogo (añadir por TMDB o manual, editar ficha técnica y quitar títulos).
-                </p>
-              </div>
-            </section>
+              </section>
+            </div>
           </div>
         </div>
       )}
