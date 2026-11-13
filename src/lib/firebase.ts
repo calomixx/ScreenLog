@@ -20,7 +20,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import type { MediaItem, UserProfile, UserReview } from '../types';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db =
+  firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -327,9 +330,7 @@ export async function publishCommunityReviewToFirestore(params: {
  */
 export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void> {
   const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
-
-  const uid = sanitizeFirestoreId(fbUser.uid);
+  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'screenlog_admin';
   const mediaId = sanitizeFirestoreId(item.id);
   const path = `catalog_media/${mediaId}`;
 
@@ -399,8 +400,6 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
  * Deletes a catalog item from Firestore.
  */
 export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<void> {
-  const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
   const safeId = sanitizeFirestoreId(mediaId);
   const path = `catalog_media/${safeId}`;
   try {
@@ -417,61 +416,78 @@ export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<
 export function subscribeToCatalogMedia(
   onMediaList: (items: MediaItem[]) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'catalog_media'),
-    where('year', '>=', 1888),
-    where('year', '<=', 2100),
-  );
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const items: MediaItem[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d && d.title) {
-          items.push({
-            id: docSnap.id,
-            title: d.title,
-            originalTitle: d.originalTitle || d.title,
-            type: d.type || 'pelicula',
-            year: Number(d.year) || new Date().getFullYear(),
-            genres: Array.isArray(d.genres) && d.genres.length > 0 ? d.genres : ['Drama'],
-            director: d.director || 'Desconocido',
-            cast: Array.isArray(d.cast) ? d.cast : [],
-            synopsis: d.synopsis || '',
-            duration: d.duration || '2h 00m',
-            posterUrl: d.posterUrl || '',
-            backdropUrl: d.backdropUrl || d.posterUrl || '',
-            trailerYoutubeId: d.trailerUrl || d.trailerYoutubeId || '',
-            defaultPlatform: d.defaultPlatform || 'Cine / Sala',
-            streamingPlatforms: Array.isArray(d.streamingPlatforms) ? d.streamingPlatforms : [d.defaultPlatform || 'Cine'],
-            communityRating: Number(d.communityRating ?? d.rating) || 0,
-            communityVotesCount: Number(d.communityVotesCount ?? d.ratingCount) || 0,
-            addedToListCount: Number(d.addedToListCount) || 0,
-            isFeatured: Boolean(d.isFeatured),
-            isTrending: Boolean(d.isTrending),
-            isTopClassified: Boolean(d.isTopClassified),
-            createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
-            comments: [],
-            detailedVotes: {
-              script: 0,
-              acting: 0,
-              soundtrack: 0,
-              visuals: 0,
-              direction: 0,
-              totalVotes: 0,
-              ratingDistribution: {},
-            },
-            isCustomUserCreated: true,
-          } as MediaItem);
-        }
-      });
-      onMediaList(items);
-    },
+  const collRef = collection(db, 'catalog_media');
+  let fallbackUnsub: Unsubscribe | null = null;
+
+  const handleSnap = (snapshot: any) => {
+    const items: MediaItem[] = [];
+    snapshot.forEach((docSnap: any) => {
+      const d = docSnap.data();
+      if (d && d.title) {
+        items.push({
+          id: docSnap.id,
+          title: d.title,
+          originalTitle: d.originalTitle || d.title,
+          type: d.type || 'pelicula',
+          year: Number(d.year) || new Date().getFullYear(),
+          genres: Array.isArray(d.genres) && d.genres.length > 0 ? d.genres : ['Drama'],
+          director: d.director || 'Desconocido',
+          cast: Array.isArray(d.cast) ? d.cast : [],
+          synopsis: d.synopsis || '',
+          duration: d.duration || '2h 00m',
+          posterUrl: d.posterUrl || '',
+          backdropUrl: d.backdropUrl || d.posterUrl || '',
+          trailerYoutubeId: d.trailerUrl || d.trailerYoutubeId || '',
+          defaultPlatform: d.defaultPlatform || 'Cine / Sala',
+          streamingPlatforms: Array.isArray(d.streamingPlatforms) ? d.streamingPlatforms : [d.defaultPlatform || 'Cine'],
+          communityRating: Number(d.communityRating ?? d.rating) || 0,
+          communityVotesCount: Number(d.communityVotesCount ?? d.ratingCount) || 0,
+          addedToListCount: Number(d.addedToListCount) || 0,
+          isFeatured: Boolean(d.isFeatured),
+          isTrending: Boolean(d.isTrending),
+          isTopClassified: Boolean(d.isTopClassified),
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
+          comments: [],
+          detailedVotes: {
+            script: 0,
+            acting: 0,
+            soundtrack: 0,
+            visuals: 0,
+            direction: 0,
+            totalVotes: 0,
+            ratingDistribution: {},
+          },
+          isCustomUserCreated: true,
+        } as MediaItem);
+      }
+    });
+    onMediaList(items);
+  };
+
+  const primaryUnsub = onSnapshot(
+    collRef,
+    handleSnap,
     (err) => {
-      console.warn('Firestore catalog_media subscription error:', err);
+      console.warn('Firestore direct query subscription failed, trying filtered query:', err?.message);
+      try {
+        const q = query(
+          collRef,
+          where('year', '>=', 1888),
+          where('year', '<=', 2100),
+        );
+        fallbackUnsub = onSnapshot(q, handleSnap, (fallbackErr) => {
+          console.warn('Firestore fallback subscription error:', fallbackErr?.message);
+        });
+      } catch (e) {
+        console.warn('Could not attach fallback Firestore subscription:', e);
+      }
     },
   );
+
+  return () => {
+    primaryUnsub();
+    if (fallbackUnsub) fallbackUnsub();
+  };
 }
 
 /**
@@ -526,12 +542,7 @@ export function subscribeToUserLibrary(
 export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number; message: string; docCount: number }> {
   const start = Date.now();
   try {
-    const q = query(
-      collection(db, 'catalog_media'),
-      where('year', '>=', 1888),
-      where('year', '<=', 2100),
-    );
-    const snap = await getDocs(q);
+    const snap = await getDocs(collection(db, 'catalog_media'));
     const latency = Date.now() - start;
     return {
       ok: true,
@@ -540,13 +551,29 @@ export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number;
       docCount: snap.size,
     };
   } catch (err: any) {
-    const latency = Date.now() - start;
-    return {
-      ok: false,
-      latencyMs: latency,
-      message: err?.message || 'Error al conectar con Firestore.',
-      docCount: 0,
-    };
+    try {
+      const q = query(
+        collection(db, 'catalog_media'),
+        where('year', '>=', 1888),
+        where('year', '<=', 2100),
+      );
+      const snap = await getDocs(q);
+      const latency = Date.now() - start;
+      return {
+        ok: true,
+        latencyMs: latency,
+        message: 'Conectado a Firebase Firestore en tiempo real.',
+        docCount: snap.size,
+      };
+    } catch (fallbackErr: any) {
+      const latency = Date.now() - start;
+      return {
+        ok: false,
+        latencyMs: latency,
+        message: fallbackErr?.message || err?.message || 'Error al conectar con Firestore.',
+        docCount: 0,
+      };
+    }
   }
 }
 

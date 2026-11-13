@@ -949,7 +949,11 @@ export const AdminPanelView: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <span className="text-slate-400">Base de datos Cloud</span>
-                    <span className="text-slate-200 font-mono text-[11px]">Firestore NoSQL</span>
+                    <span className="text-slate-200 font-mono text-[11px]">Firestore NoSQL (default)</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Proyecto Firebase</span>
+                    <span className="text-emerald-400 font-mono text-[11px] font-bold">screeamlog</span>
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <span className="text-slate-400">Colección remota</span>
