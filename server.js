@@ -2394,41 +2394,56 @@ function createApiRouter() {
     if (!item) return safeError(res, 404, "T\xEDtulo no encontrado.", "MEDIA_NOT_FOUND");
     res.json({ success: true, data: item });
   }));
-  async function fetchFromTMDB(title, type, year) {
+  async function fetchFromTMDB(title, type, year, tmdbId, mediaTypeParam) {
     const apiKey = getValidTmdbKey();
     const baseUrl = "https://api.themoviedb.org/3";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6e3);
     try {
-      const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
-      const searchRes = await fetch(searchUrl, { signal: controller.signal });
-      if (!searchRes.ok) {
-        console.warn(`TMDB search returned HTTP ${searchRes.status} for query "${title}"`);
-        return null;
+      let mediaType = mediaTypeParam || (type === "serie" || type === "anime" ? "tv" : "movie");
+      let targetId = tmdbId || null;
+      if (!targetId) {
+        const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
+        const searchRes = await fetch(searchUrl, { signal: controller.signal });
+        if (!searchRes.ok) {
+          console.warn(`TMDB search returned HTTP ${searchRes.status} for query "${title}"`);
+          return null;
+        }
+        const searchData = await searchRes.json();
+        const results = (searchData.results || []).filter((r) => r.media_type === "movie" || r.media_type === "tv");
+        if (results.length === 0) return null;
+        let bestMatch = results[0];
+        if (year && !isNaN(Number(year))) {
+          const targetYear = Number(year);
+          const yearMatch = results.find((r) => {
+            const rYear = new Date(r.release_date || r.first_air_date || 0).getFullYear();
+            const typeMatch = !type || (type === "pelicula" ? r.media_type === "movie" : r.media_type === "tv");
+            return typeMatch && Math.abs(rYear - targetYear) <= 1;
+          });
+          if (yearMatch) bestMatch = yearMatch;
+        } else {
+          for (const r of results) {
+            if (type === "anime" && r.media_type === "tv" && r.origin_country?.includes("JP")) {
+              bestMatch = r;
+              break;
+            }
+            if (type === "serie" && r.media_type === "tv" && !r.origin_country?.includes("JP")) {
+              bestMatch = r;
+              break;
+            }
+            if (type === "pelicula" && r.media_type === "movie") {
+              bestMatch = r;
+              break;
+            }
+          }
+        }
+        targetId = bestMatch.id;
+        mediaType = bestMatch.media_type === "movie" ? "movie" : "tv";
       }
-      const searchData = await searchRes.json();
-      const results = (searchData.results || []).filter((r) => r.media_type === "movie" || r.media_type === "tv");
-      if (results.length === 0) return null;
-      let bestMatch = results[0];
-      for (const r of results) {
-        if (type === "anime" && r.media_type === "tv" && r.origin_country?.includes("JP")) {
-          bestMatch = r;
-          break;
-        }
-        if (type === "serie" && r.media_type === "tv" && !r.origin_country?.includes("JP")) {
-          bestMatch = r;
-          break;
-        }
-        if (type === "pelicula" && r.media_type === "movie") {
-          bestMatch = r;
-          break;
-        }
-      }
-      const mediaType = bestMatch.media_type === "movie" ? "movie" : "tv";
-      const detailUrl = `${baseUrl}/${mediaType}/${bestMatch.id}?language=es-ES&append_to_response=credits,videos,watch/providers,external_ids&api_key=${apiKey}`;
+      const detailUrl = `${baseUrl}/${mediaType}/${targetId}?language=es-ES&append_to_response=credits,videos,watch/providers,external_ids&api_key=${apiKey}`;
       const detailRes = await fetch(detailUrl, { signal: controller.signal });
       if (!detailRes.ok) {
-        console.warn(`TMDB detail returned HTTP ${detailRes.status} for ID ${bestMatch.id}`);
+        console.warn(`TMDB detail returned HTTP ${detailRes.status} for ID ${targetId}`);
         return null;
       }
       const detail = await detailRes.json();
@@ -2560,16 +2575,22 @@ function createApiRouter() {
     return null;
   }
   router.post("/media/lookup", asyncRoute(async (req, res) => {
-    const { title, type, year } = req.body;
+    const { title, type, year, tmdbId, mediaType } = req.body;
     if (!title || typeof title !== "string" || title.trim().length < 2) {
       return safeError(res, 400, "El t\xEDtulo debe tener al menos 2 caracteres.", "INVALID_TITLE");
     }
-    let result = await fetchFromTMDB(title.trim(), type, year);
-    if ((!result || result.confidence < 0.7) && (type === "anime" || !type)) {
+    let result = await fetchFromTMDB(
+      title.trim(),
+      type,
+      year ? Number(year) : void 0,
+      tmdbId ? Number(tmdbId) : void 0,
+      mediaType
+    );
+    if ((!result || result.confidence < 0.7) && (type === "anime" || !type) && !tmdbId) {
       const jikanResult = await fetchFromJikan(title.trim());
       if (jikanResult && (!result || jikanResult.confidence > result.confidence)) result = jikanResult;
     }
-    if (!result) result = await localFallbackLookup(title.trim());
+    if (!result && !tmdbId) result = await localFallbackLookup(title.trim());
     if (!result) {
       return res.json({ success: true, data: null, message: "No encontramos coincidencias. Completa la ficha manualmente." });
     }

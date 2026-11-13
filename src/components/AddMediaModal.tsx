@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   X, 
   Upload, 
@@ -89,8 +89,10 @@ export const AddMediaModal: React.FC = () => {
   const [hasAutofilled, setHasAutofilled] = useState(false);
   const [animeInfo, setAnimeInfo] = useState<{ format?: string; episodes?: string } | null>(null);
   const [similarSuggestions, setSimilarSuggestions] = useState<any[]>([]);
+  const isSelectingSuggestionRef = useRef(false);
 
   const resetForm = () => {
+    isSelectingSuggestionRef.current = false;
     setTitle('');
     setOriginalTitle('');
     setType('pelicula');
@@ -135,6 +137,11 @@ export const AddMediaModal: React.FC = () => {
 
   // Live query for similar titles in TMDB/catalog
   useEffect(() => {
+    if (isSelectingSuggestionRef.current) {
+      isSelectingSuggestionRef.current = false;
+      return;
+    }
+
     const trimmed = title.trim();
     if (trimmed.length < 2) {
       setSimilarSuggestions([]);
@@ -288,7 +295,13 @@ export const AddMediaModal: React.FC = () => {
   };
 
   // Main autofill triggered by button or Enter key or suggestion click
-  const handleAutofill = async (overrideTitle?: string) => {
+  const handleAutofill = async (
+    overrideTitle?: string,
+    overrideType?: MediaType,
+    overrideYear?: number,
+    overrideTmdbId?: number | string,
+    overrideMediaType?: 'movie' | 'tv',
+  ) => {
     const trimmedTitle = (overrideTitle || title).trim();
     if (!trimmedTitle || trimmedTitle.length < 2 || isAutofilling) return;
 
@@ -297,10 +310,19 @@ export const AddMediaModal: React.FC = () => {
     setAutofillWarning(null);
     setAutofillSuccess(null);
 
+    const lookupType = overrideType || type;
+    const lookupYear = overrideYear || year;
+
     try {
       const result = await apiRequest<{ success: boolean; data: any }>('/api/media/lookup', {
         method: 'POST',
-        body: JSON.stringify({ title: trimmedTitle, type }),
+        body: JSON.stringify({
+          title: trimmedTitle,
+          type: lookupType,
+          year: lookupYear,
+          tmdbId: overrideTmdbId,
+          mediaType: overrideMediaType,
+        }),
       });
 
       const data = result.data;
@@ -315,6 +337,7 @@ export const AddMediaModal: React.FC = () => {
       setAutofillError(err.message || 'No fue posible autocompletar la ficha con TMDB. Puedes rellenar los datos manualmente.');
     } finally {
       setIsAutofilling(false);
+      isSelectingSuggestionRef.current = false;
     }
   };
 
@@ -541,25 +564,34 @@ export const AddMediaModal: React.FC = () => {
                   <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                     {similarSuggestions.map((item) => (
                       <button
-                        key={item.id || item.title}
+                        key={item.id || `${item.title}-${item.year}`}
                         type="button"
                         onClick={() => {
+                          isSelectingSuggestionRef.current = true;
                           setTitle(item.title);
-                          handleAutofill(item.title);
+                          if (item.year) setYear(Number(item.year));
+                          if (item.type) setType(item.type);
                           setSimilarSuggestions([]);
+                          handleAutofill(
+                            item.title,
+                            item.type,
+                            item.year ? Number(item.year) : undefined,
+                            item.tmdbId,
+                            item.mediaType,
+                          );
                         }}
-                        className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#0A0A0B] hover:bg-emerald-600/30 border border-white/10 hover:border-emerald-500/50 text-xs text-slate-200 hover:text-white transition-all text-left shadow-sm group active:scale-95"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#0A0A0B] hover:bg-emerald-600/30 border border-white/10 hover:border-emerald-500/50 text-xs text-slate-200 hover:text-white transition-all text-left shadow-sm group active:scale-95"
                       >
                         {item.posterUrl && (
                           <img
                             src={item.posterUrl}
                             alt=""
-                            className="w-4 h-5 object-cover rounded shadow-sm"
+                            className="w-4 h-5 object-cover rounded shadow-sm flex-shrink-0"
                           />
                         )}
-                        <span className="font-medium group-hover:text-emerald-200">{item.title}</span>
-                        <span className="text-[10px] text-slate-400 group-hover:text-emerald-300">
-                          ({item.year} • {item.type})
+                        <span className="font-semibold group-hover:text-emerald-200">{item.title}</span>
+                        <span className="text-[10px] text-slate-400 group-hover:text-emerald-300 font-mono">
+                          ({item.year || 'S/F'} • {item.type})
                         </span>
                       </button>
                     ))}
