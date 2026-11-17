@@ -57,7 +57,7 @@ export const SystemDashboardView: React.FC = () => {
   return (
     <div id="system-dashboard-view" className="space-y-12 pb-16 scroll-mt-20">
             {/* WORKSPACE ACTIVE STATUS BAR (Claramente dentro del sistema) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#16161B] via-[#131317] to-[#1A1216] border border-white/10 shadow-lg">
+      <div className="relative z-10 isolate flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#202028] via-[#17171E] to-[#261A1F] border border-white/15 ring-1 ring-white/5 backdrop-blur-xl shadow-[0_18px_45px_-12px_rgba(0,0,0,0.9),0_10px_30px_-14px_rgba(225,29,72,0.45),inset_0_1px_0_rgba(255,255,255,0.09)]">
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="relative shrink-0">
             <img
