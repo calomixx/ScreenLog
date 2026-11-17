@@ -1976,7 +1976,7 @@ var currentYear = (/* @__PURE__ */ new Date()).getFullYear();
 var mediaFormSchema = z.object({
   title: z.string().trim().min(2, "El t\xEDtulo debe tener al menos 2 caracteres.").max(200, "El t\xEDtulo no puede exceder 200 caracteres."),
   originalTitle: z.string().trim().max(200).optional(),
-  type: z.enum(["pelicula", "serie", "anime", "documental"]),
+  type: z.enum(["pelicula", "serie", "anime", "documental", "novela"]),
   year: z.number().int("El a\xF1o debe ser un n\xFAmero entero.").min(1888, "El a\xF1o debe ser 1888 o posterior (nacimiento del cine).").max(currentYear + 2, `El a\xF1o no puede ser superior a ${currentYear + 2}.`),
   director: z.string().trim().min(2, "El nombre del director debe tener al menos 2 caracteres.").max(160, "El director no puede exceder 160 caracteres."),
   genres: z.array(z.string().trim().min(1)).min(1, "Debes seleccionar al menos un g\xE9nero cinematogr\xE1fico.").max(12, "M\xE1ximo 12 g\xE9neros permitidos."),
@@ -2227,7 +2227,7 @@ function normalizeTitle(t) {
   return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 function buildMediaFromBody(body, existing) {
-  const mediaTypes = ["pelicula", "serie", "anime", "documental"];
+  const mediaTypes = ["pelicula", "serie", "anime", "documental", "novela"];
   const type = mediaTypes.includes(body.type) ? body.type : existing?.type || "pelicula";
   const genres = Array.isArray(body.genres) ? body.genres.filter((genre) => typeof genre === "string").map((genre) => sanitizeText(genre, 40)).filter(Boolean).slice(0, 12) : existing?.genres || ["Drama"];
   const cast = Array.isArray(body.cast) ? body.cast.filter((member) => typeof member === "string").map((member) => sanitizeText(member, 80)).filter(Boolean).slice(0, 30) : existing?.cast || [];
@@ -2475,7 +2475,7 @@ function createApiRouter() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6e3);
     try {
-      let mediaType = mediaTypeParam || (type === "serie" || type === "anime" ? "tv" : "movie");
+      let mediaType = mediaTypeParam || (type === "serie" || type === "anime" || type === "novela" || type === "documental" ? "tv" : "movie");
       let targetId = tmdbId || null;
       if (!targetId) {
         const searchUrl = `${baseUrl}/search/multi?query=${encodeURIComponent(title)}&language=es-ES&include_adult=false&api_key=${apiKey}`;
@@ -2503,6 +2503,10 @@ function createApiRouter() {
               break;
             }
             if (type === "serie" && r.media_type === "tv" && !r.origin_country?.includes("JP")) {
+              bestMatch = r;
+              break;
+            }
+            if ((type === "novela" || type === "documental") && r.media_type === "tv") {
               bestMatch = r;
               break;
             }
