@@ -195,16 +195,16 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
         <motion.div
           key={`ambilight-${activeMedia.id}`}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.55 }}
+          animate={{ opacity: 0.7 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2, ease: 'easeOut' }}
-          className="pointer-events-none absolute -inset-3 sm:-inset-6 z-0 overflow-hidden rounded-[2.5rem]"
+          className="pointer-events-none absolute -inset-8 sm:-inset-20 lg:-inset-32 z-0"
           aria-hidden="true"
         >
           <img
             src={activeMedia.backdropUrl || activeMedia.posterUrl}
             alt=""
-            className="w-full h-full object-cover scale-110 blur-[65px] sm:blur-[95px] saturate-200 brightness-110"
+            className="w-full h-full object-cover scale-125 blur-[90px] sm:blur-[140px] lg:blur-[180px] saturate-200 brightness-125 opacity-80"
             referrerPolicy="no-referrer"
           />
         </motion.div>
@@ -212,7 +212,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
       <section 
         id="hero-cinematic-slider"
-        className="relative z-10 w-full min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-3xl border border-white/15 bg-[#0A0A0B]/95 shadow-[0_25px_75px_-15px_rgba(0,0,0,0.85)]"
+        className="relative z-10 w-full min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A0B]/40 backdrop-blur-sm shadow-[0_25px_75px_-15px_rgba(0,0,0,0.85)]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -230,15 +230,15 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           <img
             src={activeMedia.backdropUrl || activeMedia.posterUrl}
             alt={activeMedia.title}
-            className="w-full h-full object-cover object-center filter brightness-65 saturate-125 animate-ken-burns"
+            className="w-full h-full object-cover object-center filter brightness-90 saturate-140 contrast-105 animate-ken-burns"
             referrerPolicy="no-referrer"
           />
 
           {/* Cinematic Vignette, Color Grading & Gradient Grids */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B]/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B] via-[#0A0A0B]/85 to-transparent w-full md:w-3/4" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-rose-600/15 via-transparent to-transparent" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-rose-600/20 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B]/90 via-[#0A0A0B]/50 to-transparent/10 w-full md:w-3/5" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-rose-600/20 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
         </motion.div>
       </AnimatePresence>
 
@@ -303,7 +303,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
             >
               {/* Title & Metadata */}
               <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold text-white tracking-tight leading-tight drop-shadow-md">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold text-white tracking-tight leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                   {activeMedia.title}
                 </h1>
                 {activeMedia.originalTitle && activeMedia.originalTitle !== activeMedia.title && (
@@ -350,7 +350,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
               </div>
 
               {/* Synopsis */}
-              <p className="text-sm sm:text-base text-slate-300/90 line-clamp-3 leading-relaxed max-w-xl font-light">
+              <p className="text-sm sm:text-base text-slate-200 line-clamp-3 leading-relaxed max-w-xl font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                 {activeMedia.synopsis}
               </p>
 
@@ -441,7 +441,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
         {/* Bottom Filmstrip Thumbnails & Apartados Controls */}
         <div className="pt-6 border-t border-white/10 mt-6">
-          <div className="flex flex-col gap-3.5 sm:gap-4 p-3.5 sm:p-4 rounded-2xl bg-[#161618]/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60">
+          <div className="flex flex-col gap-3.5 sm:gap-4 p-3.5 sm:p-4 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60">
             
             {/* Filmstrip thumbnails (Child div:nth-of-type(1) - exact selector target) */}
             <div 
