@@ -75,6 +75,12 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
         bg: 'bg-emerald-600/90 text-emerald-100 border-emerald-400/40 shadow-emerald-900/40' 
       };
     }
+    if (item.type === 'novela') {
+      return { 
+        text: 'NOVELA', 
+        bg: 'bg-amber-600/90 text-amber-100 border-amber-400/40 shadow-amber-900/40' 
+      };
+    }
     if (item.type === 'documental') {
       return { 
         text: 'DOC', 

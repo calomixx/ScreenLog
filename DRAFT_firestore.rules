@@ -114,7 +114,7 @@ service cloud.firestore {
         data.authorId.matches('^[a-zA-Z0-9_\\-]+$') &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
         data.type is string && data.type.size() <= 20 &&
-        data.type in ['pelicula', 'serie', 'anime', 'documental'] &&
+        data.type in ['pelicula', 'serie', 'anime', 'documental', 'novela'] &&
         data.year is int && data.year >= 1888 && data.year <= 2100 &&
         data.director is string && data.director.size() <= 120 &&
         data.synopsis is string && data.synopsis.size() <= 2000 &&

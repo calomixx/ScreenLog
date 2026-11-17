@@ -154,6 +154,7 @@ const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
   serie: 'Serie',
   anime: 'Anime',
   documental: 'Documental',
+  novela: 'Novela',
 };
 
 const MEDIA_TYPE_STYLES: Record<MediaType, string> = {
@@ -161,6 +162,7 @@ const MEDIA_TYPE_STYLES: Record<MediaType, string> = {
   serie: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
   anime: 'bg-pink-500/15 text-pink-300 border-pink-500/30',
   documental: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  novela: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
 };
 
 const StatCard: React.FC<{ icon: React.ElementType; label: string; value: string | number; tone?: string }> = ({
@@ -1072,6 +1074,7 @@ export const AdminPanelView: React.FC = () => {
               <option value="serie">Series únicamente</option>
               <option value="anime">Anime</option>
               <option value="documental">Documentales</option>
+              <option value="novela">Novelas</option>
             </select>
           </div>
 

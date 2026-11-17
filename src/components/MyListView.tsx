@@ -441,7 +441,7 @@ export const MyListView: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Type filters */}
           <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full -mx-0.5">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental'] as const).map((t) => (
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTypeFilter(t)}
