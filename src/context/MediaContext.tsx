@@ -309,6 +309,10 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               if (!items.some((it) => it.id === c.id)) {
                 items.unshift(c);
               }
+              // Sincronizar automáticamente títulos personalizados a Firestore
+              saveCatalogMediaToFirestore(c).catch((e) =>
+                console.warn('Auto-sync custom item to Firestore failed:', c.title, e),
+              );
             });
           }
         }
@@ -774,14 +778,15 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify(updated),
       })
         .then(() => {
-          if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
-            saveCatalogMediaToFirestore(updated).catch((err) =>
-              console.error('Firestore catalog update error:', err),
-            );
-          }
+          saveCatalogMediaToFirestore(updated).catch((err) =>
+            console.error('Firestore catalog update error:', err),
+          );
           showToast(`Ficha de ${updated.title} actualizada.`, 'success');
         })
         .catch((error) => {
+          saveCatalogMediaToFirestore(updated).catch((err) =>
+            console.error('Firestore catalog update fallback error:', err),
+          );
           showToast(error instanceof ApiError ? error.message : 'El cambio no se guardó en el servidor.', 'warning');
         });
       return { success: true };
@@ -885,11 +890,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (e) {
           console.warn('Could not remove media from local storage:', e);
         }
-        if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
-          deleteCatalogMediaFromFirestore(id).catch((err) =>
-            console.error('Firestore catalog delete error:', err),
-          );
-        }
+        deleteCatalogMediaFromFirestore(id).catch((err) =>
+          console.error('Firestore catalog delete error:', err),
+        );
         showToast(`"${title}" ha sido eliminado del catálogo.`, 'info');
         return { success: true };
       } catch (err: any) {
@@ -1022,21 +1025,20 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       })
         .then(() => {
-          if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
-            saveCatalogMediaToFirestore(newMedia)
-              .then(() => {
-                showToast(`"${newMedia.title}" guardado globalmente en Firestore.`, 'success');
-              })
-              .catch((err) => {
-                console.error('Firestore catalog media save error:', err);
-                showToast(`Título añadido: ${newMedia.title}.`, 'success');
-              });
-          } else {
-            showToast(`"${newMedia.title}" añadido. Inicia sesión con Google para sincronizarlo globalmente.`, 'info');
-          }
+          saveCatalogMediaToFirestore(newMedia)
+            .then(() => {
+              showToast(`"${newMedia.title}" guardado en tu catálogo y sincronizado en Firebase.`, 'success');
+            })
+            .catch((err) => {
+              console.error('Firestore catalog media save error:', err);
+              showToast(`Título añadido: ${newMedia.title}.`, 'success');
+            });
         })
         .catch((error) => {
-          // Keep the custom title locally so the user's progress is never lost
+          // Even if local server fails, still try saving directly to Firestore
+          saveCatalogMediaToFirestore(newMedia).catch((err) =>
+            console.error('Firestore catalog media fallback error:', err),
+          );
           showToast(error instanceof ApiError ? error.message : 'Título guardado en tu colección.', 'info');
         });
 

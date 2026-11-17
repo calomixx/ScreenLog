@@ -329,23 +329,23 @@ export const DetailModal: React.FC = () => {
         }
       }}
     >
-      <div className="relative w-full max-w-4xl">
-        {/* DYNAMIC AMBILIGHT AURA PARA LA FICHA */}
+      <div className="relative w-full max-w-5xl">
+        {/* DYNAMIC AMBILIGHT AURA PARA LA FICHA: Difusión suave y sin límites duros */}
         <div
-          className="pointer-events-none fixed sm:absolute -inset-6 sm:-inset-10 z-0 overflow-hidden rounded-[3rem] opacity-55 transition-opacity duration-500"
+          className="pointer-events-none absolute -inset-10 sm:-inset-24 lg:-inset-36 z-0 opacity-70 transition-opacity duration-500"
           aria-hidden="true"
         >
           <img
             src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
             alt=""
-            className="w-full h-full object-cover scale-125 blur-[80px] sm:blur-[110px] saturate-200 brightness-110"
+            className="w-full h-full object-cover scale-125 blur-[100px] sm:blur-[140px] md:blur-[180px] saturate-200 brightness-125 opacity-75"
             referrerPolicy="no-referrer"
           />
         </div>
 
         <div 
           id="detail-modal-container"
-          className="relative z-10 w-full bg-[#141416]/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 text-slate-100 flex flex-col h-[92vh] sm:h-[88vh] md:h-[90vh]"
+          className="relative z-10 w-full bg-[#141416]/90 backdrop-blur-xl border border-white/10 ring-1 ring-white/5 rounded-3xl overflow-hidden shadow-2xl shadow-black/95 text-slate-100 flex flex-col h-[94vh] sm:h-[90vh] md:h-[92vh]"
         >
         {/* Floating Top-Right Action Controls (Close, Share, Admin Edit) - Always accessible */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-40 pointer-events-auto">
@@ -399,26 +399,32 @@ export const DetailModal: React.FC = () => {
           id="detail-modal-body-content"
           className="w-full flex-1 overflow-y-auto overscroll-contain bg-[#141416] relative text-slate-100"
         >
+          {/* Subtle ambient backdrop wash across modal body so colors flow completely */}
+          <div className="pointer-events-none absolute inset-0 z-0 opacity-15 overflow-hidden">
+            <img
+              src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
+              alt=""
+              className="w-full h-full object-cover blur-3xl scale-110 saturate-150"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#141416]/75 to-[#141416]" />
+          </div>
+
           {/* Collapsible Hero Header (Naturally scrolls up and minimizes as user scrolls down) */}
           <div 
             ref={heroRef}
             id="detail-modal-header"
-            className="relative w-full overflow-hidden bg-[#0A0A0B] min-h-[200px] sm:min-h-[230px] p-4 sm:p-6 pb-5 flex flex-col justify-end"
+            className="relative w-full overflow-hidden bg-[#0A0A0B] min-h-[220px] sm:min-h-[270px] p-4 sm:p-6 pb-6 flex flex-col justify-end"
           >
-            {/* Backdrop Image */}
+            {/* Backdrop Image - Colores vivos y completos */}
             <img
               src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
               alt={selectedMedia.title}
-              className="absolute inset-0 w-full h-full object-cover filter brightness-40 pointer-events-none"
+              className="absolute inset-0 w-full h-full object-cover filter brightness-85 saturate-135 contrast-105 pointer-events-none"
               referrerPolicy="no-referrer"
             />
-            <img
-              src={selectedMedia.posterUrl}
-              alt=""
-              className="absolute -bottom-10 -left-10 w-64 h-64 object-cover blur-[55px] saturate-200 opacity-35 pointer-events-none"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/80 to-[#0A0A0B]/55 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#141416] via-[#141416]/60 to-transparent/30 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#141416]/90 via-[#141416]/40 to-transparent/10 pointer-events-none" />
 
             {/* Banner Details (Poster + Title + Status Selector) */}
             <div className="relative z-10 flex items-start sm:items-end gap-3.5 sm:gap-5 pt-8 sm:pt-6 pr-24 sm:pr-40">
@@ -442,7 +448,7 @@ export const DetailModal: React.FC = () => {
                   )}
                 </div>
 
-                <h2 className="font-display font-extrabold text-white text-lg sm:text-2xl md:text-3xl leading-snug break-words">
+                <h2 className="font-display font-extrabold text-white text-lg sm:text-2xl md:text-3xl leading-snug break-words drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
                   {selectedMedia.title}
                 </h2>
 
@@ -526,7 +532,7 @@ export const DetailModal: React.FC = () => {
           {/* Sticky Navigation Tabs Menu - Sticks firmly to top-0 when user scrolls down */}
           <div 
             id="detail-modal-tabs-menu"
-            className="sticky top-0 z-30 bg-[#0E0E10]/95 backdrop-blur-md border-y border-white/10 px-4 sm:px-6 py-2 sm:py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar select-none pr-28 sm:pr-40 shadow-lg shadow-black/60"
+            className="sticky top-0 z-30 bg-[#0E0E10]/80 backdrop-blur-xl border-y border-white/10 px-4 sm:px-6 py-2 sm:py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar select-none pr-28 sm:pr-40 shadow-lg shadow-black/60"
           >
             <button
               onClick={() => handleTabChange('info')}
