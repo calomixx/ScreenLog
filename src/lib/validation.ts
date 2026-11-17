@@ -227,7 +227,7 @@ export const mediaFormSchema = z.object({
     .min(2, 'El título debe tener al menos 2 caracteres.')
     .max(200, 'El título no puede exceder 200 caracteres.'),
   originalTitle: z.string().trim().max(200).optional(),
-  type: z.enum(['pelicula', 'serie', 'anime', 'documental']),
+  type: z.enum(['pelicula', 'serie', 'anime', 'documental', 'novela']),
   year: z
     .number()
     .int('El año debe ser un número entero.')

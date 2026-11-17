@@ -167,7 +167,7 @@ export const SystemDashboardView: React.FC = () => {
 
           {/* Type filters */}
           <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['todos', 'pelicula', 'serie', 'anime'] as const).map((t) => (
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTopTypeFilter(t)}
@@ -210,7 +210,7 @@ export const SystemDashboardView: React.FC = () => {
 
           {/* Type filters */}
           <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['todos', 'pelicula', 'serie', 'anime'] as const).map((t) => (
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setAddedTypeFilter(t)}

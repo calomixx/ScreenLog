@@ -313,7 +313,7 @@ function isVersionOrRemake(title1: string, year1: number, title2: string, year2:
 }
 
 function buildMediaFromBody(body: any, existing?: MediaItem): MediaItem {
-  const mediaTypes = ['pelicula', 'serie', 'anime', 'documental'];
+  const mediaTypes = ['pelicula', 'serie', 'anime', 'documental', 'novela'];
   const type = mediaTypes.includes(body.type) ? body.type : existing?.type || 'pelicula';
   const genres = Array.isArray(body.genres)
     ? body.genres
@@ -618,7 +618,7 @@ export function createApiRouter(): Router {
     const timeout = setTimeout(() => controller.abort(), 6000);
 
     try {
-      let mediaType: 'movie' | 'tv' = mediaTypeParam || (type === 'serie' || type === 'anime' ? 'tv' : 'movie');
+      let mediaType: 'movie' | 'tv' = mediaTypeParam || (type === 'serie' || type === 'anime' || type === 'novela' || type === 'documental' ? 'tv' : 'movie');
       let targetId: number | string | null = tmdbId || null;
 
       if (!targetId) {
@@ -647,6 +647,7 @@ export function createApiRouter(): Router {
           for (const r of results) {
             if (type === 'anime' && r.media_type === 'tv' && r.origin_country?.includes('JP')) { bestMatch = r; break; }
             if (type === 'serie' && r.media_type === 'tv' && !r.origin_country?.includes('JP')) { bestMatch = r; break; }
+            if ((type === 'novela' || type === 'documental') && r.media_type === 'tv') { bestMatch = r; break; }
             if (type === 'pelicula' && r.media_type === 'movie') { bestMatch = r; break; }
           }
         }

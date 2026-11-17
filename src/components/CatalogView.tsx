@@ -217,7 +217,7 @@ export const CatalogView: React.FC = () => {
 
           {/* Type Pills */}
           <div className="flex items-center gap-1 bg-[#0A0A0B] p-1 rounded-xl border border-white/10 overflow-x-auto">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental'] as const).map((t) => (
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setSelectedType(t)}

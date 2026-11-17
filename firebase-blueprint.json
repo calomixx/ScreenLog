@@ -216,7 +216,7 @@
         "type": {
           "type": "string",
           "description": "Media type category.",
-          "enum": ["pelicula", "serie", "anime", "documental"]
+          "enum": ["pelicula", "serie", "anime", "documental", "novela"]
         },
         "year": {
           "type": "number",

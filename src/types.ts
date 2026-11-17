@@ -30,7 +30,7 @@ export interface UserProfile {
   joinedDate: string;
 }
 
-export type MediaType = 'pelicula' | 'serie' | 'anime' | 'documental';
+export type MediaType = 'pelicula' | 'serie' | 'anime' | 'documental' | 'novela';
 
 export type WatchStatus = 'pendiente' | 'en_proceso' | 'terminada';
 

@@ -218,7 +218,7 @@ export const EditMediaModal: React.FC = () => {
     if (isNaN(year) || year < 1888 || year > currentYear + 5) {
       newErrors.year = `Oye, ese año no parece real 🤔 (debe ser entre 1888 y ${currentYear + 5})`;
     }
-    if (type === 'serie' && seasonsCount < 1) {
+    if ((type === 'serie' || type === 'novela') && seasonsCount < 1) {
       newErrors.seasons = 'Las temporadas deben ser al menos 1';
     }
     setErrors(newErrors);
@@ -240,8 +240,8 @@ export const EditMediaModal: React.FC = () => {
       year: Number(year),
       releaseDate: releaseDate.trim() || undefined,
       duration: type === 'pelicula' ? duration.trim() : `${seasonsCount} Temp. (${episodesCount} eps)`,
-      seasonsCount: type === 'serie' ? Number(seasonsCount) : undefined,
-      episodesCount: type === 'serie' ? Number(episodesCount) : undefined,
+      seasonsCount: type === 'serie' || type === 'novela' ? Number(seasonsCount) : undefined,
+      episodesCount: type === 'serie' || type === 'novela' ? Number(episodesCount) : undefined,
       synopsis: synopsis.trim(),
       director: director.trim() || 'Director Desconocido',
       country: country.trim() || undefined,
@@ -674,6 +674,7 @@ export const EditMediaModal: React.FC = () => {
                     <option value="serie">📺 Serie</option>
                     <option value="anime">⛩️ Anime</option>
                     <option value="documental">🌍 Documental</option>
+                    <option value="novela">📖 Novela</option>
                   </select>
                 </div>
 

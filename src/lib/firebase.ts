@@ -335,7 +335,7 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
   const path = `catalog_media/${mediaId}`;
 
   const title = clampString(item.title, BLUEPRINT_LIMITS.TITLE_MAX_LEN, 'Sin título');
-  const type = ['pelicula', 'serie', 'anime', 'documental'].includes(item.type) ? item.type : 'pelicula';
+  const type = ['pelicula', 'serie', 'anime', 'documental', 'novela'].includes(item.type) ? item.type : 'pelicula';
   const year = Math.max(1888, Math.min(2100, Math.round(Number(item.year) || new Date().getFullYear())));
   const director = clampString(item.director, BLUEPRINT_LIMITS.DIRECTOR_MAX_LEN, 'Desconocido');
   const synopsis = clampString(item.synopsis, BLUEPRINT_LIMITS.SYNOPSIS_MAX_LEN, 'Sin sinopsis disponible.');

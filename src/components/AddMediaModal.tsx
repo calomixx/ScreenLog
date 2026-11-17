@@ -213,7 +213,7 @@ export const AddMediaModal: React.FC = () => {
     if (data.originalTitle && typeof data.originalTitle === 'string') {
       setOriginalTitle(data.originalTitle);
     }
-    if (data.type && ['pelicula', 'serie', 'anime', 'documental'].includes(data.type)) {
+    if (data.type && ['pelicula', 'serie', 'anime', 'documental', 'novela'].includes(data.type)) {
       setType(data.type as MediaType);
     }
     if (data.year && !isNaN(Number(data.year))) {
@@ -698,6 +698,7 @@ export const AddMediaModal: React.FC = () => {
                 <option value="serie">Serie de TV</option>
                 <option value="anime">Anime</option>
                 <option value="documental">Documental</option>
+                <option value="novela">Novela</option>
               </select>
             </div>
 
@@ -741,7 +742,7 @@ export const AddMediaModal: React.FC = () => {
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder={type === 'anime' ? 'ej: OVA (6 eps) o 1 Temporada (12 eps)' : type === 'serie' ? 'ej: 3 Temporadas (24 eps)' : 'ej: 2h 15m'}
+                placeholder={type === 'anime' ? 'ej: OVA (6 eps) o 1 Temporada (12 eps)' : type === 'serie' || type === 'novela' ? 'ej: 3 Temporadas (24 eps)' : 'ej: 2h 15m'}
                 className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-rose-500 focus:outline-none"
               />
             </div>
@@ -768,7 +769,7 @@ export const AddMediaModal: React.FC = () => {
           )}
 
           {/* Series/Anime Specific Fields */}
-          {(type === 'serie' || type === 'anime') && (
+          {(type === 'serie' || type === 'anime' || type === 'novela') && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-0">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
