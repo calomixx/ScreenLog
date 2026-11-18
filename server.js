@@ -392,6 +392,70 @@ var init_initialMedia = __esm({
         comments: []
       },
       {
+        id: "la-casa-de-las-flores",
+        title: "La Casa de las Flores",
+        originalTitle: "La Casa de las Flores",
+        type: "novela",
+        year: 2018,
+        genres: ["Telenovela", "Comedia", "Drama"],
+        director: "Manolo Caro",
+        cast: ["Ver\xF3nica Castro", "Cecilia Su\xE1rez", "Aislinn Derbez", "Dar\xEDo Yazbek Bernal"],
+        synopsis: "Los De la Mora son una familia aparentemente perfecta cuya vida se trastoca cuando la hija menor es arrestada. Para sostener las apariencias, las mujeres de la casa toman el control del negocio familiar y de sus secretos.",
+        duration: "3 Temporadas (34 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=1600&q=80",
+        defaultPlatform: "Netflix",
+        communityRating: 4.3,
+        communityVotesCount: 128,
+        addedToListCount: 340,
+        isFeatured: false,
+        isTrending: true,
+        isTopClassified: false,
+        createdAt: "2018-08-13",
+        detailedVotes: {
+          script: 0,
+          acting: 0,
+          soundtrack: 0,
+          visuals: 0,
+          direction: 0,
+          totalVotes: 0,
+          ratingDistribution: {}
+        },
+        comments: []
+      },
+      {
+        id: "pasion-de-gavilanes",
+        title: "Pasi\xF3n de Gavilanes",
+        originalTitle: "Pasi\xF3n de Gavilanes",
+        type: "novela",
+        year: 2003,
+        genres: ["Telenovela", "Romance", "Drama"],
+        director: "V\xEDctor Mallarino",
+        cast: ["Natasha Klauss", "Michel Brown", "Mario Cimarro", "Danna Garc\xEDa"],
+        synopsis: "Los hermanos Reyes Elizondo llegan a la hacienda de los Bernal para vengar la muerte de su hermana, pero el destino los enfrenta a las tres hermanas Bernal en un juego de amor, enga\xF1o y pasi\xF3n.",
+        duration: "2 Temporadas (186 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=1600&q=80",
+        defaultPlatform: "Netflix",
+        communityRating: 4.5,
+        communityVotesCount: 210,
+        addedToListCount: 520,
+        isFeatured: false,
+        isTrending: true,
+        isTopClassified: true,
+        createdAt: "2003-10-21",
+        detailedVotes: {
+          script: 0,
+          acting: 0,
+          soundtrack: 0,
+          visuals: 0,
+          direction: 0,
+          totalVotes: 0,
+          ratingDistribution: {}
+        },
+        comments: []
+      },
+      {
         id: "the-godfather-1972",
         title: "El Padrino",
         originalTitle: "The Godfather",
@@ -1362,6 +1426,24 @@ var AESTHETIC_PRESETS = {
         matchPercentage: 92,
         matchReason: "La arena del Coliseo te\xF1ida de sangre bajo la luz ocre del sol de Numidia y Roma imperial.",
         vibeTag: "Arena & Coliseo"
+      },
+      {
+        title: "Nuestro Planeta",
+        originalTitle: "Our Planet",
+        type: "documental",
+        year: 2019,
+        director: "Alastair Fothergill",
+        genres: ["Documental", "Naturaleza"],
+        synopsis: "Serie documental narrada por David Attenborough que muestra la belleza natural de la Tierra y el impacto del cambio clim\xE1tico en los h\xE1bitats m\xE1s remotos.",
+        duration: "2 Temporadas (12 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "",
+        defaultPlatform: "Netflix",
+        communityRating: 4.8,
+        matchPercentage: 91,
+        matchReason: "Naturaleza captada con luz dorada, vastos horizontes y una paleta tierra de una serenidad sobrecogedora.",
+        vibeTag: "Tierra & Horizonte"
       }
     ]
   },
@@ -1558,6 +1640,24 @@ var AESTHETIC_PRESETS = {
         matchPercentage: 92,
         matchReason: "Naturaleza reclamando ciudades en ruinas, sombras melanc\xF3licas y fogatas en medio de la desolaci\xF3n.",
         vibeTag: "Ruinas & Supervivencia"
+      },
+      {
+        title: "Pasi\xF3n de Gavilanes",
+        originalTitle: "Pasi\xF3n de Gavilanes",
+        type: "novela",
+        year: 2003,
+        director: "V\xEDctor Mallarino",
+        genres: ["Telenovela", "Romance", "Drama"],
+        synopsis: "Los hermanos Reyes buscan vengar a su hermana en la hacienda de los Bernal, pero el amor y los secretos g\xF3ticos de la familia cambian el destino de todos.",
+        duration: "2 Temporadas (186 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "",
+        defaultPlatform: "Netflix",
+        communityRating: 4.5,
+        matchPercentage: 89,
+        matchReason: "Melodrama de claroscuros, haciendas en penumbra y pasiones intensas con atm\xF3sfera rom\xE1ntica y sombr\xEDa.",
+        vibeTag: "Pasi\xF3n & Claroscuro"
       }
     ]
   },
@@ -1656,6 +1756,24 @@ var AESTHETIC_PRESETS = {
         matchPercentage: 91,
         matchReason: "Innovaci\xF3n gr\xE1fica radical con texturas de semitonos Ben-Day y paletas pasteles audaces.",
         vibeTag: "Arte C\xF3mic Pop"
+      },
+      {
+        title: "La Casa de las Flores",
+        originalTitle: "La Casa de las Flores",
+        type: "novela",
+        year: 2018,
+        director: "Manolo Caro",
+        genres: ["Telenovela", "Comedia", "Drama"],
+        synopsis: "Los De la Mora aparentan ser la familia perfecta, pero un arresto y sus secretos desatan una comedia negra llena de color y venganza.",
+        duration: "3 Temporadas (34 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "",
+        defaultPlatform: "Netflix",
+        communityRating: 4.4,
+        matchPercentage: 90,
+        matchReason: "Colores pastel saturados, simetr\xEDa esc\xE9nica y producci\xF3n de autor con un humor elegante y travieso.",
+        vibeTag: "Rosa & S\xE1tira Familiar"
       }
     ]
   },
@@ -1754,6 +1872,24 @@ var AESTHETIC_PRESETS = {
         matchPercentage: 92,
         matchReason: "Thriller policiaco de gran escala con persecuciones nocturnas en t\xFAneles subterr\xE1neos.",
         vibeTag: "Caos & Dilema Moral"
+      },
+      {
+        title: "The Last Dance",
+        originalTitle: "The Last Dance",
+        type: "documental",
+        year: 2020,
+        director: "Jason Hehir",
+        genres: ["Documental", "Deportes"],
+        synopsis: "Documental sobre la temporada final de Michael Jordan con los Chicago Bulls, combinando metraje in\xE9dito con el retrato de una obsesi\xF3n por ganar.",
+        duration: "1 Temporada (10 eps)",
+        posterUrl: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80",
+        backdropUrl: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1600&q=80",
+        trailerYoutubeId: "",
+        defaultPlatform: "Netflix",
+        communityRating: 4.8,
+        matchPercentage: 88,
+        matchReason: "Archivo granulado de los 90, claroscuros de vestuarios y tensi\xF3n documental de crimen e investigaci\xF3n.",
+        vibeTag: "Archivo & Obsesi\xF3n"
       }
     ]
   }
@@ -1829,7 +1965,8 @@ function getCuratedRecommendations(req) {
   const preset = AESTHETIC_PRESETS[presetKey] || AESTHETIC_PRESETS.cyberpunk_neon;
   let items = [...preset.items];
   if (req.mediaType && req.mediaType !== "all") {
-    const filtered = items.filter((it) => it.type === req.mediaType);
+    const allCurated = Object.values(AESTHETIC_PRESETS).flatMap((preset2) => preset2.items);
+    const filtered = allCurated.filter((it) => it.type === req.mediaType);
     if (filtered.length >= 2) items = filtered;
   }
   if (req.platform && req.platform !== "all") {
@@ -2064,6 +2201,88 @@ var contactTicketSchema = z.object({
   subject: z.string().trim().min(3, "El asunto debe tener al menos 3 caracteres.").max(160),
   message: z.string().trim().min(10, "El mensaje debe tener al menos 10 caracteres.").max(4e3)
 });
+
+// server/firebase-auth.ts
+import { createPublicKey, verify as cryptoVerify } from "node:crypto";
+var GOOGLE_CERTS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
+var KEY_CACHE_TTL_MS = 6 * 60 * 60 * 1e3;
+var cachedKeys = {};
+var cachedAt = 0;
+async function loadGooglePublicKeys() {
+  const now = Date.now();
+  if (Object.keys(cachedKeys).length > 0 && now - cachedAt < KEY_CACHE_TTL_MS) {
+    return cachedKeys;
+  }
+  try {
+    const res = await fetch(GOOGLE_CERTS_URL, {
+      headers: { accept: "application/json" }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const keys = {};
+    for (const key of data.keys || []) {
+      if (!key.kid || key.kty !== "RSA") continue;
+      keys[key.kid] = createPublicKey({
+        key: {
+          kty: "RSA",
+          n: key.n,
+          e: key.e,
+          alg: key.alg || "RS256",
+          ext: true
+        },
+        format: "jwk"
+      });
+    }
+    if (Object.keys(keys).length === 0) throw new Error("No keys");
+    cachedKeys = keys;
+    cachedAt = now;
+    return cachedKeys;
+  } catch (error) {
+    if (Object.keys(cachedKeys).length > 0) return cachedKeys;
+    throw error;
+  }
+}
+async function verifyGoogleIdToken(idToken, projectId) {
+  try {
+    if (!idToken || typeof idToken !== "string") return null;
+    const parts = idToken.trim().split(".");
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+    let header;
+    let payload;
+    try {
+      header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+      payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    } catch {
+      return null;
+    }
+    if (header.alg !== "RS256" || !header.kid) return null;
+    if (!projectId) return null;
+    const keys = await loadGooglePublicKeys();
+    const key = keys[header.kid];
+    if (!key) return null;
+    const signed = Buffer.from(`${parts[0]}.${parts[1]}`, "utf8");
+    const signature = Buffer.from(parts[2], "base64url");
+    if (!cryptoVerify("RSA-SHA256", signed, key, signature)) return null;
+    const now = Math.floor(Date.now() / 1e3);
+    if (payload.aud !== projectId) return null;
+    if (payload.iss !== `https://securetoken.google.com/${projectId}`) return null;
+    if (typeof payload.exp !== "number" || payload.exp < now) return null;
+    if (typeof payload.iat === "number" && payload.iat > now + 60) return null;
+    if (typeof payload.sub !== "string" || payload.sub.length === 0) return null;
+    const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+    if (!email || !email.includes("@")) return null;
+    if (payload.email_verified === false) return null;
+    return {
+      uid: payload.sub,
+      email,
+      name: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim() : void 0,
+      picture: typeof payload.picture === "string" && payload.picture.trim() ? payload.picture.trim() : void 0
+    };
+  } catch {
+    return null;
+  }
+}
+var FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog";
 
 // server/routes.ts
 var SESSION_COOKIE = "sl_session";
@@ -3270,13 +3489,25 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
   router.post("/auth/google", asyncRoute(async (req, res) => {
     const ip = getClientIp(req);
     const store = await getStore();
-    const uid = sanitizeText(req.body?.uid, 128);
-    const email = sanitizeText(req.body?.email, 254).toLowerCase();
-    const name = sanitizeText(req.body?.name, 80) || email.split("@")[0] || "Cin\xE9filo";
-    const photoURL = sanitizeText(req.body?.avatar, 1e3);
-    if (!uid || !email || !email.includes("@")) {
-      return safeError(res, 400, "Datos de autenticaci\xF3n de Google incompletos.", "INVALID_GOOGLE_AUTH");
+    const idToken = typeof req.body?.idToken === "string" ? req.body.idToken.trim() : "";
+    if (!idToken) {
+      return safeError(res, 400, "Falta el token de autenticaci\xF3n de Google.", "INVALID_GOOGLE_AUTH");
     }
+    const claims = await verifyGoogleIdToken(idToken, FIREBASE_PROJECT_ID);
+    if (!claims) {
+      addLog(store, {
+        level: "security",
+        category: "security",
+        message: "Token de Google inv\xE1lido, alterado o expirado rechazado.",
+        ip
+      });
+      await saveStore();
+      return safeError(res, 401, "No se pudo verificar la sesi\xF3n de Google.", "INVALID_GOOGLE_TOKEN");
+    }
+    const uid = claims.uid;
+    const email = claims.email;
+    const name = sanitizeText(claims.name, 80) || email.split("@")[0] || "Cin\xE9filo";
+    const photoURL = sanitizeText(claims.picture, 1e3);
     let user = findUserByEmail(store, email) || findUserById(store, uid);
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const bootstrapOwnerEmail = (process.env.BOOTSTRAP_OWNER_EMAIL || "").toLowerCase().trim();
