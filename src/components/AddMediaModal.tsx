@@ -42,7 +42,7 @@ const SAMPLE_POSTER_PRESETS = [
 const AVAILABLE_GENRES = [
   'Acción', 'Aventura', 'Animación', 'Anime', 'Shonen', 'Seinen', 'Mecha', 'Ciencia Ficción', 'Comedia', 
   'Crimen', 'Documental', 'Drama', 'Fantasía', 'Historia', 
-  'Misterio', 'Romance', 'Suspense', 'Terror', 'Biografía'
+  'Misterio', 'Romance', 'Suspense', 'Terror', 'Biografía', 'Telenovela'
 ];
 
 export const AddMediaModal: React.FC = () => {

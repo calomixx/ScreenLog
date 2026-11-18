@@ -914,11 +914,23 @@ export const AdminPanelView: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Películas</span>
-                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'movie').length}</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'pelicula').length}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Series</span>
-                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'tv').length}</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'serie').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Novelas</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'novela').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Animes</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'anime').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Documentales</span>
+                    <span className="text-slate-200 font-bold">{mediaList.filter((m) => m.type === 'documental').length}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Administradores</span>

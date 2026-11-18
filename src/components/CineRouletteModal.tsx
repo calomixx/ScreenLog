@@ -144,7 +144,7 @@ export const CineRouletteModal: React.FC = () => {
       } else if (timeFilter === 'epica') {
         if (item.type !== 'pelicula' || parseDurationMinutes(item.duration) <= 135) return false;
       } else if (timeFilter === 'series') {
-        if (item.type !== 'serie' && item.type !== 'anime') return false;
+        if (item.type !== 'serie' && item.type !== 'anime' && item.type !== 'novela') return false;
       }
 
       // Genre filter

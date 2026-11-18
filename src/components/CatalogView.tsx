@@ -32,7 +32,8 @@ const ALL_GENRES = [
   'Fantasía',
   'Historia',
   'Suspense',
-  'Terror'
+  'Terror',
+  'Telenovela'
 ];
 
 const ALL_PLATFORMS = [
