@@ -33,7 +33,7 @@ const AVATAR_PRESETS = [
 
 const AVAILABLE_GENRES = [
   'Ciencia Ficción', 'Drama', 'Acción', 'Terror / Suspense', 
-  'Comedia', 'Thriller', 'Romance', 'Animación', 'Aventura', 'Documental', 'Fantasía', 'Misterio'
+  'Comedia', 'Thriller', 'Romance', 'Animación', 'Aventura', 'Documental', 'Fantasía', 'Misterio', 'Telenovela'
 ];
 
 const POPULAR_PLATFORMS = [

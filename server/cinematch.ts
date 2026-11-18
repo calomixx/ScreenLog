@@ -4,7 +4,7 @@ export interface CineMatchItem {
   id: string;
   title: string;
   originalTitle?: string;
-  type: 'pelicula' | 'serie' | 'anime';
+  type: 'pelicula' | 'serie' | 'anime' | 'novela' | 'documental';
   year: number;
   director: string;
   genres: string[];
@@ -39,7 +39,7 @@ export interface CineMatchRequest {
   image?: string;
   visualPreset?: string;
   vibe?: string;
-  mediaType?: 'all' | 'pelicula' | 'serie' | 'anime';
+  mediaType?: 'all' | 'pelicula' | 'serie' | 'anime' | 'novela' | 'documental';
   platform?: string;
   userFavorites?: string[];
   queryText?: string;
@@ -54,7 +54,7 @@ export const AESTHETIC_PRESETS: Record<string, {
   items: Array<{
     title: string;
     originalTitle?: string;
-    type: 'pelicula' | 'serie' | 'anime';
+    type: 'pelicula' | 'serie' | 'anime' | 'novela' | 'documental';
     year: number;
     director: string;
     genres: string[];
@@ -264,6 +264,24 @@ export const AESTHETIC_PRESETS: Record<string, {
         matchPercentage: 92,
         matchReason: 'La arena del Coliseo teñida de sangre bajo la luz ocre del sol de Numidia y Roma imperial.',
         vibeTag: 'Arena & Coliseo'
+      },
+      {
+        title: 'Nuestro Planeta',
+        originalTitle: 'Our Planet',
+        type: 'documental',
+        year: 2019,
+        director: 'Alastair Fothergill',
+        genres: ['Documental', 'Naturaleza'],
+        synopsis: 'Serie documental narrada por David Attenborough que muestra la belleza natural de la Tierra y el impacto del cambio climático en los hábitats más remotos.',
+        duration: '2 Temporadas (12 eps)',
+        posterUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
+        backdropUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1600&q=80',
+        trailerYoutubeId: '',
+        defaultPlatform: 'Netflix',
+        communityRating: 4.8,
+        matchPercentage: 91,
+        matchReason: 'Naturaleza captada con luz dorada, vastos horizontes y una paleta tierra de una serenidad sobrecogedora.',
+        vibeTag: 'Tierra & Horizonte'
       }
     ]
   },
@@ -462,6 +480,24 @@ export const AESTHETIC_PRESETS: Record<string, {
         matchPercentage: 92,
         matchReason: 'Naturaleza reclamando ciudades en ruinas, sombras melancólicas y fogatas en medio de la desolación.',
         vibeTag: 'Ruinas & Supervivencia'
+      },
+      {
+        title: 'Pasión de Gavilanes',
+        originalTitle: 'Pasión de Gavilanes',
+        type: 'novela',
+        year: 2003,
+        director: 'Víctor Mallarino',
+        genres: ['Telenovela', 'Romance', 'Drama'],
+        synopsis: 'Los hermanos Reyes buscan vengar a su hermana en la hacienda de los Bernal, pero el amor y los secretos góticos de la familia cambian el destino de todos.',
+        duration: '2 Temporadas (186 eps)',
+        posterUrl: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
+        backdropUrl: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=1600&q=80',
+        trailerYoutubeId: '',
+        defaultPlatform: 'Netflix',
+        communityRating: 4.5,
+        matchPercentage: 89,
+        matchReason: 'Melodrama de claroscuros, haciendas en penumbra y pasiones intensas con atmósfera romántica y sombría.',
+        vibeTag: 'Pasión & Claroscuro'
       }
     ]
   },
@@ -561,6 +597,24 @@ export const AESTHETIC_PRESETS: Record<string, {
         matchPercentage: 91,
         matchReason: 'Innovación gráfica radical con texturas de semitonos Ben-Day y paletas pasteles audaces.',
         vibeTag: 'Arte Cómic Pop'
+      },
+      {
+        title: 'La Casa de las Flores',
+        originalTitle: 'La Casa de las Flores',
+        type: 'novela',
+        year: 2018,
+        director: 'Manolo Caro',
+        genres: ['Telenovela', 'Comedia', 'Drama'],
+        synopsis: 'Los De la Mora aparentan ser la familia perfecta, pero un arresto y sus secretos desatan una comedia negra llena de color y venganza.',
+        duration: '3 Temporadas (34 eps)',
+        posterUrl: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=800&q=80',
+        backdropUrl: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=1600&q=80',
+        trailerYoutubeId: '',
+        defaultPlatform: 'Netflix',
+        communityRating: 4.4,
+        matchPercentage: 90,
+        matchReason: 'Colores pastel saturados, simetría escénica y producción de autor con un humor elegante y travieso.',
+        vibeTag: 'Rosa & Sátira Familiar'
       }
     ]
   },
@@ -660,6 +714,24 @@ export const AESTHETIC_PRESETS: Record<string, {
         matchPercentage: 92,
         matchReason: 'Thriller policiaco de gran escala con persecuciones nocturnas en túneles subterráneos.',
         vibeTag: 'Caos & Dilema Moral'
+      },
+      {
+        title: 'The Last Dance',
+        originalTitle: 'The Last Dance',
+        type: 'documental',
+        year: 2020,
+        director: 'Jason Hehir',
+        genres: ['Documental', 'Deportes'],
+        synopsis: 'Documental sobre la temporada final de Michael Jordan con los Chicago Bulls, combinando metraje inédito con el retrato de una obsesión por ganar.',
+        duration: '1 Temporada (10 eps)',
+        posterUrl: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80',
+        backdropUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1600&q=80',
+        trailerYoutubeId: '',
+        defaultPlatform: 'Netflix',
+        communityRating: 4.8,
+        matchPercentage: 88,
+        matchReason: 'Archivo granulado de los 90, claroscuros de vestuarios y tensión documental de crimen e investigación.',
+        vibeTag: 'Archivo & Obsesión'
       }
     ]
   }
@@ -739,11 +811,13 @@ export function getCuratedRecommendations(req: CineMatchRequest): CineMatchRespo
   }
 
   const preset = AESTHETIC_PRESETS[presetKey] || AESTHETIC_PRESETS.cyberpunk_neon;
-
-  // Filter by mediaType if requested
   let items = [...preset.items];
+
+  // Filter by mediaType if requested. Search across every curated preset so
+  // less common categories (novela/documental) are always available.
   if (req.mediaType && req.mediaType !== 'all') {
-    const filtered = items.filter((it) => it.type === req.mediaType);
+    const allCurated = Object.values(AESTHETIC_PRESETS).flatMap((preset) => preset.items);
+    const filtered = allCurated.filter((it) => it.type === req.mediaType);
     if (filtered.length >= 2) items = filtered;
   }
 

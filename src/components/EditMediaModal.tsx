@@ -29,7 +29,7 @@ import { useMedia } from '../context/MediaContext';
 const PRESET_GENRES = [
   'Acción', 'Aventura', 'Animación', 'Ciencia Ficción', 'Comedia', 
   'Crimen', 'Documental', 'Drama', 'Fantasía', 'Historia', 
-  'Misterio', 'Romance', 'Suspense / Thriller', 'Terror', 'Bélico', 'Western'
+  'Misterio', 'Romance', 'Suspense / Thriller', 'Terror', 'Bélico', 'Western', 'Telenovela'
 ];
 
 const PRESET_PLATFORMS = [

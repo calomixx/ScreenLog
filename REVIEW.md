@@ -13,7 +13,8 @@ Commit base: `ce5ffeb`
 | Build de cliente (`vite build`) | OK, 3044 módulos; aviso de anotación `@__PURE__` en zod. |
 | Arranque del servidor en `:3311` | OK. `/api/health`, `/api/auth/status` y `/api/media` responden 200. |
 | Registro + alta de una "novela" | OK, la API aceptó `type: "novela"` y la guardó. |
-| Prueba de seguridad de `/api/auth/google` | **FALLO CRÍTICO**: se obtuvo sesión de `owner` sin credenciales. |
+| Prueba de seguridad de `/api/auth/google` | **Corregido**: sin `idToken` devuelve 400; token forjado devuelve 401. Ya no se acepta uid/email del body. |
+| CineMatch con filtro `novela` / `documental` | OK: devuelve 2 novelas y 2 documentales curados. |
 
 No existe suite de tests ejecutable: `package.json` no tiene script `test`, no hay Vitest/Jest/Playwright configurado ni CI en `.github/`. El archivo `firestore.rules.test.ts` solo exporta datos de casos; no los ejecuta.
 
@@ -34,13 +35,7 @@ No existe suite de tests ejecutable: `package.json` no tiene script `test`, no h
 ### Críticos
 
 1. **Account takeover en `/api/auth/google`** (`server/routes.ts:1457-1543`).
-   El endpoint confía en `uid`, `email` y `avatar` enviados por el cliente, sin verificar un ID token de Firebase. Cualquiera puede enviar el email de un `owner`/`admin` y recibir una sesión válida.
-   Evidencia de la prueba local:
-   ```
-   POST /api/auth/google {"uid":"attacker_uid_0001","email":"daemon@screenlog.app",...}
-   -> 200 role=owner tokenLength=43
-   ```
-   **Solución**: verificar el ID token con `firebase-admin` (`verifyIdToken`) y obtener uid/email del token, nunca del body. Si se mantiene el modo sin SDK, validar la firma RS256 contra las claves públicas de Google y `aud`/`iss`/`exp`.
+   **CORREGIDO**: el servidor ahora verifica el ID token de Firebase (`server/firebase-auth.ts`) con las claves públicas de Google y lee `uid`/`email`/`name`/`picture` del token firmado, nunca del body. Sin `idToken` → 400; token inválido → 401.
 
 2. **Cuentas semilla con hashes publicados** (`server/store.ts:205-253`, `285-288`).
    Al arrancar sin `server/data/store.json` se crean `daemon` (owner) y `calomixperceo` (admin) con hashes y sales fijos. Además, `needsSetup` pasa a `false`, por lo que el asistente de creación del Owner nunca aparece.

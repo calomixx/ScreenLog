@@ -258,6 +258,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const credential = await signInWithPopup(auth, googleProvider);
       const fbUser = credential.user;
+      // El servidor verifica este ID token firmado; el uid/email del body
+      // ya no se tienen en cuenta.
+      const idToken = await fbUser.getIdToken();
       if (fbUser && fbUser.emailVerified) {
         try {
           await syncFirebaseUserProfile(fbUser);
@@ -270,6 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         {
           method: 'POST',
           body: JSON.stringify({
+            idToken,
             uid: fbUser.uid,
             email: fbUser.email || '',
             name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cinéfilo',

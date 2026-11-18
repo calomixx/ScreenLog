@@ -106,7 +106,7 @@ export function computeCinephileStats(
   const uniqueGenresCount = uniqueGenresSet.size;
 
   const seriesOrAnimeCount = myListEntries.filter(
-    (e) => e.media.type === 'serie' || e.media.type === 'anime',
+    (e) => e.media.type === 'serie' || e.media.type === 'anime' || e.media.type === 'novela',
   ).length;
 
   const fiveStarCount = myListEntries.filter((e) => e.review.stars >= 5).length;

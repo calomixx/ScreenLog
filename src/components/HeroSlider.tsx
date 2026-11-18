@@ -17,13 +17,14 @@ import {
   Flame,
   Trophy,
   TrendingUp,
+  BookOpen,
   SlidersHorizontal
 } from 'lucide-react';
 import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
 
-export type HeroApartado = 'todos' | 'pelicula' | 'serie' | 'anime' | 'top_rated' | 'tendencias';
+export type HeroApartado = 'todos' | 'pelicula' | 'serie' | 'anime' | 'novela' | 'top_rated' | 'tendencias';
 
 interface HeroSliderProps {
   items: MediaItem[];
@@ -107,6 +108,8 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           m.genres?.some((g) => g.toLowerCase().includes('anime')) ||
           isOvaItem(m)
         );
+      case 'novela':
+        return items.filter((m) => m.type === 'novela');
       case 'top_rated':
         return [...items].sort((a, b) => {
           const ratingA = a.communityVotesCount > 0 ? a.communityRating : 0;
@@ -127,6 +130,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
       pelicula: items.filter((m) => m.type === 'pelicula').length,
       serie: items.filter((m) => m.type === 'serie').length,
       anime: items.filter((m) => m.type === 'anime' || isOvaItem(m) || m.genres?.some(g => g.toLowerCase().includes('anime'))).length,
+      novela: items.filter((m) => m.type === 'novela').length,
       top_rated: items.filter((m) => m.isTopClassified || (m.communityRating && m.communityRating >= 4.5)).length,
       tendencias: items.filter((m) => m.isTrending).length,
     };
@@ -577,6 +581,19 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
                   <Flame className="w-3 h-3 text-pink-400" />
                   <span>Anime & OVAs</span>
                   <span className="text-[10px] opacity-75 font-mono">({counts.anime})</span>
+                </button>
+
+                <button
+                  onClick={() => handleSelectApartado('novela')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    apartado === 'novela'
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40 ring-1 ring-amber-400'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <BookOpen className="w-3 h-3 text-amber-300" />
+                  <span>Novelas</span>
+                  <span className="text-[10px] opacity-75 font-mono">({counts.novela})</span>
                 </button>
 
                 <button
