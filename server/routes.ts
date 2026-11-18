@@ -42,6 +42,7 @@ import type { MediaItem, RewatchChoice, WatchStatus } from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
+import { FIREBASE_PROJECT_ID, verifyGoogleIdToken } from './firebase-auth';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -1457,14 +1458,30 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
   router.post('/auth/google', asyncRoute(async (req, res) => {
     const ip = getClientIp(req);
     const store = await getStore();
-    const uid = sanitizeText(req.body?.uid, 128);
-    const email = sanitizeText(req.body?.email, 254).toLowerCase();
-    const name = sanitizeText(req.body?.name, 80) || email.split('@')[0] || 'Cinéfilo';
-    const photoURL = sanitizeText(req.body?.avatar, 1000);
+    const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken.trim() : '';
 
-    if (!uid || !email || !email.includes('@')) {
-      return safeError(res, 400, 'Datos de autenticación de Google incompletos.', 'INVALID_GOOGLE_AUTH');
+    if (!idToken) {
+      return safeError(res, 400, 'Falta el token de autenticación de Google.', 'INVALID_GOOGLE_AUTH');
     }
+
+    // SECURITY FIX: verify the Firebase ID token server-side. uid/email/name are
+    // read from the signed token, never from the request body.
+    const claims = await verifyGoogleIdToken(idToken, FIREBASE_PROJECT_ID);
+    if (!claims) {
+      addLog(store, {
+        level: 'security',
+        category: 'security',
+        message: 'Token de Google inválido, alterado o expirado rechazado.',
+        ip,
+      });
+      await saveStore();
+      return safeError(res, 401, 'No se pudo verificar la sesión de Google.', 'INVALID_GOOGLE_TOKEN');
+    }
+
+    const uid = claims.uid;
+    const email = claims.email;
+    const name = sanitizeText(claims.name, 80) || email.split('@')[0] || 'Cinéfilo';
+    const photoURL = sanitizeText(claims.picture, 1000);
 
     let user = findUserByEmail(store, email) || findUserById(store, uid);
     const now = new Date().toISOString();

@@ -115,7 +115,7 @@ export const CineMatchView: React.FC = () => {
   const [selectedVibe, setSelectedVibe] = useState<string>('plot_twist');
 
   // Optional filters
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'pelicula' | 'serie' | 'anime'>('all');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'pelicula' | 'serie' | 'anime' | 'novela' | 'documental'>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [customNote, setCustomNote] = useState('');
 
@@ -564,7 +564,7 @@ export const CineMatchView: React.FC = () => {
 
           {/* Type filter */}
           <div className="flex items-center gap-1 bg-[#18181E] p-1 rounded-xl border border-white/5 text-xs">
-            {(['all', 'pelicula', 'serie', 'anime'] as const).map((t) => (
+            {(['all', 'pelicula', 'serie', 'anime', 'novela', 'documental'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setMediaTypeFilter(t)}
@@ -574,7 +574,7 @@ export const CineMatchView: React.FC = () => {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {t === 'all' ? 'Todos' : t === 'pelicula' ? 'Películas' : t === 'serie' ? 'Series' : 'Anime'}
+                {t === 'all' ? 'Todos' : t === 'pelicula' ? 'Películas' : t === 'serie' ? 'Series' : t === 'anime' ? 'Anime' : t === 'novela' ? 'Novelas' : 'Documentales'}
               </button>
             ))}
           </div>
