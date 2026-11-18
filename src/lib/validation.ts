@@ -280,7 +280,20 @@ export const userReviewSchema = z
     year: z.number().optional(),
     genres: z.array(z.string()).optional(),
     wouldRewatch: z.enum(['si_totalmente', 'quizas', 'no_suficiente', 'jamas']).optional(),
-    favoriteMoment: z.string().trim().max(500).optional()
+    favoriteMoment: z.string().trim().max(500).optional(),
+    scriptRating: z.number().min(1).max(10).optional(),
+    actingRating: z.number().min(1).max(10).optional(),
+    directionRating: z.number().min(1).max(10).optional(),
+    soundtrackRating: z.number().min(1).max(10).optional(),
+    cinematographyRating: z.number().min(1).max(10).optional(),
+    pacingRating: z.number().min(1).max(10).optional(),
+    emotionalImpact: z.number().min(1).max(10).optional(),
+    shortVerdict: z.string().trim().max(300).optional(),
+    favoriteCharacter: z.string().trim().max(120).optional(),
+    quote: z.string().trim().max(300).optional(),
+    recommendation: z.enum(['si', 'quizas', 'no']).optional(),
+    moodRecommendation: z.string().trim().max(100).optional(),
+    tags: z.array(z.string().trim().max(50)).max(15).optional(),
   })
   .superRefine((data, ctx) => {
     // Business invariant: If completed, stars and valid date are mandatory

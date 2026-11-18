@@ -2000,7 +2000,20 @@ var userReviewSchema = z.object({
   year: z.number().optional(),
   genres: z.array(z.string()).optional(),
   wouldRewatch: z.enum(["si_totalmente", "quizas", "no_suficiente", "jamas"]).optional(),
-  favoriteMoment: z.string().trim().max(500).optional()
+  favoriteMoment: z.string().trim().max(500).optional(),
+  scriptRating: z.number().min(1).max(10).optional(),
+  actingRating: z.number().min(1).max(10).optional(),
+  directionRating: z.number().min(1).max(10).optional(),
+  soundtrackRating: z.number().min(1).max(10).optional(),
+  cinematographyRating: z.number().min(1).max(10).optional(),
+  pacingRating: z.number().min(1).max(10).optional(),
+  emotionalImpact: z.number().min(1).max(10).optional(),
+  shortVerdict: z.string().trim().max(300).optional(),
+  favoriteCharacter: z.string().trim().max(120).optional(),
+  quote: z.string().trim().max(300).optional(),
+  recommendation: z.enum(["si", "quizas", "no"]).optional(),
+  moodRecommendation: z.string().trim().max(100).optional(),
+  tags: z.array(z.string().trim().max(50)).max(15).optional()
 }).superRefine((data, ctx) => {
   if (data.status === "terminada") {
     if (data.stars < 0.5 || data.stars > 5) {
@@ -3551,6 +3564,19 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       platform: sanitizeText(body.platform, 80),
       wouldRewatch,
       favoriteMoment: sanitizeText(body.favoriteMoment, 500),
+      scriptRating: body.scriptRating ? Math.max(1, Math.min(10, Number(body.scriptRating))) : void 0,
+      actingRating: body.actingRating ? Math.max(1, Math.min(10, Number(body.actingRating))) : void 0,
+      directionRating: body.directionRating ? Math.max(1, Math.min(10, Number(body.directionRating))) : void 0,
+      soundtrackRating: body.soundtrackRating ? Math.max(1, Math.min(10, Number(body.soundtrackRating))) : void 0,
+      cinematographyRating: body.cinematographyRating ? Math.max(1, Math.min(10, Number(body.cinematographyRating))) : void 0,
+      pacingRating: body.pacingRating ? Math.max(1, Math.min(10, Number(body.pacingRating))) : void 0,
+      emotionalImpact: body.emotionalImpact ? Math.max(1, Math.min(10, Number(body.emotionalImpact))) : void 0,
+      shortVerdict: sanitizeText(body.shortVerdict, 300),
+      favoriteCharacter: sanitizeText(body.favoriteCharacter, 120),
+      quote: sanitizeText(body.quote, 300),
+      recommendation: ["si", "quizas", "no"].includes(body.recommendation) ? body.recommendation : "si",
+      moodRecommendation: sanitizeText(body.moodRecommendation, 100),
+      tags: Array.isArray(body.tags) ? body.tags.filter((t) => typeof t === "string").map((t) => sanitizeText(t, 50)).slice(0, 15) : [],
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     const existing = store.library.find((e) => e.userId === user.id && e.mediaId === mediaId);
