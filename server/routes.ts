@@ -596,6 +596,31 @@ export function createApiRouter(): Router {
     });
   }));
 
+  // GET /api/media/trailer - resuelve el tráiler oficial de YouTube bajo demanda
+  // para títulos sin trailerYoutubeId guardado en el catálogo.
+  const trailerLookupCache = new Map<string, string>();
+  router.get('/media/trailer', asyncRoute(async (req, res) => {
+    const title = typeof req.query.title === 'string' ? sanitizeText(req.query.title, 160) : '';
+    const type = typeof req.query.type === 'string' ? req.query.type.trim() : undefined;
+    const year = Number(req.query.year) || undefined;
+    if (!title) return res.json({ success: true, trailerYoutubeId: '' });
+
+    const cacheKey = `${title.toLowerCase()}|${type || ''}|${year || ''}`;
+    if (trailerLookupCache.has(cacheKey)) {
+      return res.json({ success: true, trailerYoutubeId: trailerLookupCache.get(cacheKey) || '' });
+    }
+
+    try {
+      const tmdbData = await fetchFromTMDB(title, type, year);
+      const trailerYoutubeId = tmdbData?.trailerYoutubeId || '';
+      if (trailerLookupCache.size > 500) trailerLookupCache.clear();
+      trailerLookupCache.set(cacheKey, trailerYoutubeId);
+      return res.json({ success: true, trailerYoutubeId });
+    } catch {
+      return res.json({ success: true, trailerYoutubeId: '' });
+    }
+  }));
+
   router.get('/media/:id', asyncRoute(async (req, res) => {
     const store = await getStore();
     const id = sanitizeText(req.params.id, 120);

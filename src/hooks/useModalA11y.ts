@@ -20,6 +20,9 @@ let scrollLockCount = 0;
 let savedOverflow = '';
 let savedPaddingRight = '';
 
+// Solo el modal superior debe responder a Escape.
+const modalStack: symbol[] = [];
+
 function lockBodyScroll() {
   if (scrollLockCount === 0) {
     savedOverflow = document.body.style.overflow;
@@ -60,6 +63,8 @@ export function useModalA11y<T extends HTMLElement = HTMLDivElement>(
     if (!container) return;
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    const token = Symbol('modal');
+    modalStack.push(token);
     lockBodyScroll();
 
     const getFocusable = (): HTMLElement[] =>
@@ -72,6 +77,7 @@ export function useModalA11y<T extends HTMLElement = HTMLDivElement>(
     const focusFrame = window.requestAnimationFrame(() => focusTarget.focus?.());
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (modalStack[modalStack.length - 1] !== token) return;
       if (event.key === 'Escape' && closeOnEscape) {
         event.preventDefault();
         event.stopPropagation();
@@ -105,6 +111,8 @@ export function useModalA11y<T extends HTMLElement = HTMLDivElement>(
     return () => {
       window.cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', handleKeyDown, true);
+      const stackIndex = modalStack.lastIndexOf(token);
+      if (stackIndex >= 0) modalStack.splice(stackIndex, 1);
       unlockBodyScroll();
       previouslyFocused?.focus?.();
     };

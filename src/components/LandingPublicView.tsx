@@ -423,7 +423,9 @@ export const LandingPublicView: React.FC = () => {
                     aria-label={`Ver tráiler de ${item.title}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      openTrailer(item.trailerYoutubeId);
+                      // Sin id guardado abrimos la ficha: allí el tráiler se resuelve y se reproduce inline.
+                      if (item.trailerYoutubeId) openTrailer(item.trailerYoutubeId);
+                      else setSelectedMediaId(item.id);
                     }}
                     className="absolute bottom-2.5 left-2.5 p-2 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Ver Tráiler"
