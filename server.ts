@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import express from 'express';
 import { createApiRouter } from './server/routes';
 import { syncRateLimitsFromStore } from './server/security';
@@ -33,6 +34,7 @@ async function startServer() {
   } catch { /* ignore — fresh start */ }
 
   const app = express();
+  const server = http.createServer(app);
 
   // Cloud Run / Kubernetes / Docker health check endpoint
   app.get('/healthz', (_req, res) => {
@@ -64,7 +66,10 @@ async function startServer() {
   if (isDev) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -75,7 +80,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`TakeVault Server running on http://0.0.0.0:${PORT}`);
   });
 }
