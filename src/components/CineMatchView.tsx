@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { CineMatchItem, CineMatchResponse } from '../types';
+import { getMediaTypeLabel, getMediaTypePlural } from '../lib/mediaLabels';
 
 interface PresetCard {
   id: string;
@@ -574,7 +575,7 @@ export const CineMatchView: React.FC = () => {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {t === 'all' ? 'Todos' : t === 'pelicula' ? 'Películas' : t === 'serie' ? 'Series' : t === 'anime' ? 'Anime' : t === 'novela' ? 'Novelas' : 'Documentales'}
+                {t === 'all' ? 'Todos' : getMediaTypePlural(t)}
               </button>
             ))}
           </div>
@@ -766,7 +767,7 @@ export const CineMatchView: React.FC = () => {
                               </div>
 
                               <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-bold uppercase text-slate-300 flex-shrink-0">
-                                {item.type}
+                                {getMediaTypeLabel(item.type)}
                               </span>
                             </div>
 

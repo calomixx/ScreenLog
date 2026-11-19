@@ -58,3 +58,41 @@
 .animate-ken-burns {
   animation: kenBurns 20s ease-in-out infinite;
 }
+
+/* Visible keyboard focus across the whole app */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(251 113 133 / 0.9);
+  outline-offset: 2px;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toastIn 180ms ease-out;
+}
+
+/* Respect the user's motion preference (Ken Burns, glows, tilts, spins) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-ken-burns,
+  .animate-pulse-glow {
+    animation: none !important;
+  }
+}

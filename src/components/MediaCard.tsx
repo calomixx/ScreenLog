@@ -15,6 +15,7 @@ import {
 import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
 
 interface MediaCardProps {
   media: MediaItem;
@@ -180,7 +181,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           isHovered ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}>
           <span className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white backdrop-blur-md text-[10px] font-bold uppercase tracking-wider shadow">
-            {media.type}
+            {getMediaTypeLabel(media.type)}
           </span>
 
           <div className="flex items-center gap-1">
@@ -208,7 +209,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           {/* Top of hover overlay: Platform / Category & Menu */}
           <div className="flex items-center justify-between gap-1.5">
             <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider shadow">
-              {media.type} • {media.year}
+              {getMediaTypeLabel(media.type)} • {media.year}
             </span>
 
             <div className="flex items-center gap-1">

@@ -21,6 +21,7 @@ import { useMedia } from '../context/MediaContext';
 import { mediaFormSchema, extractYouTubeId } from '../lib/validation';
 import { MediaType } from '../types';
 import { apiRequest } from '../lib/api';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
 
 const ANIME_FORMATS = [
   { value: 'TV', label: 'TV (Serie de TV)' },
@@ -591,7 +592,7 @@ export const AddMediaModal: React.FC = () => {
                         )}
                         <span className="font-semibold group-hover:text-emerald-200">{item.title}</span>
                         <span className="text-[10px] text-slate-400 group-hover:text-emerald-300 font-mono">
-                          ({item.year || 'S/F'} • {item.type})
+                          ({item.year || 'S/F'} • {getMediaTypeLabel(item.type)})
                         </span>
                       </button>
                     ))}

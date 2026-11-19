@@ -25,6 +25,7 @@ import { FeaturesShowcase } from './FeaturesShowcase';
 import { UserTestimonialsSection } from './UserTestimonialsSection';
 import { ContactSection } from './ContactSection';
 import { LogoLockup } from './Logo';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
 
 export const LandingPublicView: React.FC = () => {
   const { mediaList, openTrailer, setSelectedMediaId, toastMessage, openRoulette } = useMedia();
@@ -405,7 +406,7 @@ export const LandingPublicView: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#111114] via-black/20 to-transparent" />
                   <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/75 border border-white/10 text-[10px] font-bold text-slate-200 flex items-center gap-1">
                     {item.type === 'pelicula' ? <Film className="w-2.5 h-2.5 text-rose-400" /> : <Tv className="w-2.5 h-2.5 text-amber-400" />}
-                    <span className="capitalize">{item.type}</span>
+                    <span className="capitalize">{getMediaTypeLabel(item.type)}</span>
                   </div>
                   {item.communityVotesCount > 0 && (
                     <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 border border-white/15 text-[10px] font-bold text-amber-400 flex items-center gap-1">

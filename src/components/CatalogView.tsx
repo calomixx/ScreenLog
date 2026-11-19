@@ -18,6 +18,8 @@ import { useMedia } from '../context/MediaContext';
 import { MediaType } from '../types';
 import { MediaCard } from './MediaCard';
 import { RecentSearches } from './RecentSearches';
+import { EmptyState } from './ui/EmptyState';
+import { MEDIA_TYPE_FILTERS } from '../lib/mediaLabels';
 
 const ALL_GENRES = [
   'Todos',
@@ -218,17 +220,18 @@ export const CatalogView: React.FC = () => {
 
           {/* Type Pills */}
           <div className="flex items-center gap-1 bg-[#0A0A0B] p-1 rounded-xl border border-white/10 overflow-x-auto">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+            {MEDIA_TYPE_FILTERS.map(({ value, label }) => (
               <button
-                key={t}
-                onClick={() => setSelectedType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-all ${
-                  selectedType === t
+                key={value}
+                onClick={() => setSelectedType(value)}
+                aria-pressed={selectedType === value}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                  selectedType === value
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {t === 'todos' ? 'Todos' : t}
+                {label}
               </button>
             ))}
           </div>
@@ -492,23 +495,19 @@ export const CatalogView: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-[#161618]/50 space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-600/10 text-rose-500 flex items-center justify-center border border-rose-500/20">
-            <Film className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">No se encontraron títulos con estos filtros</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-              Prueba cambiando los criterios de búsqueda o añade la película que buscas a CineTrack.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition-colors"
-          >
-            + Añadir Esta Película Ahora
-          </button>
-        </div>
+        <EmptyState
+          icon={Film}
+          title="No se encontraron títulos con estos filtros"
+          description="Prueba cambiando los criterios de búsqueda o añade la película que buscas al catálogo."
+          action={
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition-colors"
+            >
+              + Añadir Este Título Ahora
+            </button>
+          }
+        />
       )}
 
     </div>

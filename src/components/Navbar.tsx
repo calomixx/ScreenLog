@@ -237,6 +237,7 @@ export const Navbar: React.FC = () => {
                   <button
                     key={tab.id}
                     type="button"
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => handleTabClick(tab.id)}
                     className={`relative inline-flex items-center gap-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap shrink-0 transition-all ${
                       isActive
@@ -534,6 +535,7 @@ export const Navbar: React.FC = () => {
                 <button
                   key={tab.id}
                   type="button"
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => handleTabClick(tab.id)}
                   className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap border transition-all ${
                     isActive
@@ -615,6 +617,7 @@ export const Navbar: React.FC = () => {
               <button
                 key={tab.id}
                 type="button"
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleTabClick(tab.id)}
                 className={`relative flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-w-0 transition-colors ${
                   isActive ? 'text-rose-400 bg-rose-600/10' : 'text-slate-500 hover:text-slate-300'

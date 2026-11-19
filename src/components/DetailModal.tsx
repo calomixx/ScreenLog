@@ -30,6 +30,7 @@ import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
 import { WatchProvidersTab } from './WatchProvidersTab';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
 
 const PLATFORM_OPTIONS = [
   'Netflix',
@@ -437,7 +438,7 @@ export const DetailModal: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
-                    {selectedMedia.type}
+                    {getMediaTypeLabel(selectedMedia.type)}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 text-xs font-medium border border-white/10">
                     {selectedMedia.defaultPlatform}

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { LandingPublicView } from './components/LandingPublicView';
 import { LogoLockup, LogoMark } from './components/Logo';
+import { Toast } from './components/ui/Toast';
 import { Loader2, ShieldAlert } from 'lucide-react';
 
 // Lazy-loaded Views (Code Splitting for instant initial page load)
@@ -111,6 +112,7 @@ const MainAppContent: React.FC = () => {
     setActiveTab,
     mediaList,
     toastMessage,
+    dismissToast,
     selectedMediaId,
     isAddModalOpen,
     isTrailerModalOpen,
@@ -169,11 +171,7 @@ const MainAppContent: React.FC = () => {
         <Suspense fallback={<ViewLoader />}>{renderTab()}</Suspense>
       </main>
 
-      {toastMessage && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-[#161618] border border-white/15 text-xs sm:text-sm font-semibold text-white shadow-2xl">
-          {toastMessage.text}
-        </div>
-      )}
+      <Toast message={toastMessage} onDismiss={dismissToast} />
 
       <Suspense fallback={null}>
         {selectedMediaId && <DetailModal />}

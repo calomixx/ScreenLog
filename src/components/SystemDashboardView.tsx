@@ -16,6 +16,7 @@ import { HeroSlider } from './HeroSlider';
 import { MediaCard } from './MediaCard';
 import { computeCinephileStats } from '../lib/cinephileRanks';
 import { CinephileBadgesSection } from './CinephileBadgesSection';
+import { MEDIA_TYPE_FILTERS } from '../lib/mediaLabels';
 const UserStatsPanel = lazy(() => import('./UserStatsPanel').then((m) => ({ default: m.UserStatsPanel })));
 import { MediaType } from '../types';
 
@@ -166,18 +167,19 @@ export const SystemDashboardView: React.FC = () => {
           </div>
 
           {/* Type filters */}
-          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 overflow-x-auto max-w-full">
+            {MEDIA_TYPE_FILTERS.map(({ value, label }) => (
               <button
-                key={t}
-                onClick={() => setTopTypeFilter(t)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
-                  topTypeFilter === t
+                key={value}
+                onClick={() => setTopTypeFilter(value)}
+                aria-pressed={topTypeFilter === value}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  topTypeFilter === value
                     ? 'bg-rose-600 text-white shadow-md font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {t === 'todos' ? 'Todos' : t}
+                {label}
               </button>
             ))}
           </div>
@@ -209,18 +211,19 @@ export const SystemDashboardView: React.FC = () => {
           </div>
 
           {/* Type filters */}
-          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 overflow-x-auto max-w-full">
+            {MEDIA_TYPE_FILTERS.map(({ value, label }) => (
               <button
-                key={t}
-                onClick={() => setAddedTypeFilter(t)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
-                  addedTypeFilter === t
+                key={value}
+                onClick={() => setAddedTypeFilter(value)}
+                aria-pressed={addedTypeFilter === value}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  addedTypeFilter === value
                     ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {t === 'todos' ? 'Todos' : t}
+                {label}
               </button>
             ))}
           </div>
