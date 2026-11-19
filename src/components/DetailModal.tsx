@@ -12,6 +12,7 @@ import {
   Check, 
   MessageSquare, 
   ThumbsUp, 
+  ThumbsDown,
   Send, 
   Sliders, 
   Share2, 
@@ -24,7 +25,11 @@ import {
   Heart,
   Trash2,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  ExternalLink,
+  Quote,
+  Tag,
+  Smile
 } from 'lucide-react';
 import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -33,6 +38,7 @@ import { WatchProvidersTab } from './WatchProvidersTab';
 import { getMediaTypeLabel } from '../lib/mediaLabels';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { FALLBACK_BACKDROP, FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
+import { extractYouTubeId } from '../lib/validation';
 
 const PLATFORM_OPTIONS = [
   'Netflix',
@@ -59,6 +65,32 @@ const EVALUATION_PRESETS: EvaluationTag[] = [
   'Mediocre (4/10)',
   'Mala (2-3/10)',
   'Pérdida de tiempo (1/10)'
+];
+
+const CINEPHILE_TAG_OPTIONS = [
+  'Giro inesperado 🤯',
+  'Visualmente hipnótica ✨',
+  'Banda sonora épica 🎶',
+  'Actuación de Óscar 🏆',
+  'Tensión constante ⏱️',
+  'Final polémico ⚡',
+  'Lloré a mares 😭',
+  'Para ver repetidas veces 🔁',
+  'Clásico de culto 👑',
+  'Guión brillante 📜',
+  'Risas garantizadas 😂',
+  'Atmósfera oscura 🌑'
+];
+
+const MOOD_OPTIONS = [
+  '🍿 Noche de palomitas',
+  '🧠 Para reflexionar y debatir',
+  '😭 Para llorar a gusto',
+  '⚡ Adrenalina pura y acción',
+  '❤️ En pareja',
+  '👥 Con amigos',
+  '😴 Para desconectar la mente',
+  '🕯️ A oscuras en silencio'
 ];
 
 const REWATCH_OPTIONS: { value: RewatchChoice; label: string; icon: string }[] = [
@@ -119,7 +151,7 @@ export const DetailModal: React.FC = () => {
     deleteMediaItem
   } = useMedia();
 
-  const [activeTab, setActiveTab] = useState<'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'trailer' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -157,7 +189,7 @@ export const DetailModal: React.FC = () => {
     }
   }, [selectedMedia?.id]);
 
-  const handleTabChange = (newTab: 'info' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver') => {
+  const handleTabChange = (newTab: 'info' | 'trailer' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver') => {
     if (contentContainerRef.current) {
       tabScrollsRef.current[activeTab] = contentContainerRef.current.scrollTop;
     }
@@ -187,7 +219,9 @@ export const DetailModal: React.FC = () => {
     acting: 9,
     soundtrack: 9,
     visuals: 9,
-    direction: 9
+    direction: 9,
+    pacing: 9,
+    emotionalImpact: 9
   });
   const [hasVotedDetailed, setHasVotedDetailed] = useState(false);
 
@@ -220,6 +254,19 @@ export const DetailModal: React.FC = () => {
     platform: 'Netflix',
     wouldRewatch: 'si_totalmente',
     favoriteMoment: '',
+    scriptRating: 9,
+    actingRating: 9,
+    directionRating: 9,
+    soundtrackRating: 9,
+    cinematographyRating: 9,
+    pacingRating: 9,
+    emotionalImpact: 9,
+    shortVerdict: '',
+    favoriteCharacter: '',
+    quote: '',
+    recommendation: 'si',
+    moodRecommendation: '',
+    tags: [],
     updatedAt: new Date().toISOString()
   });
 
@@ -246,7 +293,20 @@ export const DetailModal: React.FC = () => {
           genres: existing.genres || selectedMedia.genres || [],
           year: existing.year || selectedMedia.year || new Date().getFullYear(),
           director: existing.director || selectedMedia.director || '',
-          platform: existing.platform || selectedMedia.defaultPlatform || 'Netflix'
+          platform: existing.platform || selectedMedia.defaultPlatform || 'Netflix',
+          scriptRating: existing.scriptRating ?? 9,
+          actingRating: existing.actingRating ?? 9,
+          directionRating: existing.directionRating ?? 9,
+          soundtrackRating: existing.soundtrackRating ?? 9,
+          cinematographyRating: existing.cinematographyRating ?? 9,
+          pacingRating: existing.pacingRating ?? 9,
+          emotionalImpact: existing.emotionalImpact ?? 9,
+          shortVerdict: existing.shortVerdict || '',
+          favoriteCharacter: existing.favoriteCharacter || '',
+          quote: existing.quote || '',
+          recommendation: existing.recommendation || 'si',
+          moodRecommendation: existing.moodRecommendation || '',
+          tags: existing.tags || [],
         });
       } else {
         setReviewForm({
@@ -262,6 +322,19 @@ export const DetailModal: React.FC = () => {
           platform: selectedMedia.defaultPlatform || 'Netflix',
           wouldRewatch: 'si_totalmente',
           favoriteMoment: '',
+          scriptRating: 9,
+          actingRating: 9,
+          directionRating: 9,
+          soundtrackRating: 9,
+          cinematographyRating: 9,
+          pacingRating: 9,
+          emotionalImpact: 9,
+          shortVerdict: '',
+          favoriteCharacter: '',
+          quote: '',
+          recommendation: 'si',
+          moodRecommendation: '',
+          tags: [],
           updatedAt: new Date().toISOString()
         });
       }
@@ -546,6 +619,17 @@ export const DetailModal: React.FC = () => {
                       </button>
                     );
                   })}
+
+                  {/* Quick Trailer Button directly in header banner */}
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('trailer')}
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white flex items-center gap-1.5 shadow-md shadow-rose-950/60 hover:scale-105 active:scale-95 transition-all ml-auto sm:ml-1"
+                    title="Ver Tráiler Oficial"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white flex-shrink-0" />
+                    <span>Ver Tráiler</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -566,6 +650,19 @@ export const DetailModal: React.FC = () => {
             >
               <Film className="w-4 h-4 text-rose-400 flex-shrink-0" />
               <span>Sinopsis</span>
+            </button>
+
+            <button
+              id="detail-modal-tab-trailer"
+              onClick={() => handleTabChange('trailer')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === 'trailer' 
+                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Play className="w-4 h-4 text-rose-400 flex-shrink-0 fill-current" />
+              <span>Tráiler</span>
             </button>
 
             <button
@@ -636,26 +733,30 @@ export const DetailModal: React.FC = () => {
           {/* TAB 1: SINOPSIS & FICHA TÉCNICA */}
           {activeTab === 'info' && (
             <div className="space-y-6">
-              {/* Trailer button */}
-              {selectedMedia.trailerYoutubeId && (
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-rose-600/20 via-white/5 to-[#161618] border border-rose-500/30">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-rose-600 text-white font-bold">
-                      <Play className="w-5 h-5 fill-white" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Ver Tráiler Oficial</h4>
-                      <p className="text-xs text-slate-400">Reproduce el adelanto en alta definición</p>
-                    </div>
+              {/* Trailer button banner in Info tab */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-rose-600/20 via-white/5 to-[#161618] border border-rose-500/30">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-rose-600 text-white font-bold shadow-md shadow-rose-950/50">
+                    <Play className="w-5 h-5 fill-white" />
                   </div>
-                  <button
-                    onClick={() => openTrailer(selectedMedia.trailerYoutubeId)}
-                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors"
-                  >
-                    Reproducir
-                  </button>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Ver Tráiler Cinemático Oficial</h4>
+                    <p className="text-xs text-slate-400">
+                      {selectedMedia.trailerYoutubeId 
+                        ? 'Reproduce el adelanto en alta definición integrado en la ficha'
+                        : 'Buscar y reproducir el tráiler en YouTube'}
+                    </p>
+                  </div>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('trailer')}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors flex items-center justify-center gap-2 self-start sm:self-auto"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  <span>{selectedMedia.trailerYoutubeId ? 'Reproducir Tráiler' : 'Ver Opciones de Tráiler'}</span>
+                </button>
+              </div>
 
               {/* Synopsis */}
               <div>
@@ -722,6 +823,101 @@ export const DetailModal: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: TRÁILER CINEMÁTICO INTEGRADO */}
+          {activeTab === 'trailer' && (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              {(() => {
+                const ytid = selectedMedia.trailerYoutubeId ? extractYouTubeId(selectedMedia.trailerYoutubeId) : '';
+                if (ytid) {
+                  return (
+                    <div className="space-y-4">
+                      {/* Cinema Video Player Container */}
+                      <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/15 shadow-2xl shadow-black/95">
+                        <iframe
+                          src={`https://www.youtube-nocookie.com/embed/${ytid}?autoplay=1&rel=0&modestbranding=1`}
+                          title={`Tráiler de ${selectedMedia.title}`}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+
+                      {/* Video Player Meta & Controls */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <Film className="w-4 h-4 text-rose-400" />
+                          <span className="font-semibold text-white">Tráiler Oficial:</span>
+                          <span className="text-slate-400">{selectedMedia.title} ({selectedMedia.year})</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openTrailer(ytid)}
+                            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white font-semibold transition-colors flex items-center gap-1.5"
+                            title="Abrir en reproductor flotante amplio"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                            <span>Modo Teatro Flotante</span>
+                          </button>
+
+                          <a
+                            href={`https://www.youtube.com/watch?v=${ytid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Ver en YouTube</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="rounded-3xl border border-dashed border-white/15 bg-[#0A0A0B]/80 p-8 sm:p-12 text-center space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+                      <Play className="w-7 h-7 fill-rose-500/40 ml-0.5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-base sm:text-lg font-bold text-white">
+                        Sin tráiler oficial enlazado para "{selectedMedia.title}"
+                      </h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Este título aún no tiene un identificador de YouTube asignado en el catálogo. Puedes buscarlo directamente en YouTube con un solo clic.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                      <a
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMedia.title + ' ' + selectedMedia.year + ' trailer oficial')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-colors flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Buscar Tráiler en YouTube</span>
+                      </a>
+
+                      {isCatalogAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => openEditMediaModal(selectedMedia)}
+                          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold border border-white/10 transition-colors flex items-center gap-1.5"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Asignar Tráiler (Admin)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -842,11 +1038,13 @@ export const DetailModal: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     {[
-                      { key: 'script', label: 'Guión (1-10)' },
-                      { key: 'acting', label: 'Actuaciones (1-10)' },
-                      { key: 'soundtrack', label: 'Banda Sonora (1-10)' },
-                      { key: 'visuals', label: 'Visuales (1-10)' },
-                      { key: 'direction', label: 'Dirección (1-10)' }
+                      { key: 'script', label: 'Guión & Narrativa (1-10)' },
+                      { key: 'acting', label: 'Actuaciones & Elenco (1-10)' },
+                      { key: 'direction', label: 'Dirección & Estilo (1-10)' },
+                      { key: 'soundtrack', label: 'Banda Sonora & Sonido (1-10)' },
+                      { key: 'visuals', label: 'Fotografía & Visuales (1-10)' },
+                      { key: 'pacing', label: 'Ritmo & Montaje (1-10)' },
+                      { key: 'emotionalImpact', label: 'Impacto Emocional (1-10)' }
                     ].map((field) => (
                       <div key={field.key} className="flex items-center justify-between gap-2">
                         <span className="text-slate-300">{field.label}</span>
@@ -1010,6 +1208,159 @@ export const DetailModal: React.FC = () => {
                   </div>
                 </div>
 
+                {/* ¿La recomiendas a otros cinéfilos? */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
+                    <ThumbsUp className="w-3.5 h-3.5 text-rose-400" />
+                    <span>¿La recomiendas a otros cinéfilos?</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'si', label: '¡Sí, totalmente!', icon: '👍', color: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' },
+                      { id: 'quizas', label: 'Con reservas', icon: '🤔', color: 'border-amber-500/50 bg-amber-500/15 text-amber-300' },
+                      { id: 'no', label: 'No la recomiendo', icon: '👎', color: 'border-rose-500/50 bg-rose-500/15 text-rose-300' },
+                    ].map((rec) => (
+                      <button
+                        key={rec.id}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, recommendation: rec.id as any })}
+                        className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all ${
+                          (reviewForm.recommendation || 'si') === rec.id
+                            ? `${rec.color} ring-1 ring-white/20 shadow-sm font-extrabold`
+                            : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        <span>{rec.icon}</span>
+                        <span className="truncate">{rec.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Momento o Mood Ideal */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Smile className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Momento o Estado de Ánimo Ideal para Verla</span>
+                    </span>
+                    {reviewForm.moodRecommendation && (
+                      <button
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, moodRecommendation: '' })}
+                        className="text-[10px] text-slate-400 hover:text-rose-400 underline"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {MOOD_OPTIONS.map((mood) => {
+                      const isSelected = reviewForm.moodRecommendation === mood;
+                      return (
+                        <button
+                          key={mood}
+                          type="button"
+                          onClick={() => setReviewForm({ ...reviewForm, moodRecommendation: isSelected ? '' : mood })}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                            isSelected
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold shadow-sm'
+                              : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          {mood}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    type="text"
+                    value={reviewForm.moodRecommendation || ''}
+                    onChange={(e) => setReviewForm({ ...reviewForm, moodRecommendation: e.target.value })}
+                    placeholder="O escribe tu propio momento: Ej. 'Tarde lluviosa con chocolate', 'Para ver a oscuras'..."
+                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Veredicto en pocas palabras / Frase resumen */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Veredicto en Pocas Palabras (Titular de tu Reseña)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewForm.shortVerdict || ''}
+                    onChange={(e) => setReviewForm({ ...reviewForm, shortVerdict: e.target.value })}
+                    placeholder="Ej. 'Un triunfo audiovisual con un final conmovedor', 'Entretenida aunque predecible'..."
+                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Personaje Favorito & Frase Memorable */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Personaje o Interpretación Favorita</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={reviewForm.favoriteCharacter || ''}
+                      onChange={(e) => setReviewForm({ ...reviewForm, favoriteCharacter: e.target.value })}
+                      placeholder="Ej. Paul Atreides, El Guasón, Miles Morales..."
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
+                      <Quote className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Frase o Diálogo Memorable</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={reviewForm.quote || ''}
+                      onChange={(e) => setReviewForm({ ...reviewForm, quote: e.target.value })}
+                      placeholder="Ej. 'El miedo es el asesino de la mente', 'Hasta el infinito...'..."
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Etiquetas de Sensaciones Cinéfilas */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Etiquetas y Sensaciones Cinéfilas</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {CINEPHILE_TAG_OPTIONS.map((tag) => {
+                      const currentTags = reviewForm.tags || [];
+                      const isSelected = currentTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            const nextTags = isSelected
+                              ? currentTags.filter((t) => t !== tag)
+                              : [...currentTags, tag];
+                            setReviewForm({ ...reviewForm, tags: nextTags });
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                            isSelected
+                              ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-950/40 font-bold scale-105'
+                              : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Save review button */}
                 <div className="pt-2 flex items-center justify-end gap-3">
                   {currentReview && (
@@ -1088,9 +1439,11 @@ export const DetailModal: React.FC = () => {
                   {[
                     { label: 'Guión & Narrativa', score: selectedMedia.detailedVotes.script, icon: '📜' },
                     { label: 'Actuaciones & Elenco', score: selectedMedia.detailedVotes.acting, icon: '🎭' },
+                    { label: 'Dirección & Estilo', score: selectedMedia.detailedVotes.direction, icon: '🎬' },
                     { label: 'Banda Sonora & Audio', score: selectedMedia.detailedVotes.soundtrack, icon: '🎵' },
-                    { label: 'Efectos Visuales & Foto', score: selectedMedia.detailedVotes.visuals, icon: '🎨' },
-                    { label: 'Dirección & Ritmo', score: selectedMedia.detailedVotes.direction, icon: '🎬' }
+                    { label: 'Fotografía & Visuales', score: selectedMedia.detailedVotes.visuals, icon: '🎨' },
+                    { label: 'Ritmo & Montaje', score: selectedMedia.detailedVotes.pacing || 8.8, icon: '⏱️' },
+                    { label: 'Impacto Emocional & Clímax', score: selectedMedia.detailedVotes.emotionalImpact || 9.1, icon: '❤️' }
                   ].map((dim) => (
                     <div key={dim.label} className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -1217,14 +1570,19 @@ export const DetailModal: React.FC = () => {
 
         {/* DIÁLOGO DE CONFIRMACIÓN PARA ELIMINAR DEL CATÁLOGO */}
         {showDeleteConfirm && (
-          <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-media-confirm-title"
+            className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+          >
             <div className="w-full max-w-md rounded-3xl bg-[#141416] border border-rose-500/40 p-6 space-y-4 shadow-2xl text-left">
               <div className="flex items-center gap-3 text-rose-400">
                 <div className="w-10 h-10 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
-                  <Trash2 className="w-5 h-5 text-rose-400" />
+                  <Trash2 className="w-5 h-5 text-rose-400" aria-hidden="true" />
                 </div>
                 <div>
-                  <h3 className="font-display text-base font-black text-white">¿Quitar "{selectedMedia.title}" del catálogo?</h3>
+                  <h3 id="delete-media-confirm-title" className="font-display text-base font-black text-white">¿Quitar "{selectedMedia.title}" del catálogo?</h3>
                   <span className="text-[11px] text-slate-400 font-semibold">Acción de administrador</span>
                 </div>
               </div>

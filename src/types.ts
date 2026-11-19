@@ -62,6 +62,22 @@ export interface UserReview {
   platform: string; // Dónde la vi (Netflix, HBO Max, Prime Video, Disney+, etc.)
   wouldRewatch: RewatchChoice; // ¿La volvería a ver?
   favoriteMoment?: string;
+
+  // Nuevos campos detallados para calificar
+  scriptRating?: number; // Guión & Narrativa (1-10)
+  actingRating?: number; // Actuaciones & Elenco (1-10)
+  directionRating?: number; // Dirección & Estilo (1-10)
+  soundtrackRating?: number; // Banda Sonora & Audio (1-10)
+  cinematographyRating?: number; // Fotografía & Visuales (1-10)
+  pacingRating?: number; // Ritmo & Montaje (1-10)
+  emotionalImpact?: number; // Impacto Emocional & Clímax (1-10)
+  shortVerdict?: string; // Veredicto en pocas palabras / Frase resumen
+  favoriteCharacter?: string; // Personaje o actuación favorita
+  quote?: string; // Frase o diálogo memorable
+  recommendation?: 'si' | 'quizas' | 'no'; // ¿La recomiendas a tus amigos?
+  moodRecommendation?: string; // Momento ideal para verla (p.ej. noche con amigos, para reflexionar)
+  tags?: string[]; // Etiquetas de sensaciones cinéfilas (p.ej. giro inesperado, visualmente hipnótica)
+
   updatedAt: string;
 }
 
@@ -82,6 +98,8 @@ export interface DetailedCommunityVotes {
   soundtrack: number; // 1-10
   visuals: number; // 1-10
   direction: number; // 1-10
+  pacing?: number; // 1-10
+  emotionalImpact?: number; // 1-10
   totalVotes: number;
   ratingDistribution: Record<number, number>; // 1: count, 2: count, etc.
 }

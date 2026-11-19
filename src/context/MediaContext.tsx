@@ -555,6 +555,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const isAddingFirstTime = !existingReview;
 
       updateUserReview({
+        ...existingReview,
         mediaId,
         status,
         stars: existingReview?.stars ?? 0,
@@ -713,6 +714,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               soundtrack: nextScore(media.detailedVotes.soundtrack, scores.soundtrack),
               visuals: nextScore(media.detailedVotes.visuals, scores.visuals),
               direction: nextScore(media.detailedVotes.direction, scores.direction),
+              pacing: nextScore(media.detailedVotes.pacing || 8.5, scores.pacing),
+              emotionalImpact: nextScore(media.detailedVotes.emotionalImpact || 8.5, scores.emotionalImpact),
               totalVotes: votes,
             },
           };

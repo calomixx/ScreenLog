@@ -1801,6 +1801,21 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       platform: sanitizeText(body.platform, 80),
       wouldRewatch,
       favoriteMoment: sanitizeText(body.favoriteMoment, 500),
+      scriptRating: body.scriptRating ? Math.max(1, Math.min(10, Number(body.scriptRating))) : undefined,
+      actingRating: body.actingRating ? Math.max(1, Math.min(10, Number(body.actingRating))) : undefined,
+      directionRating: body.directionRating ? Math.max(1, Math.min(10, Number(body.directionRating))) : undefined,
+      soundtrackRating: body.soundtrackRating ? Math.max(1, Math.min(10, Number(body.soundtrackRating))) : undefined,
+      cinematographyRating: body.cinematographyRating ? Math.max(1, Math.min(10, Number(body.cinematographyRating))) : undefined,
+      pacingRating: body.pacingRating ? Math.max(1, Math.min(10, Number(body.pacingRating))) : undefined,
+      emotionalImpact: body.emotionalImpact ? Math.max(1, Math.min(10, Number(body.emotionalImpact))) : undefined,
+      shortVerdict: sanitizeText(body.shortVerdict, 300),
+      favoriteCharacter: sanitizeText(body.favoriteCharacter, 120),
+      quote: sanitizeText(body.quote, 300),
+      recommendation: ['si', 'quizas', 'no'].includes(body.recommendation) ? body.recommendation : 'si',
+      moodRecommendation: sanitizeText(body.moodRecommendation, 100),
+      tags: Array.isArray(body.tags)
+        ? body.tags.filter((t: unknown) => typeof t === 'string').map((t: string) => sanitizeText(t, 50)).slice(0, 15)
+        : [],
       updatedAt: new Date().toISOString(),
     };
     const existing = store.library.find((e) => e.userId === user.id && e.mediaId === mediaId);

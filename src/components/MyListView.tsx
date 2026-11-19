@@ -705,6 +705,14 @@ export const MyListView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Short verdict header */}
+              {review.shortVerdict && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs font-semibold text-rose-300">
+                  <Sparkles className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                  <span className="truncate">"{review.shortVerdict}"</span>
+                </div>
+              )}
+
               {/* Critique text box */}
               {review.critique ? (
                 <div className="p-3.5 rounded-2xl bg-[#0A0A0B] border border-white/10 text-xs text-slate-300 leading-relaxed font-light italic">
@@ -713,6 +721,27 @@ export const MyListView: React.FC = () => {
               ) : (
                 <div className="p-3.5 rounded-2xl bg-[#0A0A0B]/60 border border-dashed border-white/10 text-xs text-slate-500 italic">
                   Sin reseña escrita aún. Haz clic para redactar tu opinión.
+                </div>
+              )}
+
+              {/* Tags & Mood Chips */}
+              {((review.tags && review.tags.length > 0) || review.moodRecommendation) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {review.moodRecommendation && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-semibold">
+                      {review.moodRecommendation}
+                    </span>
+                  )}
+                  {review.tags?.slice(0, 3).map((tag) => (
+                    <span key={tag} className="px-2 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/10 text-[10px]">
+                      {tag}
+                    </span>
+                  ))}
+                  {review.tags && review.tags.length > 3 && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      +{review.tags.length - 3} más
+                    </span>
+                  )}
                 </div>
               )}
 
