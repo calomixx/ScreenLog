@@ -26,6 +26,7 @@ import { UserTestimonialsSection } from './UserTestimonialsSection';
 import { ContactSection } from './ContactSection';
 import { LogoLockup } from './Logo';
 import { getMediaTypeLabel } from '../lib/mediaLabels';
+import { FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
 
 export const LandingPublicView: React.FC = () => {
   const { mediaList, openTrailer, setSelectedMediaId, toastMessage, openRoulette } = useMedia();
@@ -402,6 +403,9 @@ export const LandingPublicView: React.FC = () => {
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
+                    onError={(event) => handleImageError(event, FALLBACK_POSTER)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#111114] via-black/20 to-transparent" />
                   <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/75 border border-white/10 text-[10px] font-bold text-slate-200 flex items-center gap-1">

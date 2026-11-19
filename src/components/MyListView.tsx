@@ -35,6 +35,7 @@ import { RatingStars } from './RatingStars';
 import { MediaCard } from './MediaCard';
 import { UserStatsPanel } from './UserStatsPanel';
 import { EmptyState } from './ui/EmptyState';
+import { FilterPills } from './ui/FilterPills';
 import { MEDIA_TYPE_FILTERS, getMediaTypeLabel } from '../lib/mediaLabels';
 
 export const MyListView: React.FC = () => {
@@ -442,22 +443,14 @@ export const MyListView: React.FC = () => {
         {/* Secondary Filters: Type, Search & Sort */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Type filters */}
-          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full -mx-0.5">
-            {MEDIA_TYPE_FILTERS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setTypeFilter(value)}
-                aria-pressed={typeFilter === value}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
-                  typeFilter === value
-                    ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
-                    : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <FilterPills
+            options={MEDIA_TYPE_FILTERS}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            label="Filtrar por tipo de título"
+            size="xs"
+            className="pb-1 sm:pb-0"
+          />
 
           {/* Search and Sort within list */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto flex-wrap sm:flex-nowrap justify-end w-full sm:w-auto">
@@ -553,6 +546,8 @@ export const MyListView: React.FC = () => {
                       <img
                         src={media.posterUrl}
                         alt={media.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-9 h-12 rounded object-cover flex-shrink-0 bg-black/40 border border-white/10"
                         referrerPolicy="no-referrer"
                       />
@@ -674,6 +669,8 @@ export const MyListView: React.FC = () => {
                 <img
                   src={media.posterUrl}
                   alt={media.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-20 h-28 object-cover rounded-xl shadow-lg border border-white/10 flex-shrink-0"
                   referrerPolicy="no-referrer"
                 />

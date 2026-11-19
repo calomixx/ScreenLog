@@ -16,6 +16,7 @@ import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
 import { getMediaTypeLabel } from '../lib/mediaLabels';
+import { FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
 
 interface MediaCardProps {
   media: MediaItem;
@@ -38,6 +39,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
   const cardRef = useRef<HTMLDivElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [showCardDeleteConfirm, setShowCardDeleteConfirm] = useState(false);
   const [tiltStyle, setTiltStyle] = useState({
     transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
@@ -91,6 +93,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
     }
   };
 
+  const showOverlay = isHovered || isFocused;
+
   const handleStatusChange = (e: React.MouseEvent, status: WatchStatus) => {
     e.stopPropagation();
     updateMediaStatus(media.id, status);
@@ -135,6 +139,20 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
       ref={cardRef}
       id={`media-card-${media.id}`}
       onClick={() => setSelectedMediaId(media.id)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setSelectedMediaId(media.id);
+        }
+      }}
+      onFocus={() => setIsFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsFocused(false);
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver ficha de ${media.title}`}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -143,7 +161,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
         transformStyle: 'preserve-3d',
         transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.4s ease-out'
       }}
-      className={`group relative bg-[#161618] hover:bg-[#1c1c20] border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
+      className={`group relative bg-surface hover:bg-surface-raised border border-white/5 hover:border-rose-500/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-rose-950/40 transition-shadow duration-300 flex flex-col cursor-pointer ${
         !parallax ? 'transform hover:-translate-y-1.5' : ''
       }`}
     >
@@ -163,6 +181,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           src={media.posterUrl}
           alt={media.title}
           loading="lazy"
+          decoding="async"
+          onError={(event) => handleImageError(event, FALLBACK_POSTER)}
           style={{
             transform: parallax && isHovered 
               ? `scale(1.08) translate3d(${tiltStyle.posterShiftX}px, ${tiltStyle.posterShiftY}px, 0)` 
@@ -178,7 +198,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Top Badges (visible when not hovered) */}
         <div className={`absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10 transition-opacity duration-200 ${
-          isHovered ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          showOverlay ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}>
           <span className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white backdrop-blur-md text-[10px] font-bold uppercase tracking-wider shadow">
             {getMediaTypeLabel(media.type)}
@@ -194,6 +214,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                 }}
                 className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
                 title="Editar título (Admin demon)"
+                aria-label={`Editar ${media.title}`}
               >
                 <Edit3 className="w-3 h-3" />
               </button>
@@ -203,8 +224,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
         </div>
 
         {/* Cinematic Parallax Overlay: Full Movie Synopsis & Quick Actions */}
-        <div className={`absolute inset-0 z-20 flex flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-sm transition-all duration-300 ${
-          isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+        <div className={`absolute inset-0 z-20 flex-col justify-between p-3.5 bg-gradient-to-t from-[#0A0A0B]/98 via-[#161618]/95 to-black/85 backdrop-blur-sm transition-all duration-300 ${
+          showOverlay ? 'flex opacity-100 translate-y-0 pointer-events-auto' : 'hidden'
         }`}>
           {/* Top of hover overlay: Platform / Category & Menu */}
           <div className="flex items-center justify-between gap-1.5">
@@ -222,6 +243,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   }}
                   className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
                   title="Editar catálogo (Admin demon)"
+                  aria-label={`Editar ${media.title}`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -229,12 +251,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
               <div className="relative">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsMenuOpen(!isMenuOpen);
                   }}
                   className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
                   title="Opciones de estado"
+                  aria-label={`Opciones de ${media.title}`}
+                  aria-haspopup="menu"
+                  aria-expanded={isMenuOpen}
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
@@ -242,7 +268,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
               {/* Status Dropdown Menu */}
               {isMenuOpen && (
                 <div 
-                  className="absolute right-0 top-full mt-1 w-48 bg-[#161618] border border-white/10 rounded-xl p-1.5 shadow-2xl z-30 animate-in fade-in"
+                  className="absolute right-0 top-full mt-1 w-48 bg-surface border border-white/10 rounded-xl p-1.5 shadow-2xl z-30 animate-in fade-in"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">
@@ -375,7 +401,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
 
         {/* Bottom Poster Info Overlay (when not hovered) */}
         <div className={`absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between pointer-events-none transition-opacity duration-200 ${
-          isHovered ? 'opacity-0' : 'opacity-100'
+          showOverlay ? 'opacity-0' : 'opacity-100'
         }`}>
           <span className="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[11px] text-slate-300 font-medium border border-white/10">
             {media.defaultPlatform}

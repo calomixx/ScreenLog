@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { MediaItem, MediaType, CustomUserField } from '../types';
 import { useMedia } from '../context/MediaContext';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 const PRESET_GENRES = [
   'Acción', 'Aventura', 'Animación', 'Ciencia Ficción', 'Comedia', 
@@ -127,6 +128,14 @@ export const EditMediaModal: React.FC = () => {
       setErrors({});
     }
   }, [mediaToEdit, isEditMediaModalOpen]);
+
+  const dialogRef = useModalA11y<HTMLDivElement>(
+    () => {
+      if (isDirty) setShowDiscardConfirm(true);
+      else setIsEditMediaModalOpen(false);
+    },
+    { enabled: isEditMediaModalOpen && Boolean(mediaToEdit) },
+  );
 
   if (!isEditMediaModalOpen || !mediaToEdit) return null;
 
@@ -324,7 +333,12 @@ export const EditMediaModal: React.FC = () => {
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
       <div 
         id="edit-media-modal-container"
-        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-[92vh] my-auto"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-media-modal-title"
+        tabIndex={-1}
+        className="relative w-full max-w-4xl bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl text-slate-100 flex flex-col max-h-[92vh] my-auto outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -340,7 +354,7 @@ export const EditMediaModal: React.FC = () => {
                 </span>
                 <span className="text-xs text-slate-400">demon (Administrador)</span>
               </div>
-              <h2 className="text-lg sm:text-xl font-display font-extrabold text-white truncate max-w-md">
+              <h2 id="edit-media-modal-title" className="text-lg sm:text-xl font-display font-extrabold text-white truncate max-w-md">
                 Editar Ficha: {mediaToEdit.title}
               </h2>
             </div>

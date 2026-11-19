@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { LandingPublicView } from './components/LandingPublicView';
 import { LogoLockup, LogoMark } from './components/Logo';
 import { Toast } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Loader2, ShieldAlert } from 'lucide-react';
 
 // Lazy-loaded Views (Code Splitting for instant initial page load)
@@ -66,18 +67,18 @@ const CineRouletteModal = lazy(() =>
 );
 
 const Splash: React.FC = () => (
-  <div className="min-h-dvh bg-[#0A0A0B] flex flex-col items-center justify-center gap-5">
+  <div className="min-h-dvh bg-ink flex flex-col items-center justify-center gap-5" role="status" aria-live="polite">
     <LogoMark size={64} />
     <div className="flex items-center gap-2 text-sm text-slate-400">
-      <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+      <Loader2 className="w-4 h-4 animate-spin text-rose-400" aria-hidden="true" />
       Cargando ScreenLog Pro...
     </div>
   </div>
 );
 
 const ViewLoader: React.FC = () => (
-  <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 text-slate-400">
-    <Loader2 className="w-6 h-6 animate-spin text-rose-500" />
+  <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 text-slate-400" role="status" aria-live="polite">
+    <Loader2 className="w-6 h-6 animate-spin text-rose-500" aria-hidden="true" />
     <span className="text-xs font-medium tracking-wide">Preparando vista...</span>
   </div>
 );
@@ -147,7 +148,13 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-dvh bg-[#0A0A0B] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
+    <div className="min-h-dvh bg-ink text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-rose-600 focus:text-white focus:text-sm focus:font-bold"
+      >
+        Saltar al contenido
+      </a>
       <Navbar />
 
       {/* Subtle indicator when browsing workspace as guest */}
@@ -167,8 +174,10 @@ const MainAppContent: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
-        <Suspense fallback={<ViewLoader />}>{renderTab()}</Suspense>
+      <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
+        <ErrorBoundary section="esta vista">
+          <Suspense fallback={<ViewLoader />}>{renderTab()}</Suspense>
+        </ErrorBoundary>
       </main>
 
       <Toast message={toastMessage} onDismiss={dismissToast} />
@@ -183,7 +192,7 @@ const MainAppContent: React.FC = () => {
         {isRouletteOpen && <CineRouletteModal />}
       </Suspense>
 
-      <footer className="border-t border-white/5 bg-[#121215] text-slate-400 py-6 mt-auto mb-16 md:mb-0">
+      <footer className="border-t border-white/5 bg-surface text-slate-400 py-6 mt-auto md:mb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <LogoLockup size={34} showTagline={false} />
 

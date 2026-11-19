@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Design tokens: superficies y marca compartidas por toda la app */
+@theme {
+  --color-ink: #0a0a0b;
+  --color-surface: #161618;
+  --color-surface-raised: #1c1c20;
+  --color-surface-deep: #111116;
+  --color-brand: #e11d48;
+  --color-brand-soft: #fb7185;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;

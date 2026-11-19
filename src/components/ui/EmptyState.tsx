@@ -22,7 +22,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => (
   <div
     role="status"
-    className={`text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-[#161618]/50 space-y-4 ${className}`}
+    className={`text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-surface/50 space-y-4 ${className}`}
   >
     <div
       aria-hidden="true"
