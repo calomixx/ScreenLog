@@ -35,6 +35,9 @@ import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
 import { WatchProvidersTab } from './WatchProvidersTab';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
+import { useModalA11y } from '../hooks/useModalA11y';
+import { FALLBACK_BACKDROP, FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
 import { extractYouTubeId } from '../lib/validation';
 
 const PLATFORM_OPTIONS = [
@@ -343,6 +346,8 @@ export const DetailModal: React.FC = () => {
     }
   }, [selectedMedia?.id]);
 
+  const dialogRef = useModalA11y<HTMLDivElement>(() => setSelectedMediaId(null));
+
   if (!selectedMedia) return null;
 
   const handleStatusClick = (status: WatchStatus) => {
@@ -395,14 +400,21 @@ export const DetailModal: React.FC = () => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/90 flex items-start sm:items-center justify-center p-1.5 sm:p-4 md:p-6"
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/90 flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           setSelectedMediaId(null);
         }
       }}
     >
-      <div className="relative w-full max-w-5xl">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={selectedMedia ? `Ficha de ${selectedMedia.title}` : 'Ficha del título'}
+        tabIndex={-1}
+        className="relative w-full max-w-5xl outline-none"
+      >
         {/* DYNAMIC AMBILIGHT AURA PARA LA FICHA: Difusión suave y sin límites duros */}
         <div
           className="pointer-events-none absolute -inset-10 sm:-inset-24 lg:-inset-36 z-0 opacity-70 transition-opacity duration-500"
@@ -411,6 +423,9 @@ export const DetailModal: React.FC = () => {
           <img
             src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
             alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
             className="w-full h-full object-cover scale-125 blur-[100px] sm:blur-[140px] md:blur-[180px] saturate-200 brightness-125 opacity-75"
             referrerPolicy="no-referrer"
           />
@@ -418,7 +433,7 @@ export const DetailModal: React.FC = () => {
 
         <div 
           id="detail-modal-container"
-          className="relative z-10 w-full bg-[#141416]/90 backdrop-blur-xl border border-white/10 ring-1 ring-white/5 rounded-3xl overflow-hidden shadow-2xl shadow-black/95 text-slate-100 flex flex-col h-[94vh] sm:h-[90vh] md:h-[92vh]"
+          className="relative z-10 w-full bg-[#141416]/90 backdrop-blur-xl border border-white/10 ring-1 ring-white/5 rounded-t-3xl rounded-b-none sm:rounded-3xl overflow-hidden shadow-2xl shadow-black/95 text-slate-100 flex flex-col h-[94dvh] sm:h-[90vh] md:h-[92vh] pb-[env(safe-area-inset-bottom)] sm:pb-0"
         >
         {/* Floating Top-Right Action Controls (Close, Share, Admin Edit) - Always accessible */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 sm:gap-2 z-40 pointer-events-auto">
@@ -477,6 +492,9 @@ export const DetailModal: React.FC = () => {
             <img
               src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
               alt=""
+              loading="lazy"
+              decoding="async"
+              onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
               className="w-full h-full object-cover blur-3xl scale-110 saturate-150"
               referrerPolicy="no-referrer"
             />
@@ -493,6 +511,8 @@ export const DetailModal: React.FC = () => {
             <img
               src={selectedMedia.backdropUrl || selectedMedia.posterUrl}
               alt={selectedMedia.title}
+              decoding="async"
+              onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
               className="absolute inset-0 w-full h-full object-cover filter brightness-85 saturate-135 contrast-105 pointer-events-none"
               referrerPolicy="no-referrer"
             />
@@ -504,13 +524,15 @@ export const DetailModal: React.FC = () => {
               <img
                 src={selectedMedia.posterUrl}
                 alt={selectedMedia.title}
+                decoding="async"
+                onError={(event) => handleImageError(event, FALLBACK_POSTER)}
                 className="aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl flex-shrink-0 bg-black/50 w-20 sm:w-28 md:w-32"
                 referrerPolicy="no-referrer"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm">
-                    {selectedMedia.type}
+                    {getMediaTypeLabel(selectedMedia.type)}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 text-xs font-medium border border-white/10">
                     {selectedMedia.defaultPlatform}
@@ -1548,14 +1570,19 @@ export const DetailModal: React.FC = () => {
 
         {/* DIÁLOGO DE CONFIRMACIÓN PARA ELIMINAR DEL CATÁLOGO */}
         {showDeleteConfirm && (
-          <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-media-confirm-title"
+            className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+          >
             <div className="w-full max-w-md rounded-3xl bg-[#141416] border border-rose-500/40 p-6 space-y-4 shadow-2xl text-left">
               <div className="flex items-center gap-3 text-rose-400">
                 <div className="w-10 h-10 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
-                  <Trash2 className="w-5 h-5 text-rose-400" />
+                  <Trash2 className="w-5 h-5 text-rose-400" aria-hidden="true" />
                 </div>
                 <div>
-                  <h3 className="font-display text-base font-black text-white">¿Quitar "{selectedMedia.title}" del catálogo?</h3>
+                  <h3 id="delete-media-confirm-title" className="font-display text-base font-black text-white">¿Quitar "{selectedMedia.title}" del catálogo?</h3>
                   <span className="text-[11px] text-slate-400 font-semibold">Acción de administrador</span>
                 </div>
               </div>

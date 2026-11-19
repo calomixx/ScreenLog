@@ -11,6 +11,7 @@ import {
   LogIn,
   LogOut,
   Mail,
+  Menu,
   MessageSquare,
   Pencil,
   PlusCircle,
@@ -58,6 +59,7 @@ export const Navbar: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -77,7 +79,18 @@ export const Navbar: React.FC = () => {
 
   useEffect(() => {
     setIsProfileOpen(false);
+    setIsMoreOpen(false);
   }, [activeTab]);
+
+  // Cierra la hoja "Más" con Escape (comportamiento esperado en móvil).
+  useEffect(() => {
+    if (!isMoreOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMoreOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isMoreOpen]);
 
   const tabs: TabDef[] = currentUser
     ? [
@@ -96,9 +109,13 @@ export const Navbar: React.FC = () => {
         { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
       ];
 
-  const mobileTabs: TabDef[] = currentUser
-    ? [...tabs, { id: 'cuenta', label: 'Cuenta', icon: UserIcon, authOnly: true }]
-    : tabs;
+  // En móvil mostramos 5 accesos principales y agrupamos el resto en "Más".
+  const mobilePrimaryTabs: TabDef[] = tabs.slice(0, 5);
+  const mobileOverflowTabs: TabDef[] = currentUser
+    ? [...tabs.slice(5), { id: 'cuenta', label: 'Cuenta', icon: UserIcon, authOnly: true }]
+    : tabs.slice(5);
+  const hasMoreMenu = mobileOverflowTabs.length > 0;
+  const allMobileTabs = [...mobilePrimaryTabs, ...mobileOverflowTabs];
 
   const searchResults =
     searchQuery.trim() === ''
@@ -216,7 +233,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0A0A0B]/92 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-ink/92 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/35 to-transparent pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -237,6 +254,7 @@ export const Navbar: React.FC = () => {
                   <button
                     key={tab.id}
                     type="button"
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => handleTabClick(tab.id)}
                     className={`relative inline-flex items-center gap-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap shrink-0 transition-all ${
                       isActive
@@ -528,12 +546,13 @@ export const Navbar: React.FC = () => {
             className="hidden md:flex xl:hidden items-center gap-1 pb-2.5 overflow-x-auto"
             aria-label="Navegación secundaria"
           >
-            {mobileTabs.map((tab) => {
+            {allMobileTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   type="button"
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => handleTabClick(tab.id)}
                   className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap border transition-all ${
                     isActive
@@ -555,7 +574,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         {isMobileSearchOpen && (
-          <div ref={mobileSearchRef} className="md:hidden border-t border-white/10 bg-[#0A0A0B]/98 px-3 py-2.5">
+          <div ref={mobileSearchRef} className="md:hidden border-t border-white/10 bg-ink/98 px-3 py-2.5">
             <div className="relative flex items-center">
               <Search className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
@@ -602,19 +621,22 @@ export const Navbar: React.FC = () => {
       </header>
 
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0A0A0B]/96 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-ink/96 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)]"
         aria-label="Navegación móvil"
       >
         <div
           className="grid px-1 pt-1.5 pb-1.5"
-          style={{ gridTemplateColumns: `repeat(${Math.max(mobileTabs.length, 1)}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(mobilePrimaryTabs.length + (hasMoreMenu ? 1 : 0), 1)}, minmax(0, 1fr))`,
+          }}
         >
-          {mobileTabs.map((tab) => {
+          {mobilePrimaryTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleTabClick(tab.id)}
                 className={`relative flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-w-0 transition-colors ${
                   isActive ? 'text-rose-400 bg-rose-600/10' : 'text-slate-500 hover:text-slate-300'
@@ -641,8 +663,116 @@ export const Navbar: React.FC = () => {
               </button>
             );
           })}
+
+          {hasMoreMenu && (
+            <button
+              type="button"
+              onClick={() => setIsMoreOpen(true)}
+              aria-label="Más opciones"
+              aria-haspopup="dialog"
+              aria-expanded={isMoreOpen}
+              className={`relative flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-w-0 transition-colors ${
+                mobileOverflowTabs.some((tab) => tab.id === activeTab)
+                  ? 'text-rose-400 bg-rose-600/10'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Menu className="w-5 h-5" aria-hidden="true" />
+              <span className="text-[9px] font-bold leading-none truncate max-w-full px-0.5">Más</span>
+            </button>
+          )}
         </div>
       </nav>
+
+      {isMoreOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setIsMoreOpen(false)}
+            className="absolute inset-0 w-full h-full bg-black/65 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Más opciones"
+            className="absolute bottom-0 inset-x-0 bg-[#151517] border-t border-white/10 rounded-t-3xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] space-y-1.5 animate-in slide-in-from-bottom-4 duration-200"
+          >
+            <div className="flex items-center justify-between px-2 pb-2">
+              <h2 className="text-sm font-bold text-white">Más opciones</h2>
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen(false)}
+                aria-label="Cerrar menú"
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {mobileOverflowTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  handleTabClick(tab.id);
+                  setIsMoreOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-rose-600/15 text-rose-300 border border-rose-500/30'
+                    : 'text-slate-200 hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" aria-hidden="true" />
+                {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            <div className="pt-1 mt-1 border-t border-white/5 space-y-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  openAssistant();
+                  setIsMoreOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                <Bot className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                Asistente IA
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  openRoulette();
+                  setIsMoreOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                <Dices className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                ¿Qué veo hoy?
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMoreOpen(false);
+                  if (currentUser) logout();
+                  else exitToPublic(true);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/25 transition-colors"
+              >
+                <LogOut className="w-4 h-4" aria-hidden="true" />
+                {currentUser ? 'Cerrar sesión' : 'Salir a la portada'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
