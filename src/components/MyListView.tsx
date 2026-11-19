@@ -34,6 +34,9 @@ import { WatchStatus, MediaType, UserReview } from '../types';
 import { RatingStars } from './RatingStars';
 import { MediaCard } from './MediaCard';
 import { UserStatsPanel } from './UserStatsPanel';
+import { EmptyState } from './ui/EmptyState';
+import { FilterPills } from './ui/FilterPills';
+import { MEDIA_TYPE_FILTERS, getMediaTypeLabel } from '../lib/mediaLabels';
 
 export const MyListView: React.FC = () => {
   const { 
@@ -440,21 +443,14 @@ export const MyListView: React.FC = () => {
         {/* Secondary Filters: Type, Search & Sort */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Type filters */}
-          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full -mx-0.5">
-            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTypeFilter(t)}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold capitalize whitespace-nowrap transition-all ${
-                  typeFilter === t
-                    ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-900/30'
-                    : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {t === 'todos' ? 'Todos' : t}
-              </button>
-            ))}
-          </div>
+          <FilterPills
+            options={MEDIA_TYPE_FILTERS}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            label="Filtrar por tipo de título"
+            size="xs"
+            className="pb-1 sm:pb-0"
+          />
 
           {/* Search and Sort within list */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto flex-wrap sm:flex-nowrap justify-end w-full sm:w-auto">
@@ -486,31 +482,27 @@ export const MyListView: React.FC = () => {
 
       {/* Empty State */}
       {sortedEntries.length === 0 && (
-        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-[#161618]/50 space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-600/10 text-rose-500 flex items-center justify-center border border-rose-500/20">
-            <Film className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">No se encontraron títulos en esta sección</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-              Explora el catálogo o añade tus propias películas y series para empezar a calificar y reseñar.
-            </p>
-          </div>
-          <div className="flex justify-center gap-3 pt-2">
-            <button
-              onClick={() => setActiveTab('explorar')}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs transition-colors"
-            >
-              Explorar Catálogo
-            </button>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors"
-            >
-              + Añadir Mi Título
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          icon={Film}
+          title="No se encontraron títulos en esta sección"
+          description="Explora el catálogo o añade tus propias películas y series para empezar a calificar y reseñar."
+          action={
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <button
+                onClick={() => setActiveTab('explorar')}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs transition-colors"
+              >
+                Explorar Catálogo
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-900/30 transition-colors"
+              >
+                + Añadir Mi Título
+              </button>
+            </div>
+          }
+        />
       )}
 
       {/* VIEW 1: GRID MODE */}
@@ -554,6 +546,8 @@ export const MyListView: React.FC = () => {
                       <img
                         src={media.posterUrl}
                         alt={media.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-9 h-12 rounded object-cover flex-shrink-0 bg-black/40 border border-white/10"
                         referrerPolicy="no-referrer"
                       />
@@ -561,7 +555,7 @@ export const MyListView: React.FC = () => {
                         <span className="font-bold text-white group-hover:text-rose-400 transition-colors block">
                           {media.title}
                         </span>
-                        <span className="text-[10px] text-slate-400 uppercase">{media.type}</span>
+                        <span className="text-[10px] text-slate-400 uppercase">{getMediaTypeLabel(media.type)}</span>
                       </div>
                     </div>
                   </td>
@@ -675,13 +669,15 @@ export const MyListView: React.FC = () => {
                 <img
                   src={media.posterUrl}
                   alt={media.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-20 h-28 object-cover rounded-xl shadow-lg border border-white/10 flex-shrink-0"
                   referrerPolicy="no-referrer"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-white/10 text-slate-300">
-                      {media.type}
+                      {getMediaTypeLabel(media.type)}
                     </span>
                     {review.status === 'terminada' ? (
                       <span className="text-xs font-bold text-emerald-400">⭐ Terminada</span>

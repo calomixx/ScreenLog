@@ -21,6 +21,8 @@ import { useMedia } from '../context/MediaContext';
 import { mediaFormSchema, extractYouTubeId } from '../lib/validation';
 import { MediaType } from '../types';
 import { apiRequest } from '../lib/api';
+import { getMediaTypeLabel } from '../lib/mediaLabels';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 const ANIME_FORMATS = [
   { value: 'TV', label: 'TV (Serie de TV)' },
@@ -128,6 +130,8 @@ export const AddMediaModal: React.FC = () => {
     resetForm();
     setIsAddModalOpen(false);
   };
+
+  const dialogRef = useModalA11y<HTMLDivElement>(handleClose, { enabled: isAddModalOpen });
 
   useEffect(() => {
     if (!isAddModalOpen) {
@@ -459,7 +463,12 @@ export const AddMediaModal: React.FC = () => {
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div 
         id="add-media-modal-container"
-        className="relative w-full max-w-3xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-media-modal-title"
+        tabIndex={-1}
+        className="relative w-full max-w-3xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh] outline-none"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/10 bg-[#0A0A0B] flex items-center justify-between">
@@ -468,7 +477,7 @@ export const AddMediaModal: React.FC = () => {
               <Film className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-display font-bold text-white">
+              <h2 id="add-media-modal-title" className="text-lg sm:text-xl font-display font-bold text-white">
                 Añadir Título al Catálogo
               </h2>
               <p className="text-xs text-slate-400">
@@ -591,7 +600,7 @@ export const AddMediaModal: React.FC = () => {
                         )}
                         <span className="font-semibold group-hover:text-emerald-200">{item.title}</span>
                         <span className="text-[10px] text-slate-400 group-hover:text-emerald-300 font-mono">
-                          ({item.year || 'S/F'} • {item.type})
+                          ({item.year || 'S/F'} • {getMediaTypeLabel(item.type)})
                         </span>
                       </button>
                     ))}

@@ -25,7 +25,18 @@ import {
   Tv
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
-import { CineMatchItem, CineMatchResponse } from '../types';
+import { CineMatchItem, CineMatchResponse, MediaType } from '../types';
+import { MEDIA_TYPE_FILTERS, getMediaTypeLabel } from '../lib/mediaLabels';
+import { FilterPills } from './ui/FilterPills';
+import { FALLBACK_BACKDROP, handleImageError } from '../lib/imageFallback';
+
+const CINEMATCH_TYPE_OPTIONS: ReadonlyArray<{ value: 'all' | MediaType; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  ...MEDIA_TYPE_FILTERS.filter((option) => option.value !== 'todos').map((option) => ({
+    value: option.value as MediaType,
+    label: option.label,
+  })),
+];
 
 interface PresetCard {
   id: string;
@@ -563,21 +574,14 @@ export const CineMatchView: React.FC = () => {
           </div>
 
           {/* Type filter */}
-          <div className="flex items-center gap-1 bg-[#18181E] p-1 rounded-xl border border-white/5 text-xs">
-            {(['all', 'pelicula', 'serie', 'anime', 'novela', 'documental'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setMediaTypeFilter(t)}
-                className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                  mediaTypeFilter === t
-                    ? 'bg-rose-600 text-white font-bold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {t === 'all' ? 'Todos' : t === 'pelicula' ? 'Películas' : t === 'serie' ? 'Series' : t === 'anime' ? 'Anime' : t === 'novela' ? 'Novelas' : 'Documentales'}
-              </button>
-            ))}
-          </div>
+          <FilterPills
+            options={CINEMATCH_TYPE_OPTIONS}
+            value={mediaTypeFilter}
+            onChange={setMediaTypeFilter}
+            label="Filtrar recomendaciones por tipo"
+            size="sm"
+            className="bg-[#18181E] border-white/5"
+          />
 
           {/* Platform filter */}
           <div className="flex items-center gap-2">
@@ -725,6 +729,8 @@ export const CineMatchView: React.FC = () => {
                             alt={item.title}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             loading="lazy"
+                            decoding="async"
+                            onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#121118] via-transparent to-black/40" />
 
@@ -766,7 +772,7 @@ export const CineMatchView: React.FC = () => {
                               </div>
 
                               <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-bold uppercase text-slate-300 flex-shrink-0">
-                                {item.type}
+                                {getMediaTypeLabel(item.type)}
                               </span>
                             </div>
 
