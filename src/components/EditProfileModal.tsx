@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useMedia } from '../context/MediaContext';
 import { CustomUserField, UserProfile } from '../types';
-import { useModalA11y } from '../hooks/useModalA11y';
 
 const AVATAR_PRESETS = [
   { id: '1', name: 'Director', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80' },
@@ -100,11 +99,6 @@ export const EditProfileModal: React.FC = () => {
       setCustomPhotoUploadStatus(null);
     }
   }, [currentUser, isEditProfileModalOpen]);
-
-  const dialogRef = useModalA11y<HTMLDivElement>(
-    () => setIsEditProfileModalOpen(false),
-    { enabled: isEditProfileModalOpen && Boolean(currentUser) },
-  );
 
   if (!isEditProfileModalOpen || !currentUser) return null;
 
@@ -208,12 +202,7 @@ export const EditProfileModal: React.FC = () => {
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div 
         id="edit-profile-modal-container"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Editar perfil"
-        tabIndex={-1}
-        className="relative w-full max-w-2xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh] outline-none"
+        className="relative w-full max-w-2xl bg-[#161618] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
       >
         {/* Modal Header */}
         <div className="relative px-6 py-5 border-b border-white/10 bg-[#0A0A0B] flex items-center justify-between">

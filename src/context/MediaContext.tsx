@@ -104,7 +104,6 @@ interface MediaContextType {
 
   toastMessage: { text: string; type?: 'success' | 'info' | 'warning' } | null;
   showToast: (text: string, type?: 'success' | 'info' | 'warning') => void;
-  dismissToast: () => void;
 
   addCustomMedia: (item: Partial<MediaItem> & { title: string; type: MediaItem['type'] }) => string;
   updateUserReview: (review: UserReview) => void;
@@ -285,8 +284,6 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setToastMessage((prev) => (prev?.text === text ? null : prev));
     }, 3800);
   }, []);
-
-  const dismissToast = useCallback(() => setToastMessage(null), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1377,7 +1374,6 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsEditProfileModalOpen,
     toastMessage,
     showToast,
-    dismissToast,
     addCustomMedia,
     updateUserReview,
     updateMediaStatus,

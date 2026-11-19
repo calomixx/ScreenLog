@@ -121,31 +121,4 @@ Se añadió `novela` como tipo de medio de forma consistente:
 
 Verificación: `npm run lint` pasa con 0 errores, el build de cliente compila y una prueba real de API creó una ficha con `type: "novela"` correctamente.
 
-## 6. Mejoras de frontend aplicadas (rama `pruebaaa`)
-
-Implementación del plan de UX/accesibilidad/rendimiento acordado:
-
-**Fundamentos**
-- `src/lib/mediaLabels.ts`: etiquetas singulares/plurales y filtros de tipo en un único sitio.
-- Tokens de diseño en `index.css` (`@theme` de Tailwind 4): `ink`, `surface`, `surface-raised`, `surface-deep`, `brand`, `brand-soft`.
-- Primitivas reutilizables: `ui/EmptyState`, `ui/Toast`, `ui/FilterPills`, `ui/Skeleton`, `ui/DeferredMount`, `ui/ErrorBoundary`.
-
-**Accesibilidad**
-- Foco visible global (`:focus-visible`) y soporte de `prefers-reduced-motion`.
-- `hooks/useModalA11y.ts`: bloqueo de scroll con contador (modales anidados), focus trap, cierre con Escape y restauración del foco.
-- Aplicado a `DetailModal`, `AddMediaModal`, `EditMediaModal`, `EditProfileModal`, `TrailerModal` y `CineRouletteModal` (`role="dialog"`, `aria-modal`, `aria-labelledby`).
-- `MediaCard` ahora es navegable por teclado (`role="button"`, `tabIndex`, Enter/Espacio) y muestra sus acciones al recibir foco.
-- Toasts con `aria-live="polite"` y cierre manual; enlace "Saltar al contenido"; `aria-current="page"` en navegación.
-
-**Responsive**
-- Barra móvil limitada a 5 accesos principales + hoja "Más" con el resto (incluye asistente, ruleta y salir), con Escape y safe-area.
-- `DetailModal` se comporta como bottom-sheet en móvil y como diálogo centrado desde `sm`.
-
-**Rendimiento y robustez**
-- Imágenes con `loading="lazy"`, `decoding="async"`, prioridad alta solo en el hero y placeholder SVG ante error (`lib/imageFallback.ts`).
-- `UserStatsPanel` (Recharts) se monta en diferido al acercarse al viewport.
-- `ErrorBoundary` por vista para no dejar la app en blanco ante un fallo, conservando navbar y footer.
-
-Verificación: `tsc --noEmit` sin errores y `vite build` correcto.
-
 > Nota: `server.js` de la raíz es un artefacto de build antiguo y no se editó a mano; se regenera con `npm run build`.

@@ -23,7 +23,6 @@ import {
 import { MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
-import { FALLBACK_BACKDROP, FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
 
 export type HeroApartado = 'todos' | 'pelicula' | 'serie' | 'anime' | 'novela' | 'top_rated' | 'tendencias';
 
@@ -215,9 +214,6 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           <img
             src={activeMedia.backdropUrl || activeMedia.posterUrl}
             alt=""
-            loading="lazy"
-            decoding="async"
-            onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
             className="w-full h-full object-cover scale-125 blur-[90px] sm:blur-[140px] lg:blur-[180px] saturate-200 brightness-125 opacity-80"
             referrerPolicy="no-referrer"
           />
@@ -244,9 +240,6 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           <img
             src={activeMedia.backdropUrl || activeMedia.posterUrl}
             alt={activeMedia.title}
-            fetchPriority="high"
-            decoding="async"
-            onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
             className="w-full h-full object-cover object-center filter brightness-90 saturate-140 contrast-105 animate-ken-burns"
             referrerPolicy="no-referrer"
           />
@@ -488,8 +481,6 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
                       className="w-16 h-24 sm:w-20 sm:h-28 object-cover transition-transform duration-500 group-hover:scale-105"
                       referrerPolicy="no-referrer"
                       loading="lazy"
-                      decoding="async"
-                      onError={(event) => handleImageError(event, FALLBACK_POSTER)}
                     />
 
                     {/* Section / Format Badge */}

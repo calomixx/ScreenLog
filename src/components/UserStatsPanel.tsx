@@ -27,7 +27,6 @@ import { useMedia } from '../context/MediaContext';
 import { CinephileBadgesSection } from './CinephileBadgesSection';
 import { computeCinephileStats } from '../lib/cinephileRanks';
 import { downloadCinephilePassport } from '../lib/exportPassportPNG';
-import { getMediaTypeLabel } from '../lib/mediaLabels';
 
 interface GenreStatItem {
   genre: string;
@@ -676,7 +675,7 @@ export const UserStatsPanel: React.FC<UserStatsPanelProps> = ({ standalone = fal
                           {item.title}
                         </h4>
                         <p className="text-[11px] text-slate-400">
-                          {item.year} • <span className="capitalize">{getMediaTypeLabel(item.type)}</span>
+                          {item.year} • <span className="capitalize">{item.type}</span>
                         </p>
                         <div className="flex items-center gap-1 mt-1 text-amber-400 text-xs font-bold">
                           <Star className="w-3 h-3 fill-amber-400" />

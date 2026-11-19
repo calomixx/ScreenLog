@@ -16,10 +16,6 @@ import { HeroSlider } from './HeroSlider';
 import { MediaCard } from './MediaCard';
 import { computeCinephileStats } from '../lib/cinephileRanks';
 import { CinephileBadgesSection } from './CinephileBadgesSection';
-import { MEDIA_TYPE_FILTERS } from '../lib/mediaLabels';
-import { FilterPills } from './ui/FilterPills';
-import { DeferredMount } from './ui/DeferredMount';
-import { Skeleton } from './ui/Skeleton';
 const UserStatsPanel = lazy(() => import('./UserStatsPanel').then((m) => ({ default: m.UserStatsPanel })));
 import { MediaType } from '../types';
 
@@ -148,13 +144,9 @@ export const SystemDashboardView: React.FC = () => {
       {/* USER GENRE STATISTICS PANEL (RECHARTS) */}
       <CinephileBadgesSection />
 
-      <DeferredMount
-        fallback={<Skeleton className="h-64 w-full" label="Cargando estadísticas" />}
-      >
-        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <UserStatsPanel />
-        </Suspense>
-      </DeferredMount>
+      <Suspense fallback={<div className="h-56 rounded-3xl bg-[#161618] border border-white/10 animate-pulse" />}>
+        <UserStatsPanel />
+      </Suspense>
 
       {/* SECTION 1: MÁS CLASIFICADAS (Top Rated) */}
       <section id="section-top-clasificadas" className="space-y-4">
@@ -174,13 +166,21 @@ export const SystemDashboardView: React.FC = () => {
           </div>
 
           {/* Type filters */}
-          <FilterPills
-            options={MEDIA_TYPE_FILTERS}
-            value={topTypeFilter}
-            onChange={setTopTypeFilter}
-            label="Filtrar más clasificadas por tipo"
-            size="sm"
-          />
+          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTopTypeFilter(t)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
+                  topTypeFilter === t
+                    ? 'bg-rose-600 text-white shadow-md font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {t === 'todos' ? 'Todos' : t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Media Grid with 3D Parallax Perspective */}
@@ -209,14 +209,21 @@ export const SystemDashboardView: React.FC = () => {
           </div>
 
           {/* Type filters */}
-          <FilterPills
-            options={MEDIA_TYPE_FILTERS}
-            value={addedTypeFilter}
-            onChange={setAddedTypeFilter}
-            label="Filtrar más añadidas por tipo"
-            size="sm"
-            activeClass="bg-amber-500 text-slate-950 shadow-md font-bold"
-          />
+          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setAddedTypeFilter(t)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
+                  addedTypeFilter === t
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {t === 'todos' ? 'Todos' : t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Media Grid */}

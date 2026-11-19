@@ -19,7 +19,6 @@ import {
 import confetti from 'canvas-confetti';
 import { useMedia } from '../context/MediaContext';
 import { MediaItem } from '../types';
-import { useModalA11y } from '../hooks/useModalA11y';
 
 type TimeFilter = 'todos' | 'flash' | 'estandar' | 'epica' | 'series';
 type SourceFilter = 'catalogo' | 'pendientes' | 'top';
@@ -117,12 +116,6 @@ export const CineRouletteModal: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const spinIntervalRef = useRef<number | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useModalA11y<HTMLDivElement>(
-    () => {
-      if (!isSpinning) closeRoulette();
-    },
-    { enabled: isRouletteOpen },
-  );
 
   // Collect pending items in user's list
   const pendingItems = useMemo(() => {
@@ -279,7 +272,6 @@ export const CineRouletteModal: React.FC = () => {
 
   return (
     <div
-      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="roulette-modal-title"

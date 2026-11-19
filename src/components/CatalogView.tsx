@@ -18,9 +18,6 @@ import { useMedia } from '../context/MediaContext';
 import { MediaType } from '../types';
 import { MediaCard } from './MediaCard';
 import { RecentSearches } from './RecentSearches';
-import { EmptyState } from './ui/EmptyState';
-import { FilterPills } from './ui/FilterPills';
-import { MEDIA_TYPE_FILTERS } from '../lib/mediaLabels';
 
 const ALL_GENRES = [
   'Todos',
@@ -196,7 +193,7 @@ export const CatalogView: React.FC = () => {
       </div>
 
       {/* Filter and Search Hub */}
-      <div className="p-4 sm:p-6 rounded-3xl bg-surface border border-white/10 shadow-2xl space-y-5">
+      <div className="p-4 sm:p-6 rounded-3xl bg-[#161618] border border-white/10 shadow-2xl space-y-5">
         
         {/* Search Bar and Type Selector */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -207,7 +204,7 @@ export const CatalogView: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar por título, director, actor..."
-              className="w-full bg-ink border border-white/10 text-sm text-white placeholder-slate-400 pl-10 pr-10 py-2.5 rounded-xl focus:border-rose-500 focus:outline-none transition-colors"
+              className="w-full bg-[#0A0A0B] border border-white/10 text-sm text-white placeholder-slate-400 pl-10 pr-10 py-2.5 rounded-xl focus:border-rose-500 focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button
@@ -220,14 +217,21 @@ export const CatalogView: React.FC = () => {
           </div>
 
           {/* Type Pills */}
-          <FilterPills
-            options={MEDIA_TYPE_FILTERS}
-            value={selectedType}
-            onChange={setSelectedType}
-            label="Filtrar por tipo de título"
-            size="md"
-            className="bg-[#0A0A0B]"
-          />
+          <div className="flex items-center gap-1 bg-[#0A0A0B] p-1 rounded-xl border border-white/10 overflow-x-auto">
+            {(['todos', 'pelicula', 'serie', 'anime', 'documental', 'novela'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setSelectedType(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-all ${
+                  selectedType === t
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {t === 'todos' ? 'Todos' : t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Últimas 5 búsquedas recientes */}
@@ -488,19 +492,23 @@ export const CatalogView: React.FC = () => {
           ))}
         </div>
       ) : (
-        <EmptyState
-          icon={Film}
-          title="No se encontraron títulos con estos filtros"
-          description="Prueba cambiando los criterios de búsqueda o añade la película que buscas al catálogo."
-          action={
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition-colors"
-            >
-              + Añadir Este Título Ahora
-            </button>
-          }
-        />
+        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-[#161618]/50 space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-600/10 text-rose-500 flex items-center justify-center border border-rose-500/20">
+            <Film className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">No se encontraron títulos con estos filtros</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+              Prueba cambiando los criterios de búsqueda o añade la película que buscas a CineTrack.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition-colors"
+          >
+            + Añadir Esta Película Ahora
+          </button>
+        </div>
       )}
 
     </div>
