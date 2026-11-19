@@ -484,7 +484,7 @@ export const CineMatchView: React.FC = () => {
                 ¿Qué tipo de emoción buscas sentir hoy?
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Elige una vibra emocional y ScreenLog seleccionará historias con el tono, ritmo y clímax idóneos.
+                Elige una vibra emocional y TakeVault seleccionará historias con el tono, ritmo y clímax idóneos.
               </p>
             </div>
 
@@ -529,7 +529,7 @@ export const CineMatchView: React.FC = () => {
 
             <div className="pt-2">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Tus títulos mejor valorados en ScreenLog:
+                Tus títulos mejor valorados en TakeVault:
               </div>
               <div className="flex flex-wrap gap-2">
                 {myListEntries.filter((e) => (userReviews[e.id]?.stars || 0) >= 4).length > 0 ? (

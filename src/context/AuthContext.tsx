@@ -100,8 +100,8 @@ interface StatusResponse {
 }
 
 const defaultSettings: PublicSettings = {
-  portalName: 'ScreenLog Pro',
-  tagline: 'Explora, clasifica y comparte tu pasión por el cine',
+  portalName: 'TakeVault Pro',
+  tagline: 'Archive your takes • Cinema Vault',
   allowPublicRegistration: true,
   logoUrl: '/favicon.svg',
   communityCommentsEnabled: true,

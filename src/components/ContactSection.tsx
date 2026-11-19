@@ -27,12 +27,12 @@ import { useMedia } from '../context/MediaContext';
 import { isRealEmail } from '../lib/validation';
 
 const SITE_SOCIALS = [
-  { id: 'email', label: 'Email', href: 'mailto:contacto@screenlog.app', icon: Mail, visible: true },
+  { id: 'email', label: 'Email', href: 'mailto:contacto@takevault.app', icon: Mail, visible: true },
   { id: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/34XXXXXXXXX', icon: MessageCircle, visible: true },
-  { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/screenlog', icon: Instagram, visible: true },
-  { id: 'twitter', label: 'X / Twitter', href: 'https://x.com/screenlog', icon: Twitter, visible: true },
-  { id: 'youtube', label: 'YouTube', href: 'https://youtube.com/@screenlog', icon: Youtube, visible: true },
-  { id: 'github', label: 'GitHub', href: 'https://github.com/screenlog', icon: Github, visible: true },
+  { id: 'instagram', label: 'Instagram', href: 'https://instagram.com/takevault', icon: Instagram, visible: true },
+  { id: 'twitter', label: 'X / Twitter', href: 'https://x.com/takevault', icon: Twitter, visible: true },
+  { id: 'youtube', label: 'YouTube', href: 'https://youtube.com/@takevault', icon: Youtube, visible: true },
+  { id: 'github', label: 'GitHub', href: 'https://github.com/takevault', icon: Github, visible: true },
 ];
 
 export const ContactSection: React.FC = () => {
@@ -142,7 +142,7 @@ export const ContactSection: React.FC = () => {
             Atención al Cinéfilo & Soporte
           </div>
           <h2 className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-            Contáctanos en ScreenLog
+            Contáctanos en TakeVault
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 max-w-2xl font-light">
             ¿Tienes sugerencias de títulos para añadir, encontraste algún detalle técnico o quieres proponernos una idea? Escríbenos directamente y te responderemos en breve.
@@ -261,7 +261,7 @@ export const ContactSection: React.FC = () => {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={4}
-                    placeholder="Describe tu sugerencia, título que te gustaría ver en ScreenLog o detalle de tu consulta..."
+                    placeholder="Describe tu sugerencia, título que te gustaría ver en TakeVault o detalle de tu consulta..."
                     required
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl p-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none resize-none transition-colors"
                   />
@@ -281,7 +281,7 @@ export const ContactSection: React.FC = () => {
                   className="w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-xl shadow-rose-900/40 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
-                  {isSending ? 'Enviando Mensaje...' : 'Enviar Mensaje a ScreenLog'}
+                  {isSending ? 'Enviando Mensaje...' : 'Enviar Mensaje a TakeVault'}
                 </button>
               </form>
             )}
@@ -298,7 +298,7 @@ export const ContactSection: React.FC = () => {
               <Globe className="w-4 h-4 text-rose-400" />
               Síguenos y contáctanos
             </h4>
-            <p className="text-xs text-slate-400">Canales oficiales de ScreenLog Pro</p>
+            <p className="text-xs text-slate-400">Canales oficiales de TakeVault Pro</p>
             <div className="flex flex-wrap gap-3 pt-2">
               {SITE_SOCIALS.filter(s => s.visible).map((social) => (
                 <a
@@ -329,13 +329,13 @@ export const ContactSection: React.FC = () => {
             </div>
             <p className="text-xs text-slate-300 leading-relaxed font-light">Cada mensaje se registra en el servidor con un número de ticket para que el equipo pueda revisarlo y responderte.</p>
             <a
-              href="mailto:contacto@screenlog.app"
+              href="mailto:contacto@takevault.app"
               className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Mail className="w-3.5 h-3.5" />
-              Escribir a contacto@screenlog.app
+              Escribir a contacto@takevault.app
             </a>
           </div>
 

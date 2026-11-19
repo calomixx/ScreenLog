@@ -1,4 +1,4 @@
-# ScreenLog Pro
+# TakeVault Pro
 
 Aplicación cinematográfica para catalogar películas y series, registrar visionados, escribir reseñas y descubrir la actividad de la comunidad.
 

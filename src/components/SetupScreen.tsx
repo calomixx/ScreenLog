@@ -63,7 +63,7 @@ export const SetupScreen: React.FC = () => {
               </div>
             </div>
             <p className="text-sm text-slate-400 mt-4 leading-relaxed">
-              ScreenLog Pro todavía no tiene propietario. Esta pantalla solo aparece una vez: la primera cuenta creada
+              TakeVault Pro todavía no tiene propietario. Esta pantalla solo aparece una vez: la primera cuenta creada
               será el Owner y tendrá control total del portal.
             </p>
           </div>
@@ -106,7 +106,7 @@ export const SetupScreen: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="owner@screenlog.app"
+                  placeholder="owner@takevault.app"
                   className={inputClass}
                   autoComplete="email"
                   required

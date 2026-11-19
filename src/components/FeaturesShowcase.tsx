@@ -198,7 +198,7 @@ export const FeaturesShowcase: React.FC = () => {
             Nuestra Propuesta de Valor
           </div>
           <h2 className="text-2xl sm:text-4xl font-display font-black text-white tracking-tight leading-tight">
-            ¿Qué Ofrecemos en ScreenLog?
+            ¿Qué Ofrecemos en TakeVault?
           </h2>
           <p className="text-sm sm:text-base text-slate-400 font-light">
             Todo lo que un verdadero apasionado del cine y las series necesita para catalogar, calificar y debatir sus obras favoritas en un solo lugar.
@@ -220,7 +220,7 @@ export const FeaturesShowcase: React.FC = () => {
             className="overflow-hidden"
             role="region"
             aria-roledescription="carrusel"
-            aria-label="Características de ScreenLog Pro"
+            aria-label="Características de TakeVault Pro"
           >
             <motion.div
               className="flex gap-6"

@@ -225,7 +225,7 @@ export const Navbar: React.FC = () => {
               type="button"
               onClick={handleGoHome}
               className="flex items-center shrink-0 focus:outline-none"
-              title="ScreenLog Pro - Ir al inicio"
+              title="TakeVault Pro - Ir al inicio"
             >
               <LogoLockup size={36} showTagline={false} />
             </button>

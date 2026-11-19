@@ -10,21 +10,20 @@ interface LogoMarkProps {
 }
 
 /**
- * ScreenLog Pro Identity Mark: "Prisma Cinemático & S"
- * Un monograma 'S' continuo en perspectiva anamórfica que evoca
- * tres facetas de luz proyectada y un núcleo óptico de Play en el centro.
+ * TakeVault Pro Identity Mark: "Cinematic Vault & Optic T-V"
+ * Anamorphic prism facets with central optical Play core.
  */
 export const LogoMark: React.FC<LogoMarkProps> = ({
   size = 40,
   variant = 'gradient',
   className = '',
-  title = 'ScreenLog Pro',
+  title = 'TakeVault Pro',
 }) => {
   const rawId = useId().replace(/[:]/g, '');
-  const bgId = `sl-bg-${rawId}`;
-  const g1Id = `sl-g1-${rawId}`;
-  const g2Id = `sl-g2-${rawId}`;
-  const g3Id = `sl-g3-${rawId}`;
+  const bgId = `tv-bg-${rawId}`;
+  const g1Id = `tv-g1-${rawId}`;
+  const g2Id = `tv-g2-${rawId}`;
+  const g3Id = `tv-g3-${rawId}`;
   const isMono = variant === 'mono';
   const isLight = variant === 'light';
 
@@ -117,12 +116,12 @@ export const LogoLockup: React.FC<LogoLockupProps> = ({
   badge = true,
 }) => {
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className}`} aria-label="ScreenLog Pro">
+    <span className={`inline-flex items-center gap-2.5 ${className}`} aria-label="TakeVault Pro">
       <LogoMark size={size} variant={mono ? 'mono' : 'gradient'} className="shrink-0" />
       <span className="min-w-0">
         <span className={`flex items-center gap-1.5 font-display font-black tracking-tight whitespace-nowrap ${textClassName || 'text-lg'}`}>
           <span className={mono ? 'text-white' : 'text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-rose-300 to-amber-400'}>
-            SCREENLOG
+            TAKEVAULT
           </span>
           {badge && (
             <span className="text-[9px] uppercase font-extrabold tracking-widest px-1.5 py-0.5 rounded-md bg-rose-600/25 text-rose-300 border border-rose-500/30">
@@ -132,7 +131,7 @@ export const LogoLockup: React.FC<LogoLockupProps> = ({
         </span>
         {showTagline && (
           <span className="block text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
-            Explora • Clasifica • Tu Lista
+            Archive Your Takes • Cinema Vault
           </span>
         )}
       </span>
