@@ -29,7 +29,9 @@ import {
   ExternalLink,
   Quote,
   Tag,
-  Smile
+  Smile,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
 import { useMedia } from '../context/MediaContext';
@@ -39,6 +41,7 @@ import { getMediaTypeLabel } from '../lib/mediaLabels';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { FALLBACK_BACKDROP, FALLBACK_POSTER, handleImageError } from '../lib/imageFallback';
 import { extractYouTubeId } from '../lib/validation';
+import { apiRequest } from '../lib/api';
 
 const PLATFORM_OPTIONS = [
   'Netflix',
@@ -152,6 +155,11 @@ export const DetailModal: React.FC = () => {
   } = useMedia();
 
   const [activeTab, setActiveTab] = useState<'info' | 'trailer' | 'resena' | 'votaciones' | 'comentarios' | 'donde_ver'>('info');
+  // Tráiler resuelto bajo demanda cuando la ficha no trae trailerYoutubeId.
+  const [resolvedTrailerId, setResolvedTrailerId] = useState('');
+  const [isResolvingTrailer, setIsResolvingTrailer] = useState(false);
+  const [trailerLookupFailed, setTrailerLookupFailed] = useState(false);
+  const trailerRequestRef = useRef(0);
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -224,17 +232,6 @@ export const DetailModal: React.FC = () => {
     emotionalImpact: 9
   });
   const [hasVotedDetailed, setHasVotedDetailed] = useState(false);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedMediaId(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setSelectedMediaId]);
 
   // Personal Review Form State
   const currentReview = selectedMedia ? userReviews[selectedMedia.id] : undefined;
@@ -340,11 +337,44 @@ export const DetailModal: React.FC = () => {
       }
       setActiveTab('info');
       setHasVotedDetailed(false);
+      setResolvedTrailerId('');
+      setIsResolvingTrailer(false);
+      setTrailerLookupFailed(false);
+      trailerRequestRef.current += 1;
       if (contentContainerRef.current) {
         contentContainerRef.current.scrollTop = 0;
       }
     }
   }, [selectedMedia?.id]);
+
+  // Si el título no tiene tráiler guardado, intentamos resolverlo con TMDB
+  // para poder reproducirlo aquí mismo en lugar de mandar al usuario a YouTube.
+  useEffect(() => {
+    if (activeTab !== 'trailer' || !selectedMedia) return;
+    if (selectedMedia.trailerYoutubeId || resolvedTrailerId || isResolvingTrailer || trailerLookupFailed) return;
+
+    const requestId = trailerRequestRef.current + 1;
+    trailerRequestRef.current = requestId;
+    setIsResolvingTrailer(true);
+    setTrailerLookupFailed(false);
+
+    const params = new URLSearchParams({ title: selectedMedia.title });
+    if (selectedMedia.type) params.set('type', selectedMedia.type);
+    if (selectedMedia.year) params.set('year', String(selectedMedia.year));
+
+    apiRequest<{ trailerYoutubeId?: string }>(`/api/media/trailer?${params.toString()}`)
+      .then((data) => {
+        if (trailerRequestRef.current !== requestId) return;
+        if (data?.trailerYoutubeId) setResolvedTrailerId(data.trailerYoutubeId);
+        else setTrailerLookupFailed(true);
+      })
+      .catch(() => {
+        if (trailerRequestRef.current === requestId) setTrailerLookupFailed(true);
+      })
+      .finally(() => {
+        if (trailerRequestRef.current === requestId) setIsResolvingTrailer(false);
+      });
+  }, [activeTab, selectedMedia, resolvedTrailerId, isResolvingTrailer, trailerLookupFailed]);
 
   const dialogRef = useModalA11y<HTMLDivElement>(() => setSelectedMediaId(null));
 
@@ -744,7 +774,7 @@ export const DetailModal: React.FC = () => {
                     <p className="text-xs text-slate-400">
                       {selectedMedia.trailerYoutubeId 
                         ? 'Reproduce el adelanto en alta definición integrado en la ficha'
-                        : 'Buscar y reproducir el tráiler en YouTube'}
+                        : 'Buscamos el tráiler oficial y lo reproducimos aquí mismo, sin salir de la app'}
                     </p>
                   </div>
                 </div>
@@ -830,7 +860,7 @@ export const DetailModal: React.FC = () => {
           {activeTab === 'trailer' && (
             <div className="space-y-5 animate-in fade-in duration-300">
               {(() => {
-                const ytid = selectedMedia.trailerYoutubeId ? extractYouTubeId(selectedMedia.trailerYoutubeId) : '';
+                const ytid = extractYouTubeId(selectedMedia.trailerYoutubeId || resolvedTrailerId);
                 if (ytid) {
                   return (
                     <div className="space-y-4">
@@ -868,13 +898,28 @@ export const DetailModal: React.FC = () => {
                             href={`https://www.youtube.com/watch?v=${ytid}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-semibold transition-colors flex items-center gap-1.5"
+                            title="Abrir en YouTube (opcional)"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Ver en YouTube</span>
+                            <span>YouTube</span>
                           </a>
                         </div>
                       </div>
+                    </div>
+                  );
+                }
+
+                if (isResolvingTrailer) {
+                  return (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="rounded-3xl border border-white/10 bg-[#0A0A0B]/80 p-10 sm:p-14 text-center space-y-3"
+                    >
+                      <Loader2 className="w-8 h-8 mx-auto text-rose-500 animate-spin" aria-hidden="true" />
+                      <p className="text-sm font-bold text-white">Buscando el tráiler oficial…</p>
+                      <p className="text-xs text-slate-400">Lo cargaremos aquí mismo, sin salir de la ficha.</p>
                     </div>
                   );
                 }
@@ -886,22 +931,35 @@ export const DetailModal: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-base sm:text-lg font-bold text-white">
-                        Sin tráiler oficial enlazado para "{selectedMedia.title}"
+                        No encontramos un tráiler automático para "{selectedMedia.title}"
                       </h4>
                       <p className="text-xs text-slate-400 max-w-md mx-auto">
-                        Este título aún no tiene un identificador de YouTube asignado en el catálogo. Puedes buscarlo directamente en YouTube con un solo clic.
+                        Puedes intentar la búsqueda otra vez o abrir YouTube en una pestaña aparte como último recurso.
                       </p>
                     </div>
 
                     <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTrailerLookupFailed(false);
+                          setResolvedTrailerId('');
+                          setIsResolvingTrailer(false);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-colors flex items-center gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Reintentar búsqueda</span>
+                      </button>
+
                       <a
                         href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedMedia.title + ' ' + selectedMedia.year + ' trailer oficial')}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-colors flex items-center gap-2"
+                        className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        <span>Buscar Tráiler en YouTube</span>
+                        <span>Buscar en YouTube</span>
                       </a>
 
                       {isCatalogAdmin && (
