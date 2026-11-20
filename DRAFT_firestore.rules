@@ -109,7 +109,15 @@ service cloud.firestore {
 
     function isValidCatalogMediaItem(data) {
       return data.keys().hasAll(['authorId', 'title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['authorId', 'title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'authorId', 'title', 'originalTitle', 'type', 'year', 'director', 'cast', 'synopsis',
+          'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'trailerYoutubeId',
+          'streamingPlatforms', 'communityRating', 'communityVotesCount', 'addedToListCount',
+          'isFeatured', 'isTrending', 'isTopClassified', 'seasonsCount', 'episodesCount',
+          'releaseDate', 'country', 'language', 'ageRating', 'status', 'tags',
+          'createdByUserId', 'isCustomUserCreated', 'lastEditedBy', 'lastEditedAt',
+          'createdAt', 'updatedAt'
+        ]) &&
         data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
         data.authorId.matches('^[a-zA-Z0-9_\\-]+$') &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
@@ -124,6 +132,28 @@ service cloud.firestore {
         data.defaultPlatform is string && data.defaultPlatform.size() <= 80 &&
         data.genres is list && data.genres.size() >= 1 && data.genres.size() <= 10 &&
         data.genres[0] is string && data.genres[0].size() <= 40 &&
+        (!('originalTitle' in data) || (data.originalTitle is string && data.originalTitle.size() <= 200)) &&
+        (!('cast' in data) || (data.cast is list && data.cast.size() <= 12 && (data.cast.size() == 0 || data.cast[0] is string))) &&
+        (!('trailerYoutubeId' in data) || (data.trailerYoutubeId is string && data.trailerYoutubeId.size() <= 120)) &&
+        (!('streamingPlatforms' in data) || (data.streamingPlatforms is list && data.streamingPlatforms.size() <= 10 && (data.streamingPlatforms.size() == 0 || data.streamingPlatforms[0] is string))) &&
+        (!('communityRating' in data) || (data.communityRating is number && data.communityRating >= 0 && data.communityRating <= 10)) &&
+        (!('communityVotesCount' in data) || (data.communityVotesCount is int && data.communityVotesCount >= 0 && data.communityVotesCount <= 1000000)) &&
+        (!('addedToListCount' in data) || (data.addedToListCount is int && data.addedToListCount >= 0 && data.addedToListCount <= 1000000)) &&
+        (!('isFeatured' in data) || data.isFeatured is bool) &&
+        (!('isTrending' in data) || data.isTrending is bool) &&
+        (!('isTopClassified' in data) || data.isTopClassified is bool) &&
+        (!('seasonsCount' in data) || (data.seasonsCount is int && data.seasonsCount >= 0 && data.seasonsCount <= 200)) &&
+        (!('episodesCount' in data) || (data.episodesCount is int && data.episodesCount >= 0 && data.episodesCount <= 10000)) &&
+        (!('releaseDate' in data) || (data.releaseDate is string && data.releaseDate.size() <= 30)) &&
+        (!('country' in data) || (data.country is string && data.country.size() <= 80)) &&
+        (!('language' in data) || (data.language is string && data.language.size() <= 80)) &&
+        (!('ageRating' in data) || (data.ageRating is string && data.ageRating.size() <= 40)) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 40)) &&
+        (!('tags' in data) || (data.tags is list && data.tags.size() <= 12 && (data.tags.size() == 0 || data.tags[0] is string))) &&
+        (!('createdByUserId' in data) || (data.createdByUserId is string && data.createdByUserId.size() <= 128)) &&
+        (!('isCustomUserCreated' in data) || data.isCustomUserCreated is bool) &&
+        (!('lastEditedBy' in data) || (data.lastEditedBy is string && data.lastEditedBy.size() <= 128)) &&
+        (!('lastEditedAt' in data) || (data.lastEditedAt is string && data.lastEditedAt.size() <= 40)) &&
         data.createdAt is timestamp &&
         data.updatedAt == request.time;
     }

@@ -354,39 +354,82 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
         .slice(0, BLUEPRINT_LIMITS.MAX_ARRAY_ITEMS)
     : ['Drama'];
 
+  // Campos obligatorios del documento.
+  const payload: Record<string, unknown> = {
+    authorId: uid,
+    title,
+    type,
+    year,
+    director,
+    synopsis,
+    posterUrl,
+    backdropUrl,
+    duration,
+    defaultPlatform,
+    genres,
+  };
+
+  // Metadatos opcionales: completan la ficha en Firestore (tráiler, reparto,
+  // plataformas, notas de la comunidad, temporadas...). Se omiten si están vacíos.
+  const putString = (key: string, value: unknown, maxLen: number) => {
+    const text = clampString(value, maxLen, '');
+    if (text) payload[key] = text;
+  };
+  const putNumber = (key: string, value: unknown, min: number, max: number, integer = false) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return;
+    const clamped = Math.min(max, Math.max(min, num));
+    payload[key] = integer ? Math.round(clamped) : clamped;
+  };
+  const putBoolean = (key: string, value: unknown) => {
+    payload[key] = Boolean(value);
+  };
+  const putList = (key: string, value: unknown, maxItems: number, maxLen: number) => {
+    if (!Array.isArray(value)) return;
+    const list = value
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      .map((entry) => entry.trim().slice(0, maxLen))
+      .slice(0, maxItems);
+    if (list.length > 0) payload[key] = list;
+  };
+
+  putString('originalTitle', item.originalTitle, BLUEPRINT_LIMITS.TITLE_MAX_LEN);
+  putList('cast', item.cast, 12, BLUEPRINT_LIMITS.NAME_MAX_LEN);
+  putString('trailerYoutubeId', item.trailerYoutubeId, 120);
+  putList('streamingPlatforms', item.streamingPlatforms, 10, BLUEPRINT_LIMITS.PLATFORM_MAX_LEN);
+  putNumber('communityRating', item.communityRating ?? 0, 0, 10);
+  putNumber('communityVotesCount', item.communityVotesCount ?? 0, 0, 1_000_000, true);
+  putNumber('addedToListCount', item.addedToListCount ?? 0, 0, 1_000_000, true);
+  putBoolean('isFeatured', item.isFeatured);
+  putBoolean('isTrending', item.isTrending);
+  putBoolean('isTopClassified', item.isTopClassified);
+  putNumber('seasonsCount', item.seasonsCount, 0, 200, true);
+  putNumber('episodesCount', item.episodesCount, 0, 10_000, true);
+  putString('releaseDate', item.releaseDate, 30);
+  putString('country', item.country, 80);
+  putString('language', item.language, 80);
+  putString('ageRating', item.ageRating, 40);
+  putString('status', item.status, 40);
+  putList('tags', item.tags, 12, BLUEPRINT_LIMITS.GENRE_MAX_LEN);
+  putString('createdByUserId', item.createdByUserId, BLUEPRINT_LIMITS.ID_MAX_LEN);
+  putBoolean('isCustomUserCreated', item.isCustomUserCreated);
+  putString('lastEditedBy', item.lastEditedBy, BLUEPRINT_LIMITS.ID_MAX_LEN);
+  putString('lastEditedAt', item.lastEditedAt, 40);
+
   try {
     const mediaRef = doc(db, 'catalog_media', mediaId);
     const snap = await getDoc(mediaRef);
     if (snap.exists()) {
       const existing = snap.data();
       await setDoc(mediaRef, {
+        ...payload,
         authorId: existing.authorId || uid,
-        title,
-        type,
-        year,
-        director,
-        synopsis,
-        posterUrl,
-        backdropUrl,
-        duration,
-        defaultPlatform,
-        genres,
         createdAt: existing.createdAt,
         updatedAt: serverTimestamp(),
       });
     } else {
       await setDoc(mediaRef, {
-        authorId: uid,
-        title,
-        type,
-        year,
-        director,
-        synopsis,
-        posterUrl,
-        backdropUrl,
-        duration,
-        defaultPlatform,
-        genres,
+        ...payload,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -464,6 +507,17 @@ export function subscribeToCatalogMedia(
           isFeatured: Boolean(d.isFeatured),
           isTrending: Boolean(d.isTrending),
           isTopClassified: Boolean(d.isTopClassified),
+          seasonsCount: Number(d.seasonsCount) || undefined,
+          episodesCount: Number(d.episodesCount) || undefined,
+          releaseDate: d.releaseDate || '',
+          country: d.country || '',
+          language: d.language || '',
+          ageRating: d.ageRating || '',
+          status: d.status || undefined,
+          tags: Array.isArray(d.tags) ? d.tags.filter((tag: unknown): tag is string => typeof tag === 'string') : [],
+          createdByUserId: d.createdByUserId || undefined,
+          lastEditedBy: d.lastEditedBy || undefined,
+          lastEditedAt: d.lastEditedAt || undefined,
           createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
           comments: [],
           detailedVotes: {
@@ -475,7 +529,7 @@ export function subscribeToCatalogMedia(
             totalVotes: 0,
             ratingDistribution: {},
           },
-          isCustomUserCreated: true,
+          isCustomUserCreated: typeof d.isCustomUserCreated === 'boolean' ? d.isCustomUserCreated : true,
         } as MediaItem);
       }
     });
