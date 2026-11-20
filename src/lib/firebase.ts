@@ -485,7 +485,7 @@ export function subscribeToCatalogMedia(
     snapshot.forEach((docSnap: any) => {
       const d = docSnap.data();
       if (d && d.title) {
-        items.push({
+        const item: MediaItem = {
           id: docSnap.id,
           title: d.title,
           originalTitle: d.originalTitle || d.title,
@@ -493,31 +493,14 @@ export function subscribeToCatalogMedia(
           year: Number(d.year) || new Date().getFullYear(),
           genres: Array.isArray(d.genres) && d.genres.length > 0 ? d.genres : ['Drama'],
           director: d.director || 'Desconocido',
-          cast: Array.isArray(d.cast) ? d.cast : [],
           synopsis: d.synopsis || '',
           duration: d.duration || '2h 00m',
           posterUrl: d.posterUrl || '',
           backdropUrl: d.backdropUrl || d.posterUrl || '',
-          trailerYoutubeId: d.trailerUrl || d.trailerYoutubeId || '',
           defaultPlatform: d.defaultPlatform || 'Cine / Sala',
-          streamingPlatforms: Array.isArray(d.streamingPlatforms) ? d.streamingPlatforms : [d.defaultPlatform || 'Cine'],
           communityRating: Number(d.communityRating ?? d.rating) || 0,
           communityVotesCount: Number(d.communityVotesCount ?? d.ratingCount) || 0,
           addedToListCount: Number(d.addedToListCount) || 0,
-          isFeatured: Boolean(d.isFeatured),
-          isTrending: Boolean(d.isTrending),
-          isTopClassified: Boolean(d.isTopClassified),
-          seasonsCount: Number(d.seasonsCount) || undefined,
-          episodesCount: Number(d.episodesCount) || undefined,
-          releaseDate: d.releaseDate || '',
-          country: d.country || '',
-          language: d.language || '',
-          ageRating: d.ageRating || '',
-          status: d.status || undefined,
-          tags: Array.isArray(d.tags) ? d.tags.filter((tag: unknown): tag is string => typeof tag === 'string') : [],
-          createdByUserId: d.createdByUserId || undefined,
-          lastEditedBy: d.lastEditedBy || undefined,
-          lastEditedAt: d.lastEditedAt || undefined,
           createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
           comments: [],
           detailedVotes: {
@@ -530,7 +513,47 @@ export function subscribeToCatalogMedia(
             ratingDistribution: {},
           },
           isCustomUserCreated: typeof d.isCustomUserCreated === 'boolean' ? d.isCustomUserCreated : true,
-        } as MediaItem);
+        } as MediaItem;
+
+        // Los campos enriquecidos solo se aplican si el documento los trae:
+        // así una sincronización parcial no borra los datos locales más completos.
+        const cast = Array.isArray(d.cast)
+          ? d.cast.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
+          : [];
+        if (cast.length > 0) item.cast = cast;
+
+        const trailer = d.trailerYoutubeId || d.trailerUrl;
+        if (typeof trailer === 'string' && trailer.trim()) item.trailerYoutubeId = trailer.trim();
+
+        const platforms = Array.isArray(d.streamingPlatforms)
+          ? d.streamingPlatforms.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
+          : [];
+        if (platforms.length > 0) item.streamingPlatforms = platforms;
+
+        if (typeof d.releaseDate === 'string' && d.releaseDate) item.releaseDate = d.releaseDate;
+        if (typeof d.country === 'string' && d.country) item.country = d.country;
+        if (typeof d.language === 'string' && d.language) item.language = d.language;
+        if (typeof d.ageRating === 'string' && d.ageRating) item.ageRating = d.ageRating;
+        if (typeof d.status === 'string' && d.status) item.status = d.status as MediaItem['status'];
+
+        const seasons = Number(d.seasonsCount);
+        if (Number.isFinite(seasons) && seasons > 0) item.seasonsCount = seasons;
+        const episodes = Number(d.episodesCount);
+        if (Number.isFinite(episodes) && episodes > 0) item.episodesCount = episodes;
+
+        const tags = Array.isArray(d.tags)
+          ? d.tags.filter((tag: unknown): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+          : [];
+        if (tags.length > 0) item.tags = tags;
+
+        if (typeof d.isFeatured === 'boolean') item.isFeatured = d.isFeatured;
+        if (typeof d.isTrending === 'boolean') item.isTrending = d.isTrending;
+        if (typeof d.isTopClassified === 'boolean') item.isTopClassified = d.isTopClassified;
+        if (typeof d.createdByUserId === 'string' && d.createdByUserId) item.createdByUserId = d.createdByUserId;
+        if (typeof d.lastEditedBy === 'string' && d.lastEditedBy) item.lastEditedBy = d.lastEditedBy;
+        if (typeof d.lastEditedAt === 'string' && d.lastEditedAt) item.lastEditedAt = d.lastEditedAt;
+
+        items.push(item);
       }
     });
     onMediaList(items);
