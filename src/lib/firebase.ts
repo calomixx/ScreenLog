@@ -14,6 +14,7 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
+  increment,
   type Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -178,22 +179,26 @@ export async function syncFirebaseUserProfile(
       updatedAt: serverTimestamp(),
     });
 
-    const email = clampString(fbUser.email || 'user@screenlog.app', BLUEPRINT_LIMITS.EMAIL_MAX_LEN, 'user@screenlog.app');
+    const email = clampString(fbUser.email || 'user@takevault.app', BLUEPRINT_LIMITS.EMAIL_MAX_LEN, 'user@takevault.app');
     if (existingPrivateSnap && existingPrivateSnap.exists()) {
       const existingData = existingPrivateSnap.data();
       batch.set(privateRef, {
         userId: uid,
         email,
+        role: existingData.role || 'user',
+        blocked: existingData.blocked || false,
         createdAt: existingData.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     } else {
       batch.set(privateRef, {
         userId: uid,
         email,
+        role: 'user',
+        blocked: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     }
 
     await batch.commit();
@@ -204,6 +209,7 @@ export async function syncFirebaseUserProfile(
 
 /**
  * Saves or updates a personal library entry in Firestore for a verified Firebase user.
+ * Persists all UserReview fields including detailed ratings, tags, notes and metadata.
  */
 export async function saveLibraryEntryToFirestore(review: UserReview): Promise<void> {
   const fbUser = auth.currentUser;
@@ -218,44 +224,53 @@ export async function saveLibraryEntryToFirestore(review: UserReview): Promise<v
     ? review.status
     : 'pendiente';
   const personalRating = Math.max(0, Math.min(5, Number(review.stars) || 0));
-  const rewatchMap: Record<string, string> = {
-    si_totalmente: 'si',
-    quizas: 'tal_vez',
-    no_suficiente: 'no',
-    jamas: 'no',
-  };
-  const rewatch = rewatchMap[review.wouldRewatch] || 'sin_definir';
   const liked = personalRating >= 4;
   const personalComment = clampString(review.critique || '', BLUEPRINT_LIMITS.COMMENT_MAX_LEN, '');
+
+  // Build payload with all fields — only include optional fields when present
+  const payload: Record<string, unknown> = {
+    userId: uid,
+    mediaId,
+    status,
+    personalRating,
+    liked,
+    personalComment,
+    updatedAt: serverTimestamp(),
+  };
+
+  // Store wouldRewatch natively (no enum translation needed)
+  if (review.wouldRewatch) payload.wouldRewatch = review.wouldRewatch;
+  if (review.watchedDate) payload.watchedDate = review.watchedDate;
+  if (review.platform) payload.watchPlatform = clampString(review.platform, BLUEPRINT_LIMITS.PLATFORM_MAX_LEN);
+  if (review.favoriteMoment) payload.favoriteMoment = clampString(review.favoriteMoment, 500);
+  if (review.shortVerdict) payload.shortVerdict = clampString(review.shortVerdict, 200);
+  if (review.favoriteCharacter) payload.favoriteCharacter = clampString(review.favoriteCharacter, 120);
+  if (review.quote) payload.quote = clampString(review.quote, 300);
+  if (review.recommendation) payload.recommendation = review.recommendation;
+  if (review.moodRecommendation) payload.moodRecommendation = clampString(review.moodRecommendation, 200);
+  if (review.tags && review.tags.length > 0) payload.tags = review.tags.slice(0, 10);
+
+  // Detailed sub-ratings (clamped 1-10)
+  const clampRating = (v?: number) => v !== undefined ? Math.max(1, Math.min(10, Math.round(v))) : undefined;
+  if (review.scriptRating !== undefined) payload.scriptRating = clampRating(review.scriptRating);
+  if (review.actingRating !== undefined) payload.actingRating = clampRating(review.actingRating);
+  if (review.directionRating !== undefined) payload.directionRating = clampRating(review.directionRating);
+  if (review.soundtrackRating !== undefined) payload.soundtrackRating = clampRating(review.soundtrackRating);
+  if (review.cinematographyRating !== undefined) payload.cinematographyRating = clampRating(review.cinematographyRating);
+  if (review.pacingRating !== undefined) payload.pacingRating = clampRating(review.pacingRating);
+  if (review.emotionalImpact !== undefined) payload.emotionalImpact = clampRating(review.emotionalImpact);
 
   try {
     const entryRef = doc(db, 'user_library', entryId);
     const snap = await getDoc(entryRef);
     if (snap.exists()) {
-      const existing = snap.data();
-      await setDoc(entryRef, {
-        userId: uid,
-        mediaId,
-        status,
-        personalRating,
-        rewatch,
-        liked,
-        personalComment,
-        createdAt: existing.createdAt,
-        updatedAt: serverTimestamp(),
-      });
+      // Preserve immutable fields on update
+      await setDoc(entryRef, { ...payload, createdAt: snap.data().createdAt }, { merge: true });
     } else {
-      await setDoc(entryRef, {
-        userId: uid,
-        mediaId,
-        status,
-        personalRating,
-        rewatch,
-        liked,
-        personalComment,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      // First time: set createdAt and increment the catalog counter atomically
+      payload.createdAt = serverTimestamp();
+      await setDoc(doc(db, 'catalog_media', mediaId), { addedToListCount: increment(1) }, { merge: true });
+      await setDoc(entryRef, payload);
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -330,7 +345,7 @@ export async function publishCommunityReviewToFirestore(params: {
  */
 export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void> {
   const fbUser = auth.currentUser;
-  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'screenlog_admin';
+  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'takevault_admin';
   const mediaId = sanitizeFirestoreId(item.id);
   const path = `catalog_media/${mediaId}`;
 
@@ -354,42 +369,50 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
         .slice(0, BLUEPRINT_LIMITS.MAX_ARRAY_ITEMS)
     : ['Drama'];
 
+  const cast = Array.isArray(item.cast)
+    ? item.cast
+        .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+        .map((c) => c.trim().slice(0, 80))
+        .slice(0, 15)
+    : [];
+
+  const trailerYoutubeId = clampString(item.trailerYoutubeId || '', 120, '');
+
+  const payload: Record<string, unknown> = {
+    title,
+    type,
+    year,
+    director,
+    synopsis,
+    posterUrl,
+    backdropUrl,
+    duration,
+    defaultPlatform,
+    genres,
+    cast,
+    trailerYoutubeId,
+    communityRating: Number(item.communityRating) || 0,
+    communityVotesCount: Number(item.communityVotesCount) || 0,
+    addedToListCount: Number(item.addedToListCount) || 0,
+    isFeatured: Boolean(item.isFeatured),
+    isTrending: Boolean(item.isTrending),
+    isTopClassified: Boolean(item.isTopClassified),
+    isCustomUserCreated: Boolean(item.isCustomUserCreated),
+    updatedAt: serverTimestamp(),
+  };
+
   try {
     const mediaRef = doc(db, 'catalog_media', mediaId);
     const snap = await getDoc(mediaRef);
     if (snap.exists()) {
       const existing = snap.data();
-      await setDoc(mediaRef, {
-        authorId: existing.authorId || uid,
-        title,
-        type,
-        year,
-        director,
-        synopsis,
-        posterUrl,
-        backdropUrl,
-        duration,
-        defaultPlatform,
-        genres,
-        createdAt: existing.createdAt,
-        updatedAt: serverTimestamp(),
-      });
+      payload.authorId = existing.authorId || uid;
+      payload.createdAt = existing.createdAt;
+      await setDoc(mediaRef, payload, { merge: true });
     } else {
-      await setDoc(mediaRef, {
-        authorId: uid,
-        title,
-        type,
-        year,
-        director,
-        synopsis,
-        posterUrl,
-        backdropUrl,
-        duration,
-        defaultPlatform,
-        genres,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      payload.authorId = uid;
+      payload.createdAt = serverTimestamp();
+      await setDoc(mediaRef, payload, { merge: true });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -510,6 +533,7 @@ export function subscribeToCatalogMedia(
 
 /**
  * Subscribes to the current Firebase user's personal library in real time.
+ * Reads all stored fields back without hardcoded fallbacks.
  */
 export function subscribeToUserLibrary(
   uid: string,
@@ -525,24 +549,59 @@ export function subscribeToUserLibrary(
         const d = docSnap.data();
         if (d && typeof d.mediaId === 'string') {
           const stars = Number(d.personalRating) || 0;
-          const reverseRewatch: Record<string, UserReview['wouldRewatch']> = {
+
+          // Backward-compat: old docs stored 'rewatch' in legacy format; new docs store 'wouldRewatch' natively
+          const legacyRewatchMap: Record<string, UserReview['wouldRewatch']> = {
             si: 'si_totalmente',
             tal_vez: 'quizas',
             no: 'no_suficiente',
+            sin_definir: 'quizas',
           };
+          const wouldRewatch: UserReview['wouldRewatch'] =
+            d.wouldRewatch || legacyRewatchMap[d.rewatch] || 'quizas';
+
+          const evalTag =
+            stars >= 4.5
+              ? 'Obra Maestra (10/10)'
+              : stars >= 4
+                ? 'Excelente (9/10)'
+                : stars >= 3.5
+                  ? 'Muy Buena (8/10)'
+                  : stars >= 3
+                    ? 'Buena (7/10)'
+                    : stars >= 2
+                      ? 'Pasable / Regular (5/10)'
+                      : 'Mediocre (4/10)';
+
           map[d.mediaId] = {
             mediaId: d.mediaId,
             status: d.status || 'pendiente',
             stars,
             year: new Date().getFullYear(),
             genres: ['Drama'],
-            evaluation: stars >= 4.5 ? 'Obra Maestra (10/10)' : stars >= 4 ? 'Excelente (9/10)' : 'Buena (7/10)',
+            evaluation: evalTag,
             critique: d.personalComment || '',
             director: '',
-            watchedDate: new Date().toISOString().slice(0, 10),
-            platform: 'Netflix',
-            wouldRewatch: reverseRewatch[d.rewatch] || 'quizas',
-            updatedAt: new Date().toISOString().slice(0, 10),
+            watchedDate: d.watchedDate || new Date().toISOString().slice(0, 10),
+            platform: d.watchPlatform || '',
+            wouldRewatch,
+            favoriteMoment: d.favoriteMoment,
+            scriptRating: d.scriptRating,
+            actingRating: d.actingRating,
+            directionRating: d.directionRating,
+            soundtrackRating: d.soundtrackRating,
+            cinematographyRating: d.cinematographyRating,
+            pacingRating: d.pacingRating,
+            emotionalImpact: d.emotionalImpact,
+            shortVerdict: d.shortVerdict,
+            favoriteCharacter: d.favoriteCharacter,
+            quote: d.quote,
+            recommendation: d.recommendation,
+            moodRecommendation: d.moodRecommendation,
+            tags: Array.isArray(d.tags) ? d.tags : [],
+            updatedAt: d.updatedAt?.toDate
+              ? d.updatedAt.toDate().toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
           };
         }
       });
