@@ -256,6 +256,110 @@
           "type": "array",
           "description": "Bounded list of genres (max 10)."
         },
+        "originalTitle": {
+          "type": "string",
+          "description": "Original title in its release language.",
+          "maxLength": 200
+        },
+        "cast": {
+          "type": "array",
+          "description": "Bounded main cast list (max 12)."
+        },
+        "trailerYoutubeId": {
+          "type": "string",
+          "description": "YouTube id or URL of the official trailer.",
+          "maxLength": 120
+        },
+        "streamingPlatforms": {
+          "type": "array",
+          "description": "Bounded list of available platforms (max 10)."
+        },
+        "communityRating": {
+          "type": "number",
+          "description": "Average community rating (0-10).",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "communityVotesCount": {
+          "type": "integer",
+          "description": "Number of community votes.",
+          "minimum": 0
+        },
+        "addedToListCount": {
+          "type": "integer",
+          "description": "How many users added the title to their list.",
+          "minimum": 0
+        },
+        "isFeatured": {
+          "type": "boolean",
+          "description": "Whether the title is featured on the hero slider."
+        },
+        "isTrending": {
+          "type": "boolean",
+          "description": "Whether the title is marked as trending."
+        },
+        "isTopClassified": {
+          "type": "boolean",
+          "description": "Whether the title belongs to the top classified list."
+        },
+        "seasonsCount": {
+          "type": "integer",
+          "description": "Number of seasons for series/anime/novelas.",
+          "minimum": 0
+        },
+        "episodesCount": {
+          "type": "integer",
+          "description": "Number of episodes.",
+          "minimum": 0
+        },
+        "releaseDate": {
+          "type": "string",
+          "description": "Full release date.",
+          "maxLength": 30
+        },
+        "country": {
+          "type": "string",
+          "description": "Country of origin.",
+          "maxLength": 80
+        },
+        "language": {
+          "type": "string",
+          "description": "Original language.",
+          "maxLength": 80
+        },
+        "ageRating": {
+          "type": "string",
+          "description": "Age rating label.",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "description": "Airing status (En emisión, Finalizada, Película).",
+          "maxLength": 40
+        },
+        "tags": {
+          "type": "array",
+          "description": "Bounded list of cinephile tags (max 12)."
+        },
+        "createdByUserId": {
+          "type": "string",
+          "description": "UID of the user that created the entry.",
+          "maxLength": 128
+        },
+        "isCustomUserCreated": {
+          "type": "boolean",
+          "description": "Whether the title was added by a user instead of seeded."
+        },
+        "lastEditedBy": {
+          "type": "string",
+          "description": "UID or name of the last editor.",
+          "maxLength": 128
+        },
+        "lastEditedAt": {
+          "type": "string",
+          "description": "Timestamp of the last edition.",
+          "maxLength": 40
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

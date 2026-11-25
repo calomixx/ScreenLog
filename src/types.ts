@@ -51,6 +51,9 @@ export interface UserReview {
   id?: string;
   mediaId: string;
   status: WatchStatus;
+  /** Estado persistido en Firestore (incluye 'discarded', que la UI aún no filtra). */
+  classificationStatus?: 'pending' | 'watching' | 'watched' | 'discarded';
+  isFavorite?: boolean;
   // Requested specific fields for "Terminada"
   stars: number; // 1 to 5 (or half stars like 4.5)
   year: number;

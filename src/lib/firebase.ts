@@ -14,11 +14,10 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
-  increment,
   type Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import type { MediaItem, UserProfile, UserReview } from '../types';
+import type { MediaItem, UserProfile } from '../types';
 
 const app = initializeApp(firebaseConfig);
 export const db =
@@ -204,95 +203,6 @@ export async function syncFirebaseUserProfile(
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${publicPath} & ${privatePath}`);
-  }
-}
-
-/**
- * Saves or updates a personal library entry in Firestore for a verified Firebase user.
- * Persists all UserReview fields including detailed ratings, tags, notes and metadata.
- */
-export async function saveLibraryEntryToFirestore(review: UserReview): Promise<void> {
-  const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
-
-  const uid = sanitizeFirestoreId(fbUser.uid);
-  const mediaId = sanitizeFirestoreId(review.mediaId);
-  const entryId = sanitizeFirestoreId(`${uid}_${mediaId}`);
-  const path = `user_library/${entryId}`;
-
-  const status = ['pendiente', 'en_proceso', 'terminada'].includes(review.status)
-    ? review.status
-    : 'pendiente';
-  const personalRating = Math.max(0, Math.min(5, Number(review.stars) || 0));
-  const liked = personalRating >= 4;
-  const personalComment = clampString(review.critique || '', BLUEPRINT_LIMITS.COMMENT_MAX_LEN, '');
-
-  // Build payload with all fields — only include optional fields when present
-  const payload: Record<string, unknown> = {
-    userId: uid,
-    mediaId,
-    status,
-    personalRating,
-    liked,
-    personalComment,
-    updatedAt: serverTimestamp(),
-  };
-
-  // Store wouldRewatch natively (no enum translation needed)
-  if (review.wouldRewatch) payload.wouldRewatch = review.wouldRewatch;
-  if (review.watchedDate) payload.watchedDate = review.watchedDate;
-  if (review.platform) payload.watchPlatform = clampString(review.platform, BLUEPRINT_LIMITS.PLATFORM_MAX_LEN);
-  if (review.favoriteMoment) payload.favoriteMoment = clampString(review.favoriteMoment, 500);
-  if (review.shortVerdict) payload.shortVerdict = clampString(review.shortVerdict, 200);
-  if (review.favoriteCharacter) payload.favoriteCharacter = clampString(review.favoriteCharacter, 120);
-  if (review.quote) payload.quote = clampString(review.quote, 300);
-  if (review.recommendation) payload.recommendation = review.recommendation;
-  if (review.moodRecommendation) payload.moodRecommendation = clampString(review.moodRecommendation, 200);
-  if (review.tags && review.tags.length > 0) payload.tags = review.tags.slice(0, 10);
-
-  // Detailed sub-ratings (clamped 1-10)
-  const clampRating = (v?: number) => v !== undefined ? Math.max(1, Math.min(10, Math.round(v))) : undefined;
-  if (review.scriptRating !== undefined) payload.scriptRating = clampRating(review.scriptRating);
-  if (review.actingRating !== undefined) payload.actingRating = clampRating(review.actingRating);
-  if (review.directionRating !== undefined) payload.directionRating = clampRating(review.directionRating);
-  if (review.soundtrackRating !== undefined) payload.soundtrackRating = clampRating(review.soundtrackRating);
-  if (review.cinematographyRating !== undefined) payload.cinematographyRating = clampRating(review.cinematographyRating);
-  if (review.pacingRating !== undefined) payload.pacingRating = clampRating(review.pacingRating);
-  if (review.emotionalImpact !== undefined) payload.emotionalImpact = clampRating(review.emotionalImpact);
-
-  try {
-    const entryRef = doc(db, 'user_library', entryId);
-    const snap = await getDoc(entryRef);
-    if (snap.exists()) {
-      // Preserve immutable fields on update
-      await setDoc(entryRef, { ...payload, createdAt: snap.data().createdAt }, { merge: true });
-    } else {
-      // First time: set createdAt and increment the catalog counter atomically
-      payload.createdAt = serverTimestamp();
-      await setDoc(doc(db, 'catalog_media', mediaId), { addedToListCount: increment(1) }, { merge: true });
-      await setDoc(entryRef, payload);
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-/**
- * Deletes a personal library entry from Firestore.
- */
-export async function removeLibraryEntryFromFirestore(rawMediaId: string): Promise<void> {
-  const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
-
-  const uid = sanitizeFirestoreId(fbUser.uid);
-  const mediaId = sanitizeFirestoreId(rawMediaId);
-  const entryId = sanitizeFirestoreId(`${uid}_${mediaId}`);
-  const path = `user_library/${entryId}`;
-
-  try {
-    await deleteDoc(doc(db, 'user_library', entryId));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -529,88 +439,6 @@ export function subscribeToCatalogMedia(
     primaryUnsub();
     if (fallbackUnsub) fallbackUnsub();
   };
-}
-
-/**
- * Subscribes to the current Firebase user's personal library in real time.
- * Reads all stored fields back without hardcoded fallbacks.
- */
-export function subscribeToUserLibrary(
-  uid: string,
-  onEntries: (reviews: Record<string, UserReview>) => void,
-): Unsubscribe {
-  const safeUid = sanitizeFirestoreId(uid);
-  const q = query(collection(db, 'user_library'), where('userId', '==', safeUid));
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const map: Record<string, UserReview> = {};
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d && typeof d.mediaId === 'string') {
-          const stars = Number(d.personalRating) || 0;
-
-          // Backward-compat: old docs stored 'rewatch' in legacy format; new docs store 'wouldRewatch' natively
-          const legacyRewatchMap: Record<string, UserReview['wouldRewatch']> = {
-            si: 'si_totalmente',
-            tal_vez: 'quizas',
-            no: 'no_suficiente',
-            sin_definir: 'quizas',
-          };
-          const wouldRewatch: UserReview['wouldRewatch'] =
-            d.wouldRewatch || legacyRewatchMap[d.rewatch] || 'quizas';
-
-          const evalTag =
-            stars >= 4.5
-              ? 'Obra Maestra (10/10)'
-              : stars >= 4
-                ? 'Excelente (9/10)'
-                : stars >= 3.5
-                  ? 'Muy Buena (8/10)'
-                  : stars >= 3
-                    ? 'Buena (7/10)'
-                    : stars >= 2
-                      ? 'Pasable / Regular (5/10)'
-                      : 'Mediocre (4/10)';
-
-          map[d.mediaId] = {
-            mediaId: d.mediaId,
-            status: d.status || 'pendiente',
-            stars,
-            year: new Date().getFullYear(),
-            genres: ['Drama'],
-            evaluation: evalTag,
-            critique: d.personalComment || '',
-            director: '',
-            watchedDate: d.watchedDate || new Date().toISOString().slice(0, 10),
-            platform: d.watchPlatform || '',
-            wouldRewatch,
-            favoriteMoment: d.favoriteMoment,
-            scriptRating: d.scriptRating,
-            actingRating: d.actingRating,
-            directionRating: d.directionRating,
-            soundtrackRating: d.soundtrackRating,
-            cinematographyRating: d.cinematographyRating,
-            pacingRating: d.pacingRating,
-            emotionalImpact: d.emotionalImpact,
-            shortVerdict: d.shortVerdict,
-            favoriteCharacter: d.favoriteCharacter,
-            quote: d.quote,
-            recommendation: d.recommendation,
-            moodRecommendation: d.moodRecommendation,
-            tags: Array.isArray(d.tags) ? d.tags : [],
-            updatedAt: d.updatedAt?.toDate
-              ? d.updatedAt.toDate().toISOString().slice(0, 10)
-              : new Date().toISOString().slice(0, 10),
-          };
-        }
-      });
-      onEntries(map);
-    },
-    (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'user_library');
-    },
-  );
 }
 
 /**

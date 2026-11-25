@@ -32,6 +32,15 @@ service cloud.firestore {
       return isVerifiedUser() && request.auth.uid == userId;
     }
 
+    // Datos privados (biblioteca, preferencias): basta con estar autenticado.
+    // Las acciones públicas (reseñas, catálogo, perfil público) sí exigen
+    // email verificado mediante isOwner().
+    function isAccountOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // SECURITY FIX: Removed hardcoded email from admin check.
+    // Admin access is now determined solely by presence in /admins collection.
     function isAdmin() {
       return isVerifiedUser() &&
         exists(/databases/$(database)/documents/admins/$(request.auth.uid));
@@ -132,11 +141,13 @@ service cloud.firestore {
     function isValidCatalogMediaItem(data) {
       return data.keys().hasAll(['authorId', 'title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'createdAt', 'updatedAt']) &&
         data.keys().hasOnly([
-          'authorId', 'title', 'originalTitle', 'type', 'year', 'director', 'synopsis',
-          'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'cast',
-          'trailerYoutubeId', 'trailerUrl', 'streamingPlatforms', 'communityRating',
-          'communityVotesCount', 'addedToListCount', 'isFeatured', 'isTrending',
-          'isTopClassified', 'isCustomUserCreated', 'tags', 'createdAt', 'updatedAt'
+          'authorId', 'title', 'originalTitle', 'type', 'year', 'director', 'cast', 'synopsis',
+          'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'trailerYoutubeId',
+          'trailerUrl', 'streamingPlatforms', 'communityRating', 'communityVotesCount',
+          'addedToListCount', 'isFeatured', 'isTrending', 'isTopClassified', 'seasonsCount',
+          'episodesCount', 'releaseDate', 'country', 'language', 'ageRating', 'status', 'tags',
+          'createdByUserId', 'isCustomUserCreated', 'lastEditedBy', 'lastEditedAt',
+          'createdAt', 'updatedAt'
         ]) &&
         data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
         data.authorId.matches('^[a-zA-Z0-9_\\-]+$') &&
@@ -152,11 +163,119 @@ service cloud.firestore {
         data.defaultPlatform is string && data.defaultPlatform.size() <= 80 &&
         data.genres is list && data.genres.size() >= 1 && data.genres.size() <= 10 &&
         data.genres[0] is string && data.genres[0].size() <= 40 &&
+        (!('originalTitle' in data) || (data.originalTitle is string && data.originalTitle.size() <= 200)) &&
+        (!('cast' in data) || (data.cast is list && data.cast.size() <= 20 && (data.cast.size() == 0 || data.cast[0] is string))) &&
         (!('trailerYoutubeId' in data) || (data.trailerYoutubeId is string && data.trailerYoutubeId.size() <= 120)) &&
-        (!('cast' in data) || (data.cast is list && data.cast.size() <= 20)) &&
-        (!('addedToListCount' in data) || (data.addedToListCount is number && data.addedToListCount >= 0)) &&
+        (!('trailerUrl' in data) || (data.trailerUrl is string && data.trailerUrl.size() <= 1000)) &&
+        (!('streamingPlatforms' in data) || (data.streamingPlatforms is list && data.streamingPlatforms.size() <= 10 && (data.streamingPlatforms.size() == 0 || data.streamingPlatforms[0] is string))) &&
+        (!('communityRating' in data) || (data.communityRating is number && data.communityRating >= 0 && data.communityRating <= 10)) &&
+        (!('communityVotesCount' in data) || (data.communityVotesCount is int && data.communityVotesCount >= 0 && data.communityVotesCount <= 1000000)) &&
+        (!('addedToListCount' in data) || (data.addedToListCount is int && data.addedToListCount >= 0 && data.addedToListCount <= 1000000)) &&
+        (!('isFeatured' in data) || data.isFeatured is bool) &&
+        (!('isTrending' in data) || data.isTrending is bool) &&
+        (!('isTopClassified' in data) || data.isTopClassified is bool) &&
+        (!('seasonsCount' in data) || (data.seasonsCount is int && data.seasonsCount >= 0 && data.seasonsCount <= 200)) &&
+        (!('episodesCount' in data) || (data.episodesCount is int && data.episodesCount >= 0 && data.episodesCount <= 10000)) &&
+        (!('releaseDate' in data) || (data.releaseDate is string && data.releaseDate.size() <= 30)) &&
+        (!('country' in data) || (data.country is string && data.country.size() <= 80)) &&
+        (!('language' in data) || (data.language is string && data.language.size() <= 80)) &&
+        (!('ageRating' in data) || (data.ageRating is string && data.ageRating.size() <= 40)) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 40)) &&
+        (!('tags' in data) || (data.tags is list && data.tags.size() <= 12 && (data.tags.size() == 0 || data.tags[0] is string))) &&
+        (!('createdByUserId' in data) || (data.createdByUserId is string && data.createdByUserId.size() <= 128)) &&
+        (!('isCustomUserCreated' in data) || data.isCustomUserCreated is bool) &&
+        (!('lastEditedBy' in data) || (data.lastEditedBy is string && data.lastEditedBy.size() <= 128)) &&
+        (!('lastEditedAt' in data) || (data.lastEditedAt is string && data.lastEditedAt.size() <= 40)) &&
         data.createdAt is timestamp &&
         data.updatedAt == request.time;
+    }
+
+    function isValidStringList(value, maxCount, maxLen) {
+      return value is list &&
+        value.size() <= maxCount &&
+        (value.size() == 0 || (value[0] is string && value[0].size() <= maxLen));
+    }
+
+    // Cuenta privada del usuario: users/{uid}
+    function isValidUserAccount(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'preferences', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'preferences', 'legacyLibraryMigratedAt', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid == userId &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.email is string && data.email.size() <= 254 &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000)) &&
+        data.preferences is map &&
+        data.preferences.keys().hasOnly(['theme', 'language', 'favoriteGenres', 'defaultStatus']) &&
+        (!('theme' in data.preferences) || data.preferences.theme in ['dark', 'light', 'system']) &&
+        (!('language' in data.preferences) || data.preferences.language in ['es', 'en']) &&
+        (!('favoriteGenres' in data.preferences) || isValidStringList(data.preferences.favoriteGenres, 10, 40)) &&
+        (!('defaultStatus' in data.preferences) || data.preferences.defaultStatus in ['pending', 'watching', 'watched', 'discarded']) &&
+        (!('legacyLibraryMigratedAt' in data) || data.legacyLibraryMigratedAt is timestamp) &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    // Clasificación personal: users/{uid}/movie_classifications/{movieId}
+    function isValidMovieClassification(data, userId, movieId) {
+      return data.keys().hasAll(['movieId', 'uid', 'status', 'isFavorite', 'rating', 'categories', 'tags', 'notes', 'schemaVersion', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'movieId', 'uid', 'status', 'isFavorite', 'rating', 'categories', 'tags', 'notes',
+          'evaluation', 'watchedDate', 'platform', 'wouldRewatch', 'favoriteMoment',
+          'shortVerdict', 'quote', 'recommendation', 'moodRecommendation', 'favoriteCharacter',
+          'scriptRating', 'actingRating', 'directionRating', 'soundtrackRating',
+          'cinematographyRating', 'pacingRating', 'emotionalImpact', 'schemaVersion',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.movieId is string && data.movieId == movieId &&
+        data.uid is string && data.uid == userId &&
+        data.status in ['pending', 'watching', 'watched', 'discarded'] &&
+        data.isFavorite is bool &&
+        data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+        isValidStringList(data.categories, 10, 40) &&
+        isValidStringList(data.tags, 12, 40) &&
+        data.notes is string && data.notes.size() <= 2000 &&
+        (!('evaluation' in data) || (data.evaluation is string && data.evaluation.size() <= 60)) &&
+        (!('watchedDate' in data) || (data.watchedDate is string && data.watchedDate.size() <= 10)) &&
+        (!('platform' in data) || (data.platform is string && data.platform.size() <= 80)) &&
+        (!('wouldRewatch' in data) || data.wouldRewatch in ['yes', 'maybe', 'no', 'unset']) &&
+        (!('favoriteMoment' in data) || (data.favoriteMoment is string && data.favoriteMoment.size() <= 500)) &&
+        (!('shortVerdict' in data) || (data.shortVerdict is string && data.shortVerdict.size() <= 160)) &&
+        (!('quote' in data) || (data.quote is string && data.quote.size() <= 500)) &&
+        (!('recommendation' in data) || data.recommendation in ['yes', 'maybe', 'no', '']) &&
+        (!('moodRecommendation' in data) || (data.moodRecommendation is string && data.moodRecommendation.size() <= 200)) &&
+        (!('favoriteCharacter' in data) || (data.favoriteCharacter is string && data.favoriteCharacter.size() <= 120)) &&
+        (!('scriptRating' in data) || (data.scriptRating is number && data.scriptRating >= 0 && data.scriptRating <= 10)) &&
+        (!('actingRating' in data) || (data.actingRating is number && data.actingRating >= 0 && data.actingRating <= 10)) &&
+        (!('directionRating' in data) || (data.directionRating is number && data.directionRating >= 0 && data.directionRating <= 10)) &&
+        (!('soundtrackRating' in data) || (data.soundtrackRating is number && data.soundtrackRating >= 0 && data.soundtrackRating <= 10)) &&
+        (!('cinematographyRating' in data) || (data.cinematographyRating is number && data.cinematographyRating >= 0 && data.cinematographyRating <= 10)) &&
+        (!('pacingRating' in data) || (data.pacingRating is number && data.pacingRating >= 0 && data.pacingRating <= 10)) &&
+        (!('emotionalImpact' in data) || (data.emotionalImpact is number && data.emotionalImpact >= 0 && data.emotionalImpact <= 10)) &&
+        data.schemaVersion is int && data.schemaVersion == 1 &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    // Lista personalizada: users/{uid}/lists/{listId}
+    function isValidCustomList(data, userId, listId) {
+      return data.keys().hasAll(['listId', 'uid', 'name', 'description', 'isPublic', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['listId', 'uid', 'name', 'description', 'isPublic', 'createdAt', 'updatedAt']) &&
+        data.listId is string && data.listId == listId &&
+        data.uid is string && data.uid == userId &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+        data.description is string && data.description.size() <= 500 &&
+        data.isPublic is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    // Elemento de lista: users/{uid}/lists/{listId}/items/{movieId}
+    function isValidCustomListItem(data, movieId) {
+      return data.keys().hasAll(['movieId', 'position', 'addedAt']) &&
+        data.keys().hasOnly(['movieId', 'position', 'addedAt']) &&
+        data.movieId is string && data.movieId == movieId &&
+        data.position is int && data.position >= 0 && data.position <= 100000 &&
+        data.addedAt is timestamp;
     }
 
     // 4. Collection Rules
@@ -209,7 +328,58 @@ service cloud.firestore {
       allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
     }
 
-    // Personal User Library Entries
+    // Cuenta privada + clasificaciones personales (solo el dueño)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isAccountOwner(userId) || isAdmin());
+      allow list: if false;
+      allow create: if isAccountOwner(userId) && isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().createdAt == request.time;
+      allow update: if isAccountOwner(userId) && isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(userId) && (isAccountOwner(userId) || isAdmin());
+
+      // Una clasificación por usuario y película: el ID del documento ES el movieId.
+      match /movie_classifications/{movieId} {
+        allow get: if isAccountOwner(userId) && isValidId(movieId);
+        allow list: if isAccountOwner(userId);
+        allow create: if isAccountOwner(userId) && isValidId(movieId) &&
+          isValidMovieClassification(incoming(), userId, movieId) &&
+          incoming().createdAt == request.time;
+        allow update: if isAccountOwner(userId) && isValidId(movieId) &&
+          isValidMovieClassification(incoming(), userId, movieId) &&
+          existing().uid == userId && existing().movieId == movieId &&
+          incoming().uid == existing().uid &&
+          incoming().movieId == existing().movieId &&
+          incoming().createdAt == existing().createdAt;
+        allow delete: if isAccountOwner(userId) && isValidId(movieId);
+      }
+
+      // Listas personalizadas y sus elementos
+      match /lists/{listId} {
+        allow read: if isAccountOwner(userId) && isValidId(listId);
+        allow create: if isAccountOwner(userId) && isValidId(listId) &&
+          isValidCustomList(incoming(), userId, listId) &&
+          incoming().createdAt == request.time;
+        allow update: if isAccountOwner(userId) && isValidId(listId) &&
+          isValidCustomList(incoming(), userId, listId) &&
+          incoming().uid == existing().uid &&
+          incoming().listId == existing().listId &&
+          incoming().createdAt == existing().createdAt;
+        allow delete: if isAccountOwner(userId) && isValidId(listId);
+
+        match /items/{movieId} {
+          allow read: if isAccountOwner(userId) && isValidId(movieId);
+          allow create, update: if isAccountOwner(userId) && isValidId(movieId) &&
+            isValidCustomListItem(incoming(), movieId);
+          allow delete: if isAccountOwner(userId) && isValidId(movieId);
+        }
+      }
+    }
+
+    // Personal User Library Entries (colección legada; solo lectura/borrado para migrar)
     match /user_library/{entryId} {
       allow get: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
       allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
