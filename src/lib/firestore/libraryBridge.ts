@@ -1,4 +1,5 @@
-import { auth } from '../firebase';
+import { doc, increment, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import type { UserReview } from '../../types';
 import {
   deleteClassification,
@@ -6,7 +7,11 @@ import {
   subscribeToClassifications,
   upsertClassification,
 } from './classifications';
-import { classificationToUserReview, userReviewToClassificationInput } from './schema';
+import {
+  classificationToUserReview,
+  sanitizeFirestoreId,
+  userReviewToClassificationInput,
+} from './schema';
 
 /**
  * Puente entre el modelo de UI (`UserReview`) y el modelo persistido
@@ -28,6 +33,18 @@ export async function saveLibraryEntryToFirestore(review: UserReview): Promise<v
     const previous = await getClassification(fbUser.uid, review.mediaId);
     const input = userReviewToClassificationInput(review, previous);
     await upsertClassification(fbUser.uid, review.mediaId, input);
+    if (!previous) {
+      // Paridad con el modelo anterior: mantiene el contador del catálogo.
+      // Es best-effort: si el usuario no está verificado, la regla lo rechaza
+      // y no debe impedir guardar su clasificación privada.
+      void setDoc(
+        doc(db, 'catalog_media', sanitizeFirestoreId(review.mediaId)),
+        { addedToListCount: increment(1) },
+        { merge: true },
+      ).catch((err) => {
+        console.warn('No se pudo actualizar addedToListCount:', err);
+      });
+    }
   } catch (error) {
     console.error('No se pudo guardar la clasificación en Firestore:', error);
   }

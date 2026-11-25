@@ -956,6 +956,7 @@ var init_initialMedia = __esm({
 import dotenv from "dotenv";
 import path3 from "path";
 import fs3 from "fs";
+import http from "http";
 import express from "express";
 
 // server/routes.ts
@@ -4823,6 +4824,7 @@ async function startServer() {
   } catch {
   }
   const app = express();
+  const server = http.createServer(app);
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", uptime: process.uptime(), timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
@@ -4843,7 +4845,10 @@ async function startServer() {
   if (isDev) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server }
+      },
       appType: "spa"
     });
     app.use(vite.middlewares);
@@ -4853,8 +4858,8 @@ async function startServer() {
       res.sendFile(path3.join(distPath, "index.html"));
     });
   }
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ScreenLog Server running on http://0.0.0.0:${PORT}`);
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`TakeVault Server running on http://0.0.0.0:${PORT}`);
   });
 }
 startServer().catch((err) => {

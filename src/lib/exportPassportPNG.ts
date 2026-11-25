@@ -75,7 +75,7 @@ export function downloadCinephilePassport(data: CinephilePassportData): void {
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 36px "Plus Jakarta Sans", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('SCREENLOG PRO', 450, 95);
+  ctx.fillText('TAKEVAULT PRO', 450, 95);
 
   ctx.fillStyle = '#F43F5E';
   ctx.font = 'bold 15px sans-serif';
@@ -178,7 +178,7 @@ export function downloadCinephilePassport(data: CinephilePassportData): void {
 
   ctx.fillStyle = '#94A3B8';
   ctx.font = '14px sans-serif';
-  ctx.fillText('Verificadas por el Sistema Cinephile Rank de ScreenLog Pro', 450, vY + 122);
+  ctx.fillText('Verificadas por el Sistema Cinephile Rank de TakeVault Pro', 450, vY + 122);
 
   // Footer & Seal
   const fY = 950;
@@ -197,11 +197,11 @@ export function downloadCinephilePassport(data: CinephilePassportData): void {
 
   ctx.fillStyle = '#64748B';
   ctx.font = '13px sans-serif';
-  ctx.fillText(`Expedido el ${dateStr} · Verificado para Google AI Studio`, 450, fY + 45);
+  ctx.fillText(`Expedido el ${dateStr} · Verificado para TakeVault Pro`, 450, fY + 45);
 
   ctx.fillStyle = '#F43F5E';
   ctx.font = 'bold 15px sans-serif';
-  ctx.fillText('screenlog.pro · Bitácora Cinéfila Digital', 450, fY + 75);
+  ctx.fillText('takevault.app · Bitácora Cinéfila Digital', 450, fY + 75);
 
   // Trigger Download
   const link = document.createElement('a');

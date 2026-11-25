@@ -148,7 +148,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
       }
       setNotice(
         payload?.message ||
-          'Si el correo existe en ScreenLog Pro, un administrador podrá restablecer la contraseña de forma segura.',
+          'Si el correo existe en TakeVault Pro, un administrador podrá restablecer la contraseña de forma segura.',
       );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo enviar la solicitud.');
@@ -215,7 +215,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
 
         <div className="relative z-10 flex items-center gap-2 text-[11px] text-slate-500">
           <Film className="w-3.5 h-3.5" />
-          ScreenLog Pro · Diseñado para cinéfilos
+          TakeVault Pro · Diseñado para cinéfilos
         </div>
       </aside>
 
@@ -375,7 +375,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialMode = 'login' })
                     className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-sm shadow-xl shadow-rose-900/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                    {submitting ? 'Entrando...' : 'Entrar a ScreenLog'}
+                    {submitting ? 'Entrando...' : 'Entrar a TakeVault'}
                   </button>
 
                   <div className="relative flex items-center justify-center py-1">

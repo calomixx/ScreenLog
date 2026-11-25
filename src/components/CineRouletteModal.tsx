@@ -620,7 +620,7 @@ export const CineRouletteModal: React.FC = () => {
         {/* Footer info note */}
         <div className="px-6 py-3 bg-black/40 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-500">
           <span>Tip: Presiona <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-slate-300 font-mono text-[10px]">Espacio</kbd> para girar</span>
-          <span>ScreenLog Pro Random Picker</span>
+          <span>TakeVault Pro Random Picker</span>
         </div>
       </motion.div>
     </div>

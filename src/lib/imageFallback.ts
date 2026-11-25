@@ -19,7 +19,7 @@ export const FALLBACK_BACKDROP =
       '<stop offset="0" stop-color="#161618"/><stop offset="1" stop-color="#241018"/>' +
       '</linearGradient></defs>' +
       '<rect width="1280" height="720" fill="url(#g)"/>' +
-      '<text x="640" y="370" text-anchor="middle" font-family="system-ui,sans-serif" font-size="40" fill="#f43f5e">ScreenLog</text>' +
+      '<text x="640" y="370" text-anchor="middle" font-family="system-ui,sans-serif" font-size="40" fill="#f43f5e">TakeVault</text>' +
       '</svg>',
   );
 

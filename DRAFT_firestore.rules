@@ -69,19 +69,27 @@ service cloud.firestore {
 
     function isValidUserPrivateInfo(data, userId) {
       return data.keys().hasAll(['userId', 'email', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'email', 'role', 'blocked', 'mustChangePassword', 'preferences', 'createdAt', 'updatedAt']) &&
         data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
         data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
         data.userId == request.auth.uid &&
         data.userId == userId &&
         data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        (!('role' in data) || (data.role is string && data.role in ['user', 'admin', 'moderator', 'owner'])) &&
+        (!('blocked' in data) || data.blocked is bool) &&
         data.createdAt is timestamp &&
         data.updatedAt == request.time;
     }
 
     function isValidUserLibraryEntry(data) {
-      return data.keys().hasAll(['userId', 'mediaId', 'status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['userId', 'mediaId', 'status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasAll(['userId', 'mediaId', 'status', 'personalRating', 'liked', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'userId', 'mediaId', 'status', 'personalRating', 'liked', 'createdAt', 'updatedAt',
+          'rewatch', 'wouldRewatch', 'personalComment', 'watchedDate', 'watchPlatform',
+          'favoriteMoment', 'scriptRating', 'actingRating', 'directionRating',
+          'soundtrackRating', 'cinematographyRating', 'pacingRating', 'emotionalImpact',
+          'shortVerdict', 'favoriteCharacter', 'quote', 'recommendation', 'moodRecommendation', 'tags'
+        ]) &&
         data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
         data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
         data.userId == request.auth.uid &&
@@ -90,10 +98,26 @@ service cloud.firestore {
         data.status is string && data.status.size() <= 20 &&
         data.status in ['pendiente', 'en_proceso', 'terminada'] &&
         data.personalRating is number && data.personalRating >= 0 && data.personalRating <= 5 &&
-        data.rewatch is string && data.rewatch.size() <= 20 &&
-        data.rewatch in ['si', 'tal_vez', 'no', 'sin_definir'] &&
         data.liked is bool &&
-        data.personalComment is string && data.personalComment.size() <= 2000 &&
+        (!('wouldRewatch' in data) || (data.wouldRewatch is string && data.wouldRewatch in ['si_totalmente', 'quizas', 'no_suficiente', 'jamas'])) &&
+        (!('rewatch' in data) || (data.rewatch is string && data.rewatch in ['si', 'tal_vez', 'no', 'sin_definir'])) &&
+        (!('personalComment' in data) || (data.personalComment is string && data.personalComment.size() <= 2000)) &&
+        (!('watchedDate' in data) || (data.watchedDate is string && data.watchedDate.size() <= 30)) &&
+        (!('watchPlatform' in data) || (data.watchPlatform is string && data.watchPlatform.size() <= 80)) &&
+        (!('favoriteMoment' in data) || (data.favoriteMoment is string && data.favoriteMoment.size() <= 500)) &&
+        (!('shortVerdict' in data) || (data.shortVerdict is string && data.shortVerdict.size() <= 200)) &&
+        (!('favoriteCharacter' in data) || (data.favoriteCharacter is string && data.favoriteCharacter.size() <= 120)) &&
+        (!('quote' in data) || (data.quote is string && data.quote.size() <= 300)) &&
+        (!('recommendation' in data) || (data.recommendation is string && data.recommendation in ['si', 'quizas', 'no'])) &&
+        (!('moodRecommendation' in data) || (data.moodRecommendation is string && data.moodRecommendation.size() <= 200)) &&
+        (!('scriptRating' in data) || (data.scriptRating is number && data.scriptRating >= 1 && data.scriptRating <= 10)) &&
+        (!('actingRating' in data) || (data.actingRating is number && data.actingRating >= 1 && data.actingRating <= 10)) &&
+        (!('directionRating' in data) || (data.directionRating is number && data.directionRating >= 1 && data.directionRating <= 10)) &&
+        (!('soundtrackRating' in data) || (data.soundtrackRating is number && data.soundtrackRating >= 1 && data.soundtrackRating <= 10)) &&
+        (!('cinematographyRating' in data) || (data.cinematographyRating is number && data.cinematographyRating >= 1 && data.cinematographyRating <= 10)) &&
+        (!('pacingRating' in data) || (data.pacingRating is number && data.pacingRating >= 1 && data.pacingRating <= 10)) &&
+        (!('emotionalImpact' in data) || (data.emotionalImpact is number && data.emotionalImpact >= 1 && data.emotionalImpact <= 10)) &&
+        (!('tags' in data) || (data.tags is list && data.tags.size() <= 10)) &&
         data.createdAt is timestamp &&
         data.updatedAt == request.time;
     }
@@ -119,9 +143,9 @@ service cloud.firestore {
         data.keys().hasOnly([
           'authorId', 'title', 'originalTitle', 'type', 'year', 'director', 'cast', 'synopsis',
           'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'trailerYoutubeId',
-          'streamingPlatforms', 'communityRating', 'communityVotesCount', 'addedToListCount',
-          'isFeatured', 'isTrending', 'isTopClassified', 'seasonsCount', 'episodesCount',
-          'releaseDate', 'country', 'language', 'ageRating', 'status', 'tags',
+          'trailerUrl', 'streamingPlatforms', 'communityRating', 'communityVotesCount',
+          'addedToListCount', 'isFeatured', 'isTrending', 'isTopClassified', 'seasonsCount',
+          'episodesCount', 'releaseDate', 'country', 'language', 'ageRating', 'status', 'tags',
           'createdByUserId', 'isCustomUserCreated', 'lastEditedBy', 'lastEditedAt',
           'createdAt', 'updatedAt'
         ]) &&
@@ -140,8 +164,9 @@ service cloud.firestore {
         data.genres is list && data.genres.size() >= 1 && data.genres.size() <= 10 &&
         data.genres[0] is string && data.genres[0].size() <= 40 &&
         (!('originalTitle' in data) || (data.originalTitle is string && data.originalTitle.size() <= 200)) &&
-        (!('cast' in data) || (data.cast is list && data.cast.size() <= 12 && (data.cast.size() == 0 || data.cast[0] is string))) &&
+        (!('cast' in data) || (data.cast is list && data.cast.size() <= 20 && (data.cast.size() == 0 || data.cast[0] is string))) &&
         (!('trailerYoutubeId' in data) || (data.trailerYoutubeId is string && data.trailerYoutubeId.size() <= 120)) &&
+        (!('trailerUrl' in data) || (data.trailerUrl is string && data.trailerUrl.size() <= 1000)) &&
         (!('streamingPlatforms' in data) || (data.streamingPlatforms is list && data.streamingPlatforms.size() <= 10 && (data.streamingPlatforms.size() == 0 || data.streamingPlatforms[0] is string))) &&
         (!('communityRating' in data) || (data.communityRating is number && data.communityRating >= 0 && data.communityRating <= 10)) &&
         (!('communityVotesCount' in data) || (data.communityVotesCount is int && data.communityVotesCount >= 0 && data.communityVotesCount <= 1000000)) &&
@@ -297,7 +322,7 @@ service cloud.firestore {
           (
             incoming().userId == existing().userId &&
             incoming().createdAt == existing().createdAt &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt'])
+            !incoming().diff(existing()).affectedKeys().hasAny(['role', 'blocked'])
           )
         );
       allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
@@ -369,8 +394,7 @@ service cloud.firestore {
             existing().userId == request.auth.uid &&
             incoming().userId == existing().userId &&
             incoming().mediaId == existing().mediaId &&
-            incoming().createdAt == existing().createdAt &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'personalRating', 'rewatch', 'liked', 'personalComment', 'updatedAt'])
+            incoming().createdAt == existing().createdAt
           )
         );
       allow delete: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
@@ -423,16 +447,20 @@ service cloud.firestore {
         incoming().authorId == request.auth.uid &&
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
-      allow update: if isVerifiedUser() && isValidId(mediaId) &&
-        isValidCatalogMediaItem(incoming()) && (
-          isAdmin() ||
-          (
-            existing().authorId == request.auth.uid &&
-            incoming().authorId == existing().authorId &&
-            incoming().createdAt == existing().createdAt &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'type', 'year', 'director', 'synopsis', 'posterUrl', 'backdropUrl', 'duration', 'defaultPlatform', 'genres', 'updatedAt'])
-          )
-        );
+      allow update: if isVerifiedUser() && isValidId(mediaId) && (
+        isAdmin() ||
+        (
+          isValidCatalogMediaItem(incoming()) &&
+          existing().authorId == request.auth.uid &&
+          incoming().authorId == existing().authorId &&
+          incoming().createdAt == existing().createdAt
+        ) ||
+        // Verified users can increment addedToListCount atomically
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['addedToListCount']) &&
+          incoming().addedToListCount == existing().addedToListCount + 1
+        )
+      );
       allow delete: if isValidId(mediaId) && isAdmin();
     }
   }

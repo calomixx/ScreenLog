@@ -441,7 +441,7 @@ export const AdminPanelView: React.FC = () => {
     const typeLabel = MEDIA_TYPE_LABELS[media.type] || 'título';
     setConfirmDialog({
       title: `¿Eliminar "${media.title}" del catálogo?`,
-      description: `Esta acción quitará de forma permanente este título (${typeLabel}, ${media.year}) del catálogo de ScreenLog y registrará la acción en la auditoría.`,
+      description: `Esta acción quitará de forma permanente este título (${typeLabel}, ${media.year}) del catálogo de TakeVault y registrará la acción en la auditoría.`,
       confirmLabel: 'Quitar del catálogo',
       danger: true,
       onConfirm: async () => {
@@ -517,7 +517,7 @@ export const AdminPanelView: React.FC = () => {
     };
     const descriptions: Record<typeof action, string> = {
       block: `Se revocarán los accesos y se cerrarán inmediatamente sus ${user.sessionsCount} sesiones activas.`,
-      unblock: `El usuario podrá volver a acceder a ScreenLog Pro normalmente.`,
+      unblock: `El usuario podrá volver a acceder a TakeVault Pro normalmente.`,
       'reset-password': `Se generará una contraseña temporal de un solo uso y se cerrarán todas sus sesiones. La clave se mostrará en pantalla para que puedas copiarla.`,
       'force-logout': `Se cerrarán sus ${user.sessionsCount} sesiones en todos sus navegadores y dispositivos. Deberá iniciar sesión de nuevo.`,
     };
@@ -769,7 +769,7 @@ export const AdminPanelView: React.FC = () => {
           </div>
           <h1 className="font-display text-3xl font-black tracking-tight mt-2">Panel de administración</h1>
           <p className="text-sm text-slate-400 mt-1.5">
-            Gestiona usuarios, modera la comunidad y supervisa la seguridad de ScreenLog Pro.
+            Gestiona usuarios, modera la comunidad y supervisa la seguridad de TakeVault Pro.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
@@ -1605,7 +1605,7 @@ export const AdminPanelView: React.FC = () => {
                   value={billingForm.planName}
                   onChange={(event) => setBillingForm({ ...billingForm, planName: event.target.value })}
                   className={inputClass}
-                  placeholder="ScreenLog Pro"
+                  placeholder="TakeVault Pro"
                 />
               </div>
               <div>
@@ -1696,7 +1696,7 @@ export const AdminPanelView: React.FC = () => {
               { key: 'smtpPort', label: 'SMTP Puerto', placeholder: '587' },
               { key: 'smtpUser', label: 'SMTP Usuario', placeholder: 'usuario@ejemplo.com' },
               { key: 'smtpPassword', label: 'SMTP Contraseña', placeholder: '••••••••' },
-              { key: 'emailFrom', label: 'Correo remitente', placeholder: 'hola@screenlog.app' },
+              { key: 'emailFrom', label: 'Correo remitente', placeholder: 'hola@takevault.app' },
             ].map((field) => (
               <div key={field.key}>
                 <div className="flex items-center justify-between mb-1.5">

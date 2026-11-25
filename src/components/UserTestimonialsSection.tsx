@@ -144,7 +144,7 @@ export const UserTestimonialsSection: React.FC = () => {
             Comunidad y Experiencias
           </div>
           <h2 className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-            ¿Qué le ha gustado a los usuarios de ScreenLog?
+            ¿Qué le ha gustado a los usuarios de TakeVault?
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 max-w-2xl font-light">
             Descubre las opiniones de los miembros de la comunidad sobre las herramientas de seguimiento, calificación y catálogo.
@@ -186,7 +186,7 @@ export const UserTestimonialsSection: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-display font-bold text-white">
-                  Deja tu Opinión sobre ScreenLog
+                  Deja tu Opinión sobre TakeVault
                 </h3>
                 <p className="text-xs text-slate-400">
                   Cuéntanos qué función te gusta más o qué ha mejorado tu experiencia
@@ -197,7 +197,7 @@ export const UserTestimonialsSection: React.FC = () => {
             {showSuccessToast && (
               <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-xs text-emerald-300 flex items-center gap-2.5 animate-in fade-in duration-200">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span>¡Gracias por tu comentario! Ya está publicado en el muro de ScreenLog.</span>
+                <span>¡Gracias por tu comentario! Ya está publicado en el muro de TakeVault.</span>
               </div>
             )}
 
@@ -219,7 +219,7 @@ export const UserTestimonialsSection: React.FC = () => {
               {/* Star Rating for the platform */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300 uppercase block">
-                  Tu Calificación para ScreenLog
+                  Tu Calificación para TakeVault
                 </label>
                 <div className="flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -358,7 +358,7 @@ export const UserTestimonialsSection: React.FC = () => {
                 <MessageSquare className="w-8 h-8 mx-auto text-slate-600" />
                 <h4 className="text-sm font-bold text-white">Todavía no hay opiniones</h4>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Sé la primera persona en compartir su experiencia con ScreenLog usando el formulario.
+                  Sé la primera persona en compartir su experiencia con TakeVault usando el formulario.
                 </p>
               </div>
             )}

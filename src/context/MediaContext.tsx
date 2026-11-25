@@ -1136,7 +1136,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `screenlog-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.download = `takevault-backup-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
@@ -1205,7 +1205,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (candidateReviews.length === 0 && candidateMedia.length === 0) {
           return {
             success: false,
-            message: 'El archivo no contiene reseñas ni títulos compatibles con ScreenLog.',
+            message: 'El archivo no contiene reseñas ni títulos compatibles con TakeVault.',
             count: 0,
           };
         }

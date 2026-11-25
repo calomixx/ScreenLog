@@ -398,7 +398,7 @@ export const WatchProvidersTab: React.FC<WatchProvidersTabProps> = ({ media }) =
       >
         <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
         <p className="leading-relaxed">
-          La disponibilidad puede variar por región y fecha. Enlaces exclusivos a sitios oficiales y legales. ScreenLog no aloja contenido audiovisual pirata.
+          La disponibilidad puede variar por región y fecha. Enlaces exclusivos a sitios oficiales y legales. TakeVault no aloja contenido audiovisual pirata.
         </p>
       </div>
 

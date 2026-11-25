@@ -17,7 +17,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import type { MediaItem, UserProfile, UserReview } from '../types';
+import type { MediaItem, UserProfile } from '../types';
 
 const app = initializeApp(firebaseConfig);
 export const db =
@@ -178,22 +178,26 @@ export async function syncFirebaseUserProfile(
       updatedAt: serverTimestamp(),
     });
 
-    const email = clampString(fbUser.email || 'user@screenlog.app', BLUEPRINT_LIMITS.EMAIL_MAX_LEN, 'user@screenlog.app');
+    const email = clampString(fbUser.email || 'user@takevault.app', BLUEPRINT_LIMITS.EMAIL_MAX_LEN, 'user@takevault.app');
     if (existingPrivateSnap && existingPrivateSnap.exists()) {
       const existingData = existingPrivateSnap.data();
       batch.set(privateRef, {
         userId: uid,
         email,
+        role: existingData.role || 'user',
+        blocked: existingData.blocked || false,
         createdAt: existingData.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     } else {
       batch.set(privateRef, {
         userId: uid,
         email,
+        role: 'user',
+        blocked: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     }
 
     await batch.commit();
@@ -251,7 +255,7 @@ export async function publishCommunityReviewToFirestore(params: {
  */
 export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void> {
   const fbUser = auth.currentUser;
-  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'screenlog_admin';
+  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'takevault_admin';
   const mediaId = sanitizeFirestoreId(item.id);
   const path = `catalog_media/${mediaId}`;
 
@@ -275,9 +279,16 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
         .slice(0, BLUEPRINT_LIMITS.MAX_ARRAY_ITEMS)
     : ['Drama'];
 
-  // Campos obligatorios del documento.
+  const cast = Array.isArray(item.cast)
+    ? item.cast
+        .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+        .map((c) => c.trim().slice(0, 80))
+        .slice(0, 15)
+    : [];
+
+  const trailerYoutubeId = clampString(item.trailerYoutubeId || '', 120, '');
+
   const payload: Record<string, unknown> = {
-    authorId: uid,
     title,
     type,
     year,
@@ -288,72 +299,30 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
     duration,
     defaultPlatform,
     genres,
+    cast,
+    trailerYoutubeId,
+    communityRating: Number(item.communityRating) || 0,
+    communityVotesCount: Number(item.communityVotesCount) || 0,
+    addedToListCount: Number(item.addedToListCount) || 0,
+    isFeatured: Boolean(item.isFeatured),
+    isTrending: Boolean(item.isTrending),
+    isTopClassified: Boolean(item.isTopClassified),
+    isCustomUserCreated: Boolean(item.isCustomUserCreated),
+    updatedAt: serverTimestamp(),
   };
-
-  // Metadatos opcionales: completan la ficha en Firestore (tráiler, reparto,
-  // plataformas, notas de la comunidad, temporadas...). Se omiten si están vacíos.
-  const putString = (key: string, value: unknown, maxLen: number) => {
-    const text = clampString(value, maxLen, '');
-    if (text) payload[key] = text;
-  };
-  const putNumber = (key: string, value: unknown, min: number, max: number, integer = false) => {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return;
-    const clamped = Math.min(max, Math.max(min, num));
-    payload[key] = integer ? Math.round(clamped) : clamped;
-  };
-  const putBoolean = (key: string, value: unknown) => {
-    payload[key] = Boolean(value);
-  };
-  const putList = (key: string, value: unknown, maxItems: number, maxLen: number) => {
-    if (!Array.isArray(value)) return;
-    const list = value
-      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-      .map((entry) => entry.trim().slice(0, maxLen))
-      .slice(0, maxItems);
-    if (list.length > 0) payload[key] = list;
-  };
-
-  putString('originalTitle', item.originalTitle, BLUEPRINT_LIMITS.TITLE_MAX_LEN);
-  putList('cast', item.cast, 12, BLUEPRINT_LIMITS.NAME_MAX_LEN);
-  putString('trailerYoutubeId', item.trailerYoutubeId, 120);
-  putList('streamingPlatforms', item.streamingPlatforms, 10, BLUEPRINT_LIMITS.PLATFORM_MAX_LEN);
-  putNumber('communityRating', item.communityRating ?? 0, 0, 10);
-  putNumber('communityVotesCount', item.communityVotesCount ?? 0, 0, 1_000_000, true);
-  putNumber('addedToListCount', item.addedToListCount ?? 0, 0, 1_000_000, true);
-  putBoolean('isFeatured', item.isFeatured);
-  putBoolean('isTrending', item.isTrending);
-  putBoolean('isTopClassified', item.isTopClassified);
-  putNumber('seasonsCount', item.seasonsCount, 0, 200, true);
-  putNumber('episodesCount', item.episodesCount, 0, 10_000, true);
-  putString('releaseDate', item.releaseDate, 30);
-  putString('country', item.country, 80);
-  putString('language', item.language, 80);
-  putString('ageRating', item.ageRating, 40);
-  putString('status', item.status, 40);
-  putList('tags', item.tags, 12, BLUEPRINT_LIMITS.GENRE_MAX_LEN);
-  putString('createdByUserId', item.createdByUserId, BLUEPRINT_LIMITS.ID_MAX_LEN);
-  putBoolean('isCustomUserCreated', item.isCustomUserCreated);
-  putString('lastEditedBy', item.lastEditedBy, BLUEPRINT_LIMITS.ID_MAX_LEN);
-  putString('lastEditedAt', item.lastEditedAt, 40);
 
   try {
     const mediaRef = doc(db, 'catalog_media', mediaId);
     const snap = await getDoc(mediaRef);
     if (snap.exists()) {
       const existing = snap.data();
-      await setDoc(mediaRef, {
-        ...payload,
-        authorId: existing.authorId || uid,
-        createdAt: existing.createdAt,
-        updatedAt: serverTimestamp(),
-      });
+      payload.authorId = existing.authorId || uid;
+      payload.createdAt = existing.createdAt;
+      await setDoc(mediaRef, payload, { merge: true });
     } else {
-      await setDoc(mediaRef, {
-        ...payload,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      payload.authorId = uid;
+      payload.createdAt = serverTimestamp();
+      await setDoc(mediaRef, payload, { merge: true });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -406,7 +375,7 @@ export function subscribeToCatalogMedia(
     snapshot.forEach((docSnap: any) => {
       const d = docSnap.data();
       if (d && d.title) {
-        const item: MediaItem = {
+        items.push({
           id: docSnap.id,
           title: d.title,
           originalTitle: d.originalTitle || d.title,
@@ -414,14 +383,20 @@ export function subscribeToCatalogMedia(
           year: Number(d.year) || new Date().getFullYear(),
           genres: Array.isArray(d.genres) && d.genres.length > 0 ? d.genres : ['Drama'],
           director: d.director || 'Desconocido',
+          cast: Array.isArray(d.cast) ? d.cast : [],
           synopsis: d.synopsis || '',
           duration: d.duration || '2h 00m',
           posterUrl: d.posterUrl || '',
           backdropUrl: d.backdropUrl || d.posterUrl || '',
+          trailerYoutubeId: d.trailerUrl || d.trailerYoutubeId || '',
           defaultPlatform: d.defaultPlatform || 'Cine / Sala',
+          streamingPlatforms: Array.isArray(d.streamingPlatforms) ? d.streamingPlatforms : [d.defaultPlatform || 'Cine'],
           communityRating: Number(d.communityRating ?? d.rating) || 0,
           communityVotesCount: Number(d.communityVotesCount ?? d.ratingCount) || 0,
           addedToListCount: Number(d.addedToListCount) || 0,
+          isFeatured: Boolean(d.isFeatured),
+          isTrending: Boolean(d.isTrending),
+          isTopClassified: Boolean(d.isTopClassified),
           createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().slice(0, 10) : typeof d.createdAt === 'string' ? d.createdAt : new Date().toISOString().slice(0, 10),
           comments: [],
           detailedVotes: {
@@ -433,48 +408,8 @@ export function subscribeToCatalogMedia(
             totalVotes: 0,
             ratingDistribution: {},
           },
-          isCustomUserCreated: typeof d.isCustomUserCreated === 'boolean' ? d.isCustomUserCreated : true,
-        } as MediaItem;
-
-        // Los campos enriquecidos solo se aplican si el documento los trae:
-        // así una sincronización parcial no borra los datos locales más completos.
-        const cast = Array.isArray(d.cast)
-          ? d.cast.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
-          : [];
-        if (cast.length > 0) item.cast = cast;
-
-        const trailer = d.trailerYoutubeId || d.trailerUrl;
-        if (typeof trailer === 'string' && trailer.trim()) item.trailerYoutubeId = trailer.trim();
-
-        const platforms = Array.isArray(d.streamingPlatforms)
-          ? d.streamingPlatforms.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
-          : [];
-        if (platforms.length > 0) item.streamingPlatforms = platforms;
-
-        if (typeof d.releaseDate === 'string' && d.releaseDate) item.releaseDate = d.releaseDate;
-        if (typeof d.country === 'string' && d.country) item.country = d.country;
-        if (typeof d.language === 'string' && d.language) item.language = d.language;
-        if (typeof d.ageRating === 'string' && d.ageRating) item.ageRating = d.ageRating;
-        if (typeof d.status === 'string' && d.status) item.status = d.status as MediaItem['status'];
-
-        const seasons = Number(d.seasonsCount);
-        if (Number.isFinite(seasons) && seasons > 0) item.seasonsCount = seasons;
-        const episodes = Number(d.episodesCount);
-        if (Number.isFinite(episodes) && episodes > 0) item.episodesCount = episodes;
-
-        const tags = Array.isArray(d.tags)
-          ? d.tags.filter((tag: unknown): tag is string => typeof tag === 'string' && tag.trim().length > 0)
-          : [];
-        if (tags.length > 0) item.tags = tags;
-
-        if (typeof d.isFeatured === 'boolean') item.isFeatured = d.isFeatured;
-        if (typeof d.isTrending === 'boolean') item.isTrending = d.isTrending;
-        if (typeof d.isTopClassified === 'boolean') item.isTopClassified = d.isTopClassified;
-        if (typeof d.createdByUserId === 'string' && d.createdByUserId) item.createdByUserId = d.createdByUserId;
-        if (typeof d.lastEditedBy === 'string' && d.lastEditedBy) item.lastEditedBy = d.lastEditedBy;
-        if (typeof d.lastEditedAt === 'string' && d.lastEditedAt) item.lastEditedAt = d.lastEditedAt;
-
-        items.push(item);
+          isCustomUserCreated: true,
+        } as MediaItem);
       }
     });
     onMediaList(items);

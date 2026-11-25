@@ -71,7 +71,7 @@ const Splash: React.FC = () => (
     <LogoMark size={64} />
     <div className="flex items-center gap-2 text-sm text-slate-400">
       <Loader2 className="w-4 h-4 animate-spin text-rose-400" aria-hidden="true" />
-      Cargando ScreenLog Pro...
+      Cargando TakeVault Pro...
     </div>
   </div>
 );
@@ -217,7 +217,7 @@ const MainAppContent: React.FC = () => {
           <div className="text-[11px] text-slate-500 text-center md:text-right">
             <span>{mediaList.length} títulos catalogados</span>
             <span className="mx-2 text-slate-700">•</span>
-            <span>Espacio de Trabajo · ScreenLog Pro</span>
+            <span>Espacio de Trabajo · TakeVault Pro</span>
           </div>
         </div>
       </footer>

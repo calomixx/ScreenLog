@@ -145,7 +145,7 @@ export const LandingPublicView: React.FC = () => {
               <div className="flex items-center gap-2.5 text-emerald-200">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  <strong>Has salido del sistema de forma segura.</strong> Estás en el portal público de ScreenLog Pro.
+                  <strong>Has salido del sistema de forma segura.</strong> Estás en el portal público de TakeVault Pro.
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -318,7 +318,7 @@ export const LandingPublicView: React.FC = () => {
               Todo lo que Desbloqueas al Entrar
             </h2>
             <p className="text-sm text-slate-400">
-              Al iniciar sesión entras a tu sala personal de ScreenLog, diseñada específicamente para registrar, analizar y descubrir cine sin distracciones.
+              Al iniciar sesión entras a tu sala personal de TakeVault, diseñada específicamente para registrar, analizar y descubrir cine sin distracciones.
             </p>
           </div>
 
@@ -508,7 +508,7 @@ export const LandingPublicView: React.FC = () => {
             <div className="md:col-span-4 space-y-3">
               <h4 className="text-xs font-extrabold uppercase tracking-widest text-white">Acceso al Sistema</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                ¿Ya tienes una cuenta en ScreenLog Pro o deseas crear tu espacio privado hoy?
+                ¿Ya tienes una cuenta en TakeVault Pro o deseas crear tu espacio privado hoy?
               </p>
               <div className="flex flex-wrap gap-2.5 pt-1">
                 <button
@@ -530,7 +530,7 @@ export const LandingPublicView: React.FC = () => {
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-            <span>© {new Date().getFullYear()} ScreenLog Pro. Todos los derechos reservados.</span>
+            <span>© {new Date().getFullYear()} TakeVault Pro. Todos los derechos reservados.</span>
             <span>Portal Público Oficial • Acceso Verificado</span>
           </div>
         </div>

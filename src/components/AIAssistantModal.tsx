@@ -63,7 +63,7 @@ export const AIAssistantModal: React.FC = () => {
     {
       id: 'welcome-1',
       role: 'assistant',
-      text: `¡Hola ${currentUser ? currentUser.name : userName}! 👋 Soy **ScreenLog AI**, tu asistente inteligente oficial.\n\nEstoy aquí para enseñarte a usar todas las herramientas de la app, guiarte paso a paso para organizar tus películas y darte recomendaciones cinéfilas personalizadas.\n\n¿En qué te puedo ayudar hoy?`,
+      text: `¡Hola ${currentUser ? currentUser.name : userName}! 👋 Soy **TakeVault AI**, tu asistente inteligente oficial.\n\nEstoy aquí para enseñarte a usar todas las herramientas de la app, guiarte paso a paso para organizar tus películas y darte recomendaciones cinéfilas personalizadas.\n\n¿En qué te puedo ayudar hoy?`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -183,7 +183,7 @@ export const AIAssistantModal: React.FC = () => {
       const errorMsg: ChatMessage = {
         id: `bot-${Date.now()}`,
         role: 'assistant',
-        text: `¡Hola! Estás usando ScreenLog Pro con soporte offline:\n- **Disponibilidad Total Sin Internet**: Tus listas de películas, calificaciones, notas y estadísticas por género están 100% guardadas en tu navegador (\`localStorage\`). Puedes consultarlas y actualizarlas sin conexión.\n- **Sincronización Automática**: Cualquier cambio que realices sin conexión se añadirá a una cola local y se sincronizará cuando vuelvas a tener internet.\n- **Respaldos**: En Mi Lista puedes exportar o importar copias de seguridad en formato JSON.`,
+        text: `¡Hola! Estás usando TakeVault Pro con soporte offline:\n- **Disponibilidad Total Sin Internet**: Tus listas de películas, calificaciones, notas y estadísticas por género están 100% guardadas en tu navegador (\`localStorage\`). Puedes consultarlas y actualizarlas sin conexión.\n- **Sincronización Automática**: Cualquier cambio que realices sin conexión se añadirá a una cola local y se sincronizará cuando vuelvas a tener internet.\n- **Respaldos**: En Mi Lista puedes exportar o importar copias de seguridad en formato JSON.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         suggestedAction
       };
@@ -229,7 +229,7 @@ export const AIAssistantModal: React.FC = () => {
               ? 'bg-[#161618] text-white border border-rose-500/40'
               : 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 text-white shadow-rose-900/40 group-hover:scale-105'
           }`}
-          title="Abrir Asistente IA de ScreenLog"
+          title="Abrir Asistente IA de TakeVault"
         >
           {isAssistantOpen ? (
             <X className="w-6 h-6 text-rose-400" />
@@ -256,7 +256,7 @@ export const AIAssistantModal: React.FC = () => {
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-display font-extrabold text-white text-sm">
-                    ScreenLog AI
+                    TakeVault AI
                   </h3>
                   <span className="px-1.5 py-0.2 rounded-md bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold uppercase tracking-wider">
                     Asistente
@@ -366,7 +366,7 @@ export const AIAssistantModal: React.FC = () => {
             {isLoading && (
               <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-[#18181B] border border-white/10 text-slate-400 text-xs w-fit rounded-tl-none">
                 <Bot className="w-4 h-4 text-rose-400 animate-spin" />
-                <span>ScreenLog AI está consultando la guía...</span>
+                <span>TakeVault AI está consultando la guía...</span>
               </div>
             )}
 

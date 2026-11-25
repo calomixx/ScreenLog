@@ -1646,7 +1646,7 @@ export const DetailModal: React.FC = () => {
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                Esta película/serie se eliminará permanentemente del catálogo general de ScreenLog Pro en el servidor.
+                Esta película/serie se eliminará permanentemente del catálogo general de TakeVault Pro en el servidor.
               </p>
 
               <div className="pt-2 flex items-center justify-end gap-2.5">
