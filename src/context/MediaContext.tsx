@@ -21,6 +21,7 @@ import {
   subscribeToCatalogMedia,
 } from '../lib/firebase';
 import {
+  FirebaseSessionMissingError,
   maybeMigrateServerLibrary,
   migrateLegacyLibraryForUser,
   removeLibraryEntryFromFirestore,
@@ -411,6 +412,14 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const fbUser = auth.currentUser;
       if (!isAuthReady || !fbUser?.uid) {
         if (!cancelled) libraryHydratedRef.current = true;
+        // La app está logueada contra el servidor pero sin sesión de Firebase:
+        // los cambios se guardan en el servidor, no en Firestore.
+        if (!cancelled && isAuthReady && authUser) {
+          showToast(
+            'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
+            'warning',
+          );
+        }
         return;
       }
 
@@ -461,7 +470,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cancelled = true;
       if (unsubFirestore) unsubFirestore();
     };
-  }, [authUser?.id, isAuthReady]);
+  }, [authUser?.id, isAuthReady, authUser, showToast]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -586,7 +595,17 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (auth.currentUser?.uid) {
         saveLibraryEntryToFirestore(normalized).catch((err) => {
           console.error('Firestore library save error:', err);
+          if (err instanceof FirebaseSessionMissingError) {
+            showToast(err.message, 'warning');
+          } else {
+            showToast('No se pudo guardar en Firebase. Revisa la consola del navegador.', 'warning');
+          }
         });
+      } else {
+        showToast(
+          'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
+          'warning',
+        );
       }
 
       if (review.status === 'terminada' && review.stars >= 4) {
@@ -659,6 +678,11 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (auth.currentUser?.uid) {
         removeLibraryEntryFromFirestore(mediaId).catch((err) => {
           console.error('Firestore library delete error:', err);
+          if (err instanceof FirebaseSessionMissingError) {
+            showToast(err.message, 'warning');
+          } else {
+            showToast('No se pudo borrar en Firebase. Revisa la consola del navegador.', 'warning');
+          }
         });
       }
     },
