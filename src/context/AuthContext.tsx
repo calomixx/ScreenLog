@@ -9,6 +9,8 @@ import {
   onAuthStateChanged,
   syncFirebaseUserProfile,
 } from '../lib/firebase';
+import { ensureFirebasePasswordSession } from '../lib/firebaseAuthBridge';
+import { ensureUserAccount } from '../lib/firestore/users';
 
 export type { Role };
 
@@ -203,17 +205,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      setIsAuthReady(true);
-      if (fbUser && fbUser.emailVerified) {
+      if (fbUser) {
+        if (fbUser.emailVerified) {
+          try {
+            await syncFirebaseUserProfile(fbUser);
+          } catch (err) {
+            console.error('Error syncing Firebase user profile:', err);
+          }
+        }
         try {
-          await syncFirebaseUserProfile(fbUser);
+          // Entidad `users/{uid}` (cuenta privada + preferencias).
+          // Se espera antes de marcar la sesión como lista para que las
+          // clasificaciones no se escriban antes que su cuenta.
+          await ensureUserAccount({
+            uid: fbUser.uid,
+            displayName: fbUser.displayName,
+            email: fbUser.email,
+            photoURL: fbUser.photoURL,
+          });
         } catch (err) {
-          console.error('Error syncing Firebase user profile:', err);
+          console.warn('No se pudo sincronizar la cuenta en Firestore:', err);
         }
       }
+      setIsAuthReady(true);
     });
     return () => unsub();
   }, []);
+
+  const syncFirebaseIdentity = useCallback(
+    async (email: string, password: string, name?: string) => {
+      try {
+        const result = await ensureFirebasePasswordSession(email, password, name);
+        if (!result.ok && 'message' in result) {
+          console.warn('Firestore sin sesión de Firebase:', result.message);
+        }
+      } catch (err) {
+        console.warn('No se pudo sincronizar la sesión con Firebase:', err);
+      }
+    },
+    [],
+  );
 
   const login = useCallback(async (identifier: string, password: string, remember = false): Promise<AuthResult> => {
     try {
@@ -238,6 +269,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
+      // Sesión de Firebase Auth para que Firestore autentique las escrituras.
+      await syncFirebaseIdentity(response.data.user.email, password, response.data.user.name);
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -317,6 +350,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
+      await syncFirebaseIdentity(data.email, data.password, data.name);
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -346,6 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
+      await syncFirebaseIdentity(data.email, data.password, data.name);
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setNeedsSetup(false);

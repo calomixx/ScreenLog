@@ -15,14 +15,19 @@ import { canEditCatalog, useAuth } from './AuthContext';
 import { apiRequest, ApiError } from '../lib/api';
 import {
   auth,
-  saveLibraryEntryToFirestore,
-  removeLibraryEntryFromFirestore,
   publishCommunityReviewToFirestore,
   saveCatalogMediaToFirestore,
   deleteCatalogMediaFromFirestore,
   subscribeToCatalogMedia,
-  subscribeToUserLibrary,
 } from '../lib/firebase';
+import {
+  maybeMigrateServerLibrary,
+  migrateLegacyLibraryForUser,
+  removeLibraryEntryFromFirestore,
+  saveLibraryEntryToFirestore,
+  subscribeToUserLibrary,
+  type MediaLookup,
+} from '../lib/firestore';
 import confetti from 'canvas-confetti';
 import { computeCinephileStats } from '../lib/cinephileRanks';
 
@@ -278,6 +283,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const libraryHydratedRef = useRef(false);
   const unlockedBadgesRef = useRef<Set<string> | null>(null);
+  // El catálogo se carga de forma asíncrona; la suscripción necesita una
+  // referencia estable para enriquecer las clasificaciones con año/géneros.
+  const mediaListRef = useRef<MediaItem[]>(mediaList);
+  useEffect(() => {
+    mediaListRef.current = mediaList;
+  }, [mediaList]);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToastMessage({ text, type });
@@ -376,29 +387,75 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     libraryHydratedRef.current = false;
     let cancelled = false;
+    let unsubFirestore: (() => void) | undefined;
+    let migrationOk = true;
+
+    const mediaLookup: MediaLookup = new Map(
+      mediaListRef.current.map((item) => [
+        item.id,
+        { year: item.year, genres: item.genres, director: item.director },
+      ] as const),
+    );
+
     (async () => {
+      // 1) Arranque optimista con la copia del servidor (caché, no fuente de verdad).
+      let serverEntries: Record<string, UserReview> = {};
       try {
         const response = await apiRequest<{ success: boolean; data: Record<string, UserReview> }>('/api/me/library');
-        if (!cancelled) setUserReviews((prev) => ({ ...(response.data || {}), ...prev }));
+        serverEntries = response.data || {};
+        if (!cancelled) setUserReviews((prev) => ({ ...serverEntries, ...prev }));
       } catch {
-        if (!cancelled) setUserReviews((prev) => prev);
-      } finally {
+        // Sin servidor disponible seguimos con Firestore.
+      }
+
+      const fbUser = auth.currentUser;
+      if (!isAuthReady || !fbUser?.uid) {
+        if (!cancelled) libraryHydratedRef.current = true;
+        return;
+      }
+
+      // 2) Migración idempotente hacia users/{uid}/movie_classifications.
+      try {
+        const result = await maybeMigrateServerLibrary(
+          fbUser.uid,
+          Object.values(serverEntries),
+          mediaLookup,
+        );
+        if (result && result.failed > 0) migrationOk = false;
+      } catch (err) {
+        migrationOk = false;
+        console.warn('No se pudo migrar la biblioteca del servidor:', err);
+      }
+      try {
+        await migrateLegacyLibraryForUser(fbUser.uid);
+      } catch (err) {
+        console.warn('No se pudo migrar la colección legada user_library:', err);
+      }
+
+      if (cancelled) return;
+
+      // 3) Firestore pasa a ser la fuente de verdad en tiempo real.
+      try {
+        unsubFirestore = subscribeToUserLibrary(
+          fbUser.uid,
+          (firestoreEntries) => {
+            if (cancelled) return;
+            const cloudIsEmpty = Object.keys(firestoreEntries).length === 0;
+            if (!migrationOk && cloudIsEmpty && Object.keys(serverEntries).length > 0) {
+              // La migración falló: no borramos lo que ya había localmente.
+              libraryHydratedRef.current = true;
+              return;
+            }
+            setUserReviews(firestoreEntries);
+            libraryHydratedRef.current = true;
+          },
+          mediaLookup,
+        );
+      } catch (err) {
+        console.error('Firestore library subscription warning:', err);
         if (!cancelled) libraryHydratedRef.current = true;
       }
     })();
-
-    let unsubFirestore: (() => void) | undefined;
-    if (isAuthReady && auth.currentUser?.uid && auth.currentUser.emailVerified) {
-      try {
-        unsubFirestore = subscribeToUserLibrary(auth.currentUser.uid, (firestoreEntries) => {
-          if (!cancelled && Object.keys(firestoreEntries).length > 0) {
-            setUserReviews((prev) => ({ ...firestoreEntries, ...prev }));
-          }
-        });
-      } catch (err) {
-        console.error('Firestore library subscription warning:', err);
-      }
-    }
 
     return () => {
       cancelled = true;
@@ -526,7 +583,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast(error instanceof ApiError ? error.message : 'No se pudo guardar el cambio.', 'warning');
       });
 
-      if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+      if (auth.currentUser?.uid) {
         saveLibraryEntryToFirestore(normalized).catch((err) => {
           console.error('Firestore library save error:', err);
         });
@@ -599,7 +656,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       apiRequest(`/api/me/library/${encodeURIComponent(mediaId)}`, { method: 'DELETE' }).catch((error) => {
         showToast(error instanceof ApiError ? error.message : 'No se pudo eliminar el título.', 'warning');
       });
-      if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
+      if (auth.currentUser?.uid) {
         removeLibraryEntryFromFirestore(mediaId).catch((err) => {
           console.error('Firestore library delete error:', err);
         });

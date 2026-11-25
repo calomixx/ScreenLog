@@ -203,85 +203,6 @@ export async function syncFirebaseUserProfile(
 }
 
 /**
- * Saves or updates a personal library entry in Firestore for a verified Firebase user.
- */
-export async function saveLibraryEntryToFirestore(review: UserReview): Promise<void> {
-  const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
-
-  const uid = sanitizeFirestoreId(fbUser.uid);
-  const mediaId = sanitizeFirestoreId(review.mediaId);
-  const entryId = sanitizeFirestoreId(`${uid}_${mediaId}`);
-  const path = `user_library/${entryId}`;
-
-  const status = ['pendiente', 'en_proceso', 'terminada'].includes(review.status)
-    ? review.status
-    : 'pendiente';
-  const personalRating = Math.max(0, Math.min(5, Number(review.stars) || 0));
-  const rewatchMap: Record<string, string> = {
-    si_totalmente: 'si',
-    quizas: 'tal_vez',
-    no_suficiente: 'no',
-    jamas: 'no',
-  };
-  const rewatch = rewatchMap[review.wouldRewatch] || 'sin_definir';
-  const liked = personalRating >= 4;
-  const personalComment = clampString(review.critique || '', BLUEPRINT_LIMITS.COMMENT_MAX_LEN, '');
-
-  try {
-    const entryRef = doc(db, 'user_library', entryId);
-    const snap = await getDoc(entryRef);
-    if (snap.exists()) {
-      const existing = snap.data();
-      await setDoc(entryRef, {
-        userId: uid,
-        mediaId,
-        status,
-        personalRating,
-        rewatch,
-        liked,
-        personalComment,
-        createdAt: existing.createdAt,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await setDoc(entryRef, {
-        userId: uid,
-        mediaId,
-        status,
-        personalRating,
-        rewatch,
-        liked,
-        personalComment,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-/**
- * Deletes a personal library entry from Firestore.
- */
-export async function removeLibraryEntryFromFirestore(rawMediaId: string): Promise<void> {
-  const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
-
-  const uid = sanitizeFirestoreId(fbUser.uid);
-  const mediaId = sanitizeFirestoreId(rawMediaId);
-  const entryId = sanitizeFirestoreId(`${uid}_${mediaId}`);
-  const path = `user_library/${entryId}`;
-
-  try {
-    await deleteDoc(doc(db, 'user_library', entryId));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-/**
  * Publishes a community review to Firestore.
  */
 export async function publishCommunityReviewToFirestore(params: {
@@ -583,52 +504,6 @@ export function subscribeToCatalogMedia(
     primaryUnsub();
     if (fallbackUnsub) fallbackUnsub();
   };
-}
-
-/**
- * Subscribes to the current Firebase user's personal library in real time.
- */
-export function subscribeToUserLibrary(
-  uid: string,
-  onEntries: (reviews: Record<string, UserReview>) => void,
-): Unsubscribe {
-  const safeUid = sanitizeFirestoreId(uid);
-  const q = query(collection(db, 'user_library'), where('userId', '==', safeUid));
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const map: Record<string, UserReview> = {};
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d && typeof d.mediaId === 'string') {
-          const stars = Number(d.personalRating) || 0;
-          const reverseRewatch: Record<string, UserReview['wouldRewatch']> = {
-            si: 'si_totalmente',
-            tal_vez: 'quizas',
-            no: 'no_suficiente',
-          };
-          map[d.mediaId] = {
-            mediaId: d.mediaId,
-            status: d.status || 'pendiente',
-            stars,
-            year: new Date().getFullYear(),
-            genres: ['Drama'],
-            evaluation: stars >= 4.5 ? 'Obra Maestra (10/10)' : stars >= 4 ? 'Excelente (9/10)' : 'Buena (7/10)',
-            critique: d.personalComment || '',
-            director: '',
-            watchedDate: new Date().toISOString().slice(0, 10),
-            platform: 'Netflix',
-            wouldRewatch: reverseRewatch[d.rewatch] || 'quizas',
-            updatedAt: new Date().toISOString().slice(0, 10),
-          };
-        }
-      });
-      onEntries(map);
-    },
-    (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'user_library');
-    },
-  );
 }
 
 /**
