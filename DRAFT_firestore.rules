@@ -440,8 +440,10 @@ service cloud.firestore {
 
     // Shared Catalog Media Items
     match /catalog_media/{mediaId} {
-      allow get: if isValidId(mediaId) && existing().year >= 1888;
-      allow list: if existing().year >= 1888 && existing().year <= 2100;
+      // Catálogo público: lo puede leer cualquiera (incluso sin sesión) para
+      // que la app cargue sin depender de Firebase Auth. Las escrituras siguen
+      // restringidas a usuarios verificados/admin.
+      allow get, list: if true;
       allow create: if isVerifiedUser() && isValidId(mediaId) &&
         isValidCatalogMediaItem(incoming()) &&
         incoming().authorId == request.auth.uid &&
