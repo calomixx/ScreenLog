@@ -256,7 +256,7 @@ function attachCommunityReviews(items: MediaItem[], reviews: ServerReview[]): Me
 }
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
+  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, firebaseLinkError, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
   const currentUser = authUser as UserProfile | null;
 
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => INITIAL_MEDIA_LIST);
@@ -416,7 +416,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // los cambios se guardan en el servidor, no en Firestore.
         if (!cancelled && isAuthReady && authUser) {
           showToast(
-            'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
+            firebaseLinkError
+              ? `Firebase no vinculado: ${firebaseLinkError}`
+              : 'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
             'warning',
           );
         }
@@ -470,7 +472,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cancelled = true;
       if (unsubFirestore) unsubFirestore();
     };
-  }, [authUser?.id, isAuthReady, authUser, showToast]);
+  }, [authUser?.id, isAuthReady, authUser, showToast, firebaseLinkError]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -603,7 +605,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       } else {
         showToast(
-          'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
+          firebaseLinkError
+            ? `Firebase no vinculado: ${firebaseLinkError}`
+            : 'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
           'warning',
         );
       }
@@ -616,7 +620,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
     },
-    [authUser, requestLogin, showToast],
+    [authUser, requestLogin, showToast, firebaseLinkError],
   );
 
   const updateMediaStatus = useCallback(

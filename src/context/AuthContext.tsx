@@ -122,6 +122,8 @@ export interface AuthContextType {
   pendingLoginMode: 'login' | 'register';
   justLoggedOut: boolean;
   settings: PublicSettings;
+  /** Motivo por el que la sesión de Firebase Auth no se pudo vincular. */
+  firebaseLinkError: string | null;
   login: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
   loginWithGoogle: () => Promise<AuthResult>;
   register: (data: { name: string; username?: string; email: string; password: string; avatar?: string }) => Promise<AuthResult>;
@@ -150,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [justLoggedOut, setJustLoggedOut] = useState(false);
   const [settings, setSettings] = useState<PublicSettings>(defaultSettings);
   const [pendingLoginMode, setPendingLoginMode] = useState<'login' | 'register'>('login');
+  const [firebaseLinkError, setFirebaseLinkError] = useState<string | null>(null);
 
   const applyStatus = useCallback((data: StatusResponse['data']) => {
     setNeedsSetup(data.needsSetup);
@@ -237,9 +240,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const result = await ensureFirebasePasswordSession(email, password, name);
         if (!result.ok && 'message' in result) {
+          setFirebaseLinkError(result.message);
           console.warn('Firestore sin sesión de Firebase:', result.message);
+        } else {
+          setFirebaseLinkError(null);
         }
       } catch (err) {
+        setFirebaseLinkError('No se pudo sincronizar la sesión con Firebase.');
         console.warn('No se pudo sincronizar la sesión con Firebase:', err);
       }
     },
@@ -412,6 +419,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsGuest(true);
     setIsWorkspaceGuest(false);
     setJustLoggedOut(true);
+    setFirebaseLinkError(null);
     try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }, []);
@@ -431,6 +439,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsGuest(true);
     setIsWorkspaceGuest(false);
     setJustLoggedOut(true);
+    setFirebaseLinkError(null);
     try { sessionStorage.setItem('screenlog_guest', '1'); } catch {}
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }, []);
@@ -520,6 +529,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     pendingLoginMode,
     justLoggedOut,
     settings,
+    firebaseLinkError,
     login,
     loginWithGoogle,
     register,
@@ -546,6 +556,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     pendingLoginMode,
     justLoggedOut,
     settings,
+    firebaseLinkError,
     login,
     loginWithGoogle,
     register,
