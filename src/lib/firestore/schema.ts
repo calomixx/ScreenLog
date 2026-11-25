@@ -467,11 +467,9 @@ export function userReviewToClassificationInput(
     isFavorite: review.isFavorite ?? fallbackFavorite,
     rating: clampNumber(review.stars, 0, 5),
     categories: previous?.categories ?? [],
-    tags: clampStringList(
-      review.tags,
-      CLASSIFICATION_LIMITS.TAG_MAX_COUNT,
-      CLASSIFICATION_LIMITS.TAG_MAX_LEN,
-    ),
+    tags: review.tags
+      ? clampStringList(review.tags, CLASSIFICATION_LIMITS.TAG_MAX_COUNT, CLASSIFICATION_LIMITS.TAG_MAX_LEN)
+      : previous?.tags ?? [],
     notes: clampString(review.critique, CLASSIFICATION_LIMITS.NOTES_MAX_LEN),
     evaluation: clampString(review.evaluation, CLASSIFICATION_LIMITS.EVALUATION_MAX_LEN),
     watchedDate: clampString(review.watchedDate, CLASSIFICATION_LIMITS.DATE_MAX_LEN),
