@@ -11,6 +11,7 @@ import {
   collection,
   query,
   where,
+  limit,
   onSnapshot,
   writeBatch,
   serverTimestamp,
@@ -447,7 +448,15 @@ export function subscribeToCatalogMedia(
 export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number; message: string; docCount: number }> {
   const start = Date.now();
   try {
-    const snap = await getDocs(collection(db, 'catalog_media'));
+    // Lectura mínima y compatible con las reglas de `catalog_media`.
+    const snap = await getDocs(
+      query(
+        collection(db, 'catalog_media'),
+        where('year', '>=', 1888),
+        where('year', '<=', 2100),
+        limit(25),
+      ),
+    );
     const latency = Date.now() - start;
     return {
       ok: true,
@@ -456,29 +465,13 @@ export async function pingFirestore(): Promise<{ ok: boolean; latencyMs: number;
       docCount: snap.size,
     };
   } catch (err: any) {
-    try {
-      const q = query(
-        collection(db, 'catalog_media'),
-        where('year', '>=', 1888),
-        where('year', '<=', 2100),
-      );
-      const snap = await getDocs(q);
-      const latency = Date.now() - start;
-      return {
-        ok: true,
-        latencyMs: latency,
-        message: 'Conectado a Firebase Firestore en tiempo real.',
-        docCount: snap.size,
-      };
-    } catch (fallbackErr: any) {
-      const latency = Date.now() - start;
-      return {
-        ok: false,
-        latencyMs: latency,
-        message: fallbackErr?.message || err?.message || 'Error al conectar con Firestore.',
-        docCount: 0,
-      };
-    }
+    const latency = Date.now() - start;
+    return {
+      ok: false,
+      latencyMs: latency,
+      message: err?.message || 'Error al conectar con Firestore.',
+      docCount: 0,
+    };
   }
 }
 

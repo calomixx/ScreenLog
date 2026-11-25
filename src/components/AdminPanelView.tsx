@@ -972,8 +972,8 @@ export const AdminPanelView: React.FC = () => {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <span className="text-slate-400">Estado del servicio</span>
-                    <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className={`inline-flex items-center gap-1.5 font-bold ${firestoreStatus.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className={`w-2 h-2 rounded-full ${firestoreStatus.ok ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
                       {firestoreStatus.ok ? 'Conectado en Tiempo Real' : 'Desconectado'}
                     </span>
                   </div>
@@ -1004,6 +1004,13 @@ export const AdminPanelView: React.FC = () => {
                     <span className="text-amber-400 font-semibold text-[11px]">Exclusivo Administrador</span>
                   </div>
                 </div>
+
+                {firestoreStatus.checked && !firestoreStatus.ok && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] leading-relaxed break-words">
+                    <span className="font-bold block mb-0.5">Detalle del error</span>
+                    {firestoreStatus.message || 'Sin detalle.'}
+                  </div>
+                )}
 
                 <button
                   type="button"

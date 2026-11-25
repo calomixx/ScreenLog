@@ -1,4 +1,5 @@
-import { auth } from '../firebase';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 /**
  * Diagnóstico de la sesión de Firebase Auth y de las escrituras a Firestore.
@@ -78,9 +79,54 @@ export function getFirestoreDiagnostics(): {
   };
 }
 
+export interface FirestoreReadProbe {
+  ok: boolean;
+  latencyMs: number;
+  docs: number;
+  message: string;
+  code?: string;
+}
+
+/**
+ * Prueba de lectura real contra Firestore. Sirve para saber si el problema es
+ * de red, de permisos (reglas) o de configuración, sin depender de la UI.
+ */
+export async function probeFirestoreRead(): Promise<FirestoreReadProbe> {
+  const start = Date.now();
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'catalog_media'),
+        where('year', '>=', 1888),
+        where('year', '<=', 2100),
+        limit(1),
+      ),
+    );
+    return {
+      ok: true,
+      latencyMs: Date.now() - start,
+      docs: snap.size,
+      message: 'Lectura correcta de catalog_media.',
+    };
+  } catch (error) {
+    const err = error as { message?: string; code?: string };
+    return {
+      ok: false,
+      latencyMs: Date.now() - start,
+      docs: 0,
+      message: err?.message || String(error),
+      code: err?.code,
+    };
+  }
+}
+
 /** Expone el diagnóstico en la consola del navegador. */
 export function installFirestoreDiagnosticsGlobal(): void {
   if (typeof window === 'undefined') return;
-  (window as unknown as { __SL_FIRESTORE_DIAG?: typeof getFirestoreDiagnostics }).__SL_FIRESTORE_DIAG =
-    getFirestoreDiagnostics;
+  const target = window as unknown as {
+    __SL_FIRESTORE_DIAG?: typeof getFirestoreDiagnostics;
+    __SL_FIRESTORE_PROBE?: typeof probeFirestoreRead;
+  };
+  target.__SL_FIRESTORE_DIAG = getFirestoreDiagnostics;
+  target.__SL_FIRESTORE_PROBE = probeFirestoreRead;
 }
