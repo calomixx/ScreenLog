@@ -288,7 +288,7 @@ service cloud.firestore {
 
     // Public User Profiles (No PII)
     match /users_public/{userId} {
-      allow get: if isValidId(userId) && existing().userId == userId;
+      allow get: if isValidId(userId) && (resource == null || existing().userId == userId);
       allow list: if isSignedIn() && existing().userId is string;
       allow create: if isOwner(userId) && isValidId(userId) && isValidUserPublicProfile(incoming(), userId);
       allow update: if isOwner(userId) && isValidId(userId) && isValidUserPublicProfile(incoming(), userId) && (
@@ -402,7 +402,7 @@ service cloud.firestore {
 
     // Public Community Reviews
     match /community_reviews/{reviewId} {
-      allow get: if isValidId(reviewId) && existing().rating >= 1;
+      allow get: if isValidId(reviewId) && (resource == null || existing().rating >= 1);
       allow list: if existing().rating >= 1 && existing().rating <= 5;
       allow create: if isVerifiedUser() && isValidId(reviewId) &&
         isValidCommunityReview(incoming()) &&
@@ -440,7 +440,7 @@ service cloud.firestore {
 
     // Shared Catalog Media Items
     match /catalog_media/{mediaId} {
-      allow get: if isValidId(mediaId) && existing().year >= 1888;
+      allow get: if isValidId(mediaId) && (resource == null || existing().year >= 1888);
       allow list: if existing().year >= 1888 && existing().year <= 2100;
       allow create: if isVerifiedUser() && isValidId(mediaId) &&
         isValidCatalogMediaItem(incoming()) &&
@@ -448,16 +448,22 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
       allow update: if isVerifiedUser() && isValidId(mediaId) && (
-        isAdmin() ||
         (
-          isValidCatalogMediaItem(incoming()) &&
-          existing().authorId == request.auth.uid &&
-          incoming().authorId == existing().authorId &&
-          incoming().createdAt == existing().createdAt
+          isValidCatalogMediaItem(incoming()) && (
+            isAdmin() ||
+            (
+              existing().authorId == request.auth.uid &&
+              incoming().authorId == existing().authorId &&
+              incoming().createdAt == existing().createdAt
+            )
+          )
         ) ||
         // Verified users can increment addedToListCount atomically
         (
           incoming().diff(existing()).affectedKeys().hasOnly(['addedToListCount']) &&
+          incoming().addedToListCount is int &&
+          incoming().addedToListCount >= 1 &&
+          incoming().addedToListCount <= 1000000 &&
           incoming().addedToListCount == existing().addedToListCount + 1
         )
       );
