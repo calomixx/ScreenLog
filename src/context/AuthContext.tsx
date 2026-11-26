@@ -124,6 +124,8 @@ export interface AuthContextType {
   settings: PublicSettings;
   /** Motivo por el que la sesión de Firebase Auth no se pudo vincular. */
   firebaseLinkError: string | null;
+  /** Vincula la sesión actual con Firebase Auth usando la contraseña de la app. */
+  linkFirebaseSession: (password: string) => Promise<AuthResult>;
   login: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
   loginWithGoogle: () => Promise<AuthResult>;
   register: (data: { name: string; username?: string; email: string; password: string; avatar?: string }) => Promise<AuthResult>;
@@ -251,6 +253,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     },
     [],
+  );
+
+  const linkFirebaseSession = useCallback(
+    async (password: string): Promise<AuthResult> => {
+      const email = currentUser?.email?.trim();
+      if (!email) {
+        return { success: false, message: 'No hay una sesión de la app para vincular.' };
+      }
+      if (!password) {
+        return { success: false, message: 'Escribe tu contraseña para vincular Firebase.' };
+      }
+      const result = await ensureFirebasePasswordSession(email, password, currentUser?.name);
+      if (result.ok) {
+        setFirebaseLinkError(null);
+        return { success: true };
+      }
+      if ('message' in result) {
+        setFirebaseLinkError(result.message);
+        return { success: false, message: result.message, code: result.code };
+      }
+      setFirebaseLinkError('No se pudo vincular la sesión de Firebase.');
+      return { success: false, message: 'No se pudo vincular la sesión de Firebase.' };
+    },
+    [currentUser?.email, currentUser?.name],
   );
 
   const login = useCallback(async (identifier: string, password: string, remember = false): Promise<AuthResult> => {
@@ -530,6 +556,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     justLoggedOut,
     settings,
     firebaseLinkError,
+    linkFirebaseSession,
     login,
     loginWithGoogle,
     register,
@@ -557,6 +584,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     justLoggedOut,
     settings,
     firebaseLinkError,
+    linkFirebaseSession,
     login,
     loginWithGoogle,
     register,

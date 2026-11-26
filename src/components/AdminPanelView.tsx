@@ -59,6 +59,7 @@ import { useMedia } from '../context/MediaContext';
 import type { MediaItem, MediaType } from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
 import { pingFirestore, seedCatalogToFirestore } from '../lib/firebase';
+import { getFirestoreDiagnostics } from '../lib/firestore';
 
 type AdminTab =
   | 'summary'
@@ -185,7 +186,7 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
 );
 
 export const AdminPanelView: React.FC = () => {
-  const { currentUser, refresh, requestLogin } = useAuth();
+  const { currentUser, refresh, requestLogin, firebaseLinkError, linkFirebaseSession } = useAuth();
   const {
     mediaList,
     openEditMediaModal,
@@ -270,6 +271,35 @@ export const AdminPanelView: React.FC = () => {
       });
     }
   }, []);
+
+  const [firebaseDiag, setFirebaseDiag] = useState(() => getFirestoreDiagnostics());
+  const [isLinkingFirebase, setIsLinkingFirebase] = useState(false);
+
+  const refreshFirebaseDiag = useCallback(() => {
+    setFirebaseDiag(getFirestoreDiagnostics());
+  }, []);
+
+  const handleLinkFirebase = useCallback(async () => {
+    if (isLinkingFirebase) return;
+    const password = window.prompt(
+      'Escribe la contraseña con la que entrás a la app para vincular la sesión de Firebase:',
+    );
+    if (!password) return;
+    setIsLinkingFirebase(true);
+    try {
+      const result = await linkFirebaseSession(password);
+      if (result.success) {
+        refreshFirebaseDiag();
+        flash('Sesión de Firebase vinculada. Recargando la app...');
+        window.setTimeout(() => window.location.reload(), 900);
+      } else {
+        setError(result.message || 'No se pudo vincular la sesión de Firebase.');
+        refreshFirebaseDiag();
+      }
+    } finally {
+      setIsLinkingFirebase(false);
+    }
+  }, [isLinkingFirebase, linkFirebaseSession, refreshFirebaseDiag]);
 
   const [isSeedingFirestore, setIsSeedingFirestore] = useState(false);
 
@@ -950,6 +980,71 @@ export const AdminPanelView: React.FC = () => {
                     Los administradores y el owner tienen permisos completos CRUD sobre el catálogo (añadir por TMDB o manual, editar ficha técnica y quitar títulos).
                   </p>
                 </div>
+              </section>
+
+              <section className={`${cardClass} p-5 space-y-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-sky-400" />
+                    <h2 className="font-display text-lg font-black tracking-tight">Sesión de Firebase Auth</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshFirebaseDiag}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 text-xs font-semibold transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Actualizar
+                  </button>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Estado de la sesión</span>
+                    <span className={`inline-flex items-center gap-1.5 font-bold ${firebaseDiag.session.hasSession ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className={`w-2 h-2 rounded-full ${firebaseDiag.session.hasSession ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      {firebaseDiag.session.hasSession ? 'Vinculada' : 'No vinculada'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400 shrink-0">UID Firebase</span>
+                    <span className="text-slate-200 font-mono text-[11px] truncate">{firebaseDiag.session.uid || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400 shrink-0">Email</span>
+                    <span className="text-slate-200 font-mono text-[11px] truncate">{firebaseDiag.session.email || currentUser?.email || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-slate-400">Guardados en la nube</span>
+                    <span className="text-slate-200 font-bold">
+                      {firebaseDiag.writes.successes} ok · {firebaseDiag.writes.failures} fallidos
+                    </span>
+                  </div>
+                </div>
+
+                {!firebaseDiag.session.hasSession && (
+                  <>
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] leading-relaxed">
+                      Sin esta sesión, Firestore no guarda tus clasificaciones. Vinculala con tu contraseña de la app.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleLinkFirebase()}
+                      disabled={isLinkingFirebase}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-colors disabled:opacity-50"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      {isLinkingFirebase ? 'Vinculando...' : 'Vincular sesión de Firebase'}
+                    </button>
+                  </>
+                )}
+
+                {(firebaseLinkError || firebaseDiag.writes.lastError) && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] leading-relaxed break-words">
+                    <span className="font-bold block mb-0.5">Último problema</span>
+                    {firebaseLinkError || firebaseDiag.writes.lastError?.message}
+                  </div>
+                )}
               </section>
 
               <section className={`${cardClass} p-5 space-y-4`}>
