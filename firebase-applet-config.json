@@ -6,5 +6,7 @@
   "firestoreDatabaseId": "(default)",
   "storageBucket": "screeamlog.firebasestorage.app",
   "messagingSenderId": "902900722838",
-  "measurementId": "G-BNC0EBKEEY"
+  "measurementId": "G-BNC0EBKEEY",
+  "oAuthClientId": "902900722838-0oscbu813j94k9v19vd1qtmll6l5l0m9.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

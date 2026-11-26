@@ -254,9 +254,16 @@ export async function publishCommunityReviewToFirestore(params: {
 /**
  * Saves or updates a custom/curated catalog media item in Firestore.
  */
-export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void> {
+export async function saveCatalogMediaToFirestore(
+  item: MediaItem,
+  options?: { onlyIfMissing?: boolean },
+): Promise<boolean> {
   const fbUser = auth.currentUser;
-  const uid = fbUser?.uid ? sanitizeFirestoreId(fbUser.uid) : 'takevault_admin';
+  if (!fbUser?.uid || !fbUser.emailVerified) {
+    return false;
+  }
+
+  const uid = sanitizeFirestoreId(fbUser.uid);
   const mediaId = sanitizeFirestoreId(item.id);
   const path = `catalog_media/${mediaId}`;
 
@@ -302,9 +309,9 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
     genres,
     cast,
     trailerYoutubeId,
-    communityRating: Number(item.communityRating) || 0,
-    communityVotesCount: Number(item.communityVotesCount) || 0,
-    addedToListCount: Number(item.addedToListCount) || 0,
+    communityRating: Math.max(0, Math.min(10, Number(item.communityRating) || 0)),
+    communityVotesCount: Math.max(0, Math.min(1000000, Math.round(Number(item.communityVotesCount) || 0))),
+    addedToListCount: Math.max(0, Math.min(1000000, Math.round(Number(item.addedToListCount) || 0))),
     isFeatured: Boolean(item.isFeatured),
     isTrending: Boolean(item.isTrending),
     isTopClassified: Boolean(item.isTopClassified),
@@ -316,15 +323,23 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
     const mediaRef = doc(db, 'catalog_media', mediaId);
     const snap = await getDoc(mediaRef);
     if (snap.exists()) {
+      if (options?.onlyIfMissing) {
+        return true;
+      }
       const existing = snap.data();
       payload.authorId = existing.authorId || uid;
       payload.createdAt = existing.createdAt;
       await setDoc(mediaRef, payload, { merge: true });
     } else {
+      const publicProfileSnap = await getDoc(doc(db, 'users_public', uid));
+      if (!publicProfileSnap.exists()) {
+        await syncFirebaseUserProfile(fbUser);
+      }
       payload.authorId = uid;
       payload.createdAt = serverTimestamp();
-      await setDoc(mediaRef, payload, { merge: true });
+      await setDoc(mediaRef, payload);
     }
+    return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -334,12 +349,20 @@ export async function saveCatalogMediaToFirestore(item: MediaItem): Promise<void
  * Seeds a list of media items into Firestore catalog_media collection.
  */
 export async function seedCatalogToFirestore(items: MediaItem[]): Promise<{ success: number; failed: number }> {
+  const fbUser = auth.currentUser;
+  if (!fbUser?.uid || !fbUser.emailVerified) {
+    throw new Error(
+      'Inicia sesión con una cuenta de Firebase verificada (por ejemplo, con Google) para subir el catálogo a Firestore.',
+    );
+  }
+
   let success = 0;
   let failed = 0;
   for (const item of items) {
     try {
-      await saveCatalogMediaToFirestore(item);
-      success++;
+      const saved = await saveCatalogMediaToFirestore(item);
+      if (saved) success++;
+      else failed++;
     } catch (err) {
       console.warn('Failed to seed item to Firestore:', item.title, err);
       failed++;
@@ -352,6 +375,9 @@ export async function seedCatalogToFirestore(items: MediaItem[]): Promise<{ succ
  * Deletes a catalog item from Firestore.
  */
 export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<void> {
+  const fbUser = auth.currentUser;
+  if (!fbUser?.uid || !fbUser.emailVerified) return;
+
   const safeId = sanitizeFirestoreId(mediaId);
   const path = `catalog_media/${safeId}`;
   try {

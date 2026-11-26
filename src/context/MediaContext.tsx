@@ -325,10 +325,6 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               if (!items.some((it) => it.id === c.id)) {
                 items.unshift(c);
               }
-              // Sincronizar automáticamente títulos personalizados a Firestore
-              saveCatalogMediaToFirestore(c).catch((e) =>
-                console.warn('Auto-sync custom item to Firestore failed:', c.title, e),
-              );
             });
           }
         }
@@ -353,6 +349,24 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cancelled = true;
     };
   }, []);
+
+  // Sincronizar títulos personalizados locales a Firestore solo cuando hay sesión verificada de Firebase
+  useEffect(() => {
+    if (!isAuthReady || !auth.currentUser?.uid || !auth.currentUser.emailVerified) return;
+    try {
+      const savedCustom = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
+      if (!savedCustom) return;
+      const parsedCustom = JSON.parse(savedCustom) as MediaItem[];
+      if (!Array.isArray(parsedCustom)) return;
+      parsedCustom.forEach((c) => {
+        saveCatalogMediaToFirestore(c, { onlyIfMissing: true }).catch((e) =>
+          console.warn('Auto-sync custom item to Firestore failed:', c.title, e),
+        );
+      });
+    } catch (err) {
+      console.warn('Could not auto-sync local custom media to Firestore:', err);
+    }
+  }, [isAuthReady, authUser?.id]);
 
   // Real-time synchronization with Firebase Firestore cloud catalog
   useEffect(() => {
@@ -1128,8 +1142,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
         .then(() => {
           saveCatalogMediaToFirestore(newMedia)
-            .then(() => {
-              showToast(`"${newMedia.title}" guardado en tu catálogo y sincronizado en Firebase.`, 'success');
+            .then((synced) => {
+              showToast(
+                synced
+                  ? `"${newMedia.title}" guardado en tu catálogo y sincronizado en Firebase.`
+                  : `Título añadido: ${newMedia.title}.`,
+                'success',
+              );
             })
             .catch((err) => {
               console.error('Firestore catalog media save error:', err);
