@@ -271,7 +271,34 @@ Todas las funciones:
 
 `ensureUserAccount` se llama al iniciar sesión (en `AuthContext`) y es idempotente.
 
-### `src/lib/firebaseAuthBridge.ts` — sesión de Firebase para login por contraseña
+### `src/lib/firebaseCustomToken.ts` — sesión de Firebase automática (recomendada)
+
+El servidor firma un *custom token* para el usuario que ya inició sesión en la app
+(`POST /api/auth/firebase-token`) y el navegador lo canjea con
+`signInWithCustomToken`. No hace falta el proveedor Email/Password ni que el usuario
+escriba nada: al iniciar sesión, `AuthContext` abre la sesión de Firebase sola, y si
+algún guardado llega antes, `MediaContext` la abre en ese momento antes de escribir.
+
+El servidor también crea el usuario de Firebase (`uid` = id del usuario de la app) con
+el email verificado la primera vez, así que aparece en *Authentication → Users* y las
+reglas que exigen `email_verified` funcionan igual.
+
+Requisito de una sola vez (servidor, no usuarios finales): una credencial de servicio.
+
+```bash
+# Firebase Console → Configuración del proyecto → Cuentas de servicio
+# → Generar nueva clave privada → guardar como serviceAccountKey.json en la raíz
+npm run firebase:check   # confirma que el servidor puede firmar sesiones
+```
+
+También se puede definir `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON en una variable) o
+`FIREBASE_SERVICE_ACCOUNT_FILE` (ruta). El archivo está en `.gitignore`.
+
+Si esa credencial no existe, el respaldo es habilitar **Email/Password** en
+*Authentication → Sign-in method*: `ensureFirebasePasswordSession` crea la cuenta de
+Firebase automáticamente con la contraseña de la app.
+
+### `src/lib/firebaseAuthBridge.ts` — respaldo con Email/Password
 
 La app autentica contra su propio servidor (`/api/auth/login`), no contra Firebase.
 Firestore firma cada petición con `request.auth`, así que sin una sesión de Firebase

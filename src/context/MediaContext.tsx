@@ -13,6 +13,7 @@ import {
 import { INITIAL_MEDIA_LIST } from '../data/initialMedia';
 import { canEditCatalog, useAuth } from './AuthContext';
 import { apiRequest, ApiError } from '../lib/api';
+import { ensureFirebaseCustomSession } from '../lib/firebaseCustomToken';
 import {
   auth,
   publishCommunityReviewToFirestore,
@@ -256,7 +257,7 @@ function attachCommunityReviews(items: MediaItem[], reviews: ServerReview[]): Me
 }
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, firebaseLinkError, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
+  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, firebaseUid, firebaseLinkError, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
   const currentUser = authUser as UserProfile | null;
 
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => INITIAL_MEDIA_LIST);
@@ -414,13 +415,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!cancelled) libraryHydratedRef.current = true;
         // La app está logueada contra el servidor pero sin sesión de Firebase:
         // los cambios se guardan en el servidor, no en Firestore.
-        if (!cancelled && isAuthReady && authUser) {
-          showToast(
-            firebaseLinkError
-              ? `Firebase no vinculado: ${firebaseLinkError}`
-              : 'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
-            'warning',
-          );
+        if (!cancelled && isAuthReady && authUser && firebaseLinkError) {
+          showToast(`Firebase no vinculado: ${firebaseLinkError}`, 'warning');
         }
         return;
       }
@@ -472,7 +468,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cancelled = true;
       if (unsubFirestore) unsubFirestore();
     };
-  }, [authUser?.id, isAuthReady, authUser, showToast, firebaseLinkError]);
+  }, [authUser?.id, isAuthReady, firebaseUid, authUser, showToast, firebaseLinkError]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -594,23 +590,32 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast(error instanceof ApiError ? error.message : 'No se pudo guardar el cambio.', 'warning');
       });
 
-      if (auth.currentUser?.uid) {
-        saveLibraryEntryToFirestore(normalized).catch((err) => {
+      void (async () => {
+        try {
+          if (!auth.currentUser?.uid) {
+            // La sesión de Firebase se abre sola con el token que firma el
+            // servidor; el usuario no tiene que hacer nada.
+            const session = await ensureFirebaseCustomSession();
+            if (!session.ok) {
+              showToast(
+                `Firebase no vinculado: ${
+                  session.message || firebaseLinkError || 'no se pudo abrir la sesión.'
+                }`,
+                'warning',
+              );
+              return;
+            }
+          }
+          await saveLibraryEntryToFirestore(normalized);
+        } catch (err) {
           console.error('Firestore library save error:', err);
           if (err instanceof FirebaseSessionMissingError) {
             showToast(err.message, 'warning');
           } else {
             showToast('No se pudo guardar en Firebase. Revisa la consola del navegador.', 'warning');
           }
-        });
-      } else {
-        showToast(
-          firebaseLinkError
-            ? `Firebase no vinculado: ${firebaseLinkError}`
-            : 'Tu sesión no está vinculada a Firebase. Cierra sesión y vuelve a entrar para guardar en la nube.',
-          'warning',
-        );
-      }
+        }
+      })();
 
       if (review.status === 'terminada' && review.stars >= 4) {
         try {
@@ -679,16 +684,22 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       apiRequest(`/api/me/library/${encodeURIComponent(mediaId)}`, { method: 'DELETE' }).catch((error) => {
         showToast(error instanceof ApiError ? error.message : 'No se pudo eliminar el título.', 'warning');
       });
-      if (auth.currentUser?.uid) {
-        removeLibraryEntryFromFirestore(mediaId).catch((err) => {
+      void (async () => {
+        try {
+          if (!auth.currentUser?.uid) {
+            const session = await ensureFirebaseCustomSession();
+            if (!session.ok) return;
+          }
+          await removeLibraryEntryFromFirestore(mediaId);
+        } catch (err) {
           console.error('Firestore library delete error:', err);
           if (err instanceof FirebaseSessionMissingError) {
             showToast(err.message, 'warning');
           } else {
             showToast('No se pudo borrar en Firebase. Revisa la consola del navegador.', 'warning');
           }
-        });
-      }
+        }
+      })();
     },
     [authUser, requestLogin, showToast],
   );

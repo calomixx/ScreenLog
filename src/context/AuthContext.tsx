@@ -10,6 +10,7 @@ import {
   syncFirebaseUserProfile,
 } from '../lib/firebase';
 import { ensureFirebasePasswordSession } from '../lib/firebaseAuthBridge';
+import { ensureFirebaseCustomSession } from '../lib/firebaseCustomToken';
 import { ensureUserAccount } from '../lib/firestore/users';
 
 export type { Role };
@@ -114,6 +115,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export interface AuthContextType {
   loading: boolean;
   isAuthReady: boolean;
+  /** UID de la sesión de Firebase Auth activa (null si no hay). */
+  firebaseUid: string | null;
   needsSetup: boolean;
   currentUser: UserAccount | null;
   sessionInfo: SessionInfo | null;
@@ -146,6 +149,7 @@ export interface AuthContextType {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
@@ -192,7 +196,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (async () => {
       try {
         const response = await apiRequest<StatusResponse>('/api/auth/status');
-        if (!cancelled) applyStatus(response.data);
+        if (cancelled) return;
+        if (response.data.user) {
+          // Sesión de Firebase automática para sesiones recordadas: el servidor
+          // firma un token con el id del usuario ya autenticado. Se resuelve
+          // antes de publicar el usuario para que la biblioteca no intente
+          // escribir en Firestore sin credenciales.
+          const custom = await ensureFirebaseCustomSession();
+          if (!cancelled && !custom.ok) {
+            const message = custom.message || 'No se pudo crear la sesión de Firebase.';
+            setFirebaseLinkError(message);
+            console.warn('Firestore sin sesión de Firebase:', message);
+          }
+        }
+        if (cancelled) return;
+        applyStatus(response.data);
       } catch {
         if (!cancelled) {
           setNeedsSetup(false);
@@ -210,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUid(fbUser?.uid ?? null);
       if (fbUser) {
         if (fbUser.emailVerified) {
           try {
@@ -239,16 +258,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const syncFirebaseIdentity = useCallback(
     async (email: string, password: string, name?: string) => {
+      // 1) Vía preferida: el servidor firma un token para el usuario de la app.
+      const custom = await ensureFirebaseCustomSession();
+      if (custom.ok) {
+        setFirebaseLinkError(null);
+        return;
+      }
+      const customMessage = custom.message || 'No se pudo crear la sesión de Firebase.';
+
+      // 2) Respaldo: proveedor Email/Password (si está habilitado).
       try {
         const result = await ensureFirebasePasswordSession(email, password, name);
-        if (!result.ok && 'message' in result) {
-          setFirebaseLinkError(result.message);
-          console.warn('Firestore sin sesión de Firebase:', result.message);
-        } else {
+        if (result.ok) {
           setFirebaseLinkError(null);
+          return;
         }
+        const message = 'message' in result ? result.message : customMessage;
+        setFirebaseLinkError(message);
+        console.warn('Firestore sin sesión de Firebase:', message);
       } catch (err) {
-        setFirebaseLinkError('No se pudo sincronizar la sesión con Firebase.');
+        setFirebaseLinkError(customMessage);
         console.warn('No se pudo sincronizar la sesión con Firebase:', err);
       }
     },
@@ -257,12 +286,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const linkFirebaseSession = useCallback(
     async (password: string): Promise<AuthResult> => {
+      // 1) Token firmado por el servidor (no requiere contraseña).
+      const custom = await ensureFirebaseCustomSession();
+      if (custom.ok) {
+        setFirebaseLinkError(null);
+        return { success: true };
+      }
+
+      // 2) Respaldo con Email/Password.
+      const customMessage = custom.message || 'No se pudo crear la sesión de Firebase.';
       const email = currentUser?.email?.trim();
       if (!email) {
-        return { success: false, message: 'No hay una sesión de la app para vincular.' };
+        setFirebaseLinkError(customMessage);
+        return { success: false, message: customMessage };
       }
       if (!password) {
-        return { success: false, message: 'Escribe tu contraseña para vincular Firebase.' };
+        setFirebaseLinkError(customMessage);
+        return { success: false, message: customMessage };
       }
       const result = await ensureFirebasePasswordSession(email, password, currentUser?.name);
       if (result.ok) {
@@ -547,6 +587,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = useMemo<AuthContextType>(() => ({
     loading,
     isAuthReady,
+    firebaseUid,
     needsSetup,
     currentUser,
     sessionInfo,
@@ -575,6 +616,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }), [
     loading,
     isAuthReady,
+    firebaseUid,
     needsSetup,
     currentUser,
     sessionInfo,

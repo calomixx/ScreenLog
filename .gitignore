@@ -9,6 +9,9 @@ coverage/
 
 server/data/
 .playwright/
+serviceAccountKey.json
+server/serviceAccountKey.json
+firebase-service-account.json
 
 # Dev server output logs
 *.err

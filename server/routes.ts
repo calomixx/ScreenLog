@@ -43,6 +43,7 @@ import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
 import { FIREBASE_PROJECT_ID, verifyGoogleIdToken } from './firebase-auth';
+import { createFirebaseCustomToken, getFirebaseAdminStatus } from './firebase-admin';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -1666,6 +1667,22 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
         session: req.authSession ? safeSession(req.authSession) : null,
       },
     });
+  }));
+
+  // Sesión de Firebase sin proveedor Email/Password: el servidor firma un
+  // custom token para el usuario ya autenticado en la app.
+  router.post('/auth/firebase-token', requireAuth, asyncRoute(async (req, res) => {
+    const user = req.authUser;
+    if (!user) return;
+
+    const status = getFirebaseAdminStatus();
+    if (!status.ready) {
+      safeError(res, 503, status.message, 'FIREBASE_ADMIN_NOT_CONFIGURED');
+      return;
+    }
+
+    const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+    res.json({ success: true, data: { token } });
   }));
 
   router.post('/auth/change-password', requireAuth, asyncRoute(async (req, res) => {

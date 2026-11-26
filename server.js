@@ -954,7 +954,7 @@ var init_initialMedia = __esm({
 
 // server.ts
 import dotenv from "dotenv";
-import path3 from "path";
+import path4 from "path";
 import fs3 from "fs";
 import http from "http";
 import express from "express";
@@ -2439,6 +2439,126 @@ async function verifyGoogleIdToken(idToken, projectId) {
 }
 var FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog";
 
+// server/firebase-admin.ts
+import { existsSync, readFileSync } from "node:fs";
+import path3 from "node:path";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+var cached = null;
+function candidateFiles() {
+  const fromEnv = (process.env.FIREBASE_SERVICE_ACCOUNT_FILE || "").trim();
+  const files = [
+    fromEnv,
+    path3.resolve(process.cwd(), "serviceAccountKey.json"),
+    path3.resolve(process.cwd(), "server", "serviceAccountKey.json"),
+    path3.resolve(process.cwd(), "firebase-service-account.json")
+  ];
+  return files.filter(Boolean);
+}
+function loadServiceAccount() {
+  const rawJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (rawJson) {
+    try {
+      return JSON.parse(rawJson);
+    } catch {
+      console.warn("FIREBASE_SERVICE_ACCOUNT_JSON no es un JSON v\xE1lido.");
+    }
+  }
+  for (const file of candidateFiles()) {
+    if (!existsSync(file)) continue;
+    try {
+      return JSON.parse(readFileSync(file, "utf8"));
+    } catch (error) {
+      console.warn(`No se pudo leer ${file}:`, error);
+    }
+  }
+  return null;
+}
+function ensureInitialized() {
+  if (cached?.ready) return cached;
+  const serviceAccount = loadServiceAccount();
+  if (!serviceAccount) {
+    cached = {
+      ready: false,
+      message: "Falta la credencial de servicio de Firebase en el servidor. Firebase Console \u2192 Configuraci\xF3n del proyecto \u2192 Cuentas de servicio \u2192 Generar nueva clave privada, y guarda el JSON como serviceAccountKey.json en la ra\xEDz del proyecto (o define FIREBASE_SERVICE_ACCOUNT_JSON)."
+    };
+    return cached;
+  }
+  try {
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount),
+        projectId: serviceAccount.project_id || (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog"
+      });
+    }
+    cached = { ready: true, message: "Firebase Admin inicializado." };
+  } catch (error) {
+    cached = {
+      ready: false,
+      message: `No se pudo inicializar Firebase Admin: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+  return cached;
+}
+function getFirebaseAdminStatus() {
+  return ensureInitialized();
+}
+function isUserNotFound(error) {
+  const code = error?.code;
+  return code === "auth/user-not-found";
+}
+function isEmailTaken(error) {
+  const code = error?.code;
+  return code === "auth/email-already-exists" || code === "auth/uid-already-exists";
+}
+async function ensureAuthUser(auth, uid, email, displayName) {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  try {
+    const existing = await auth.getUser(uid);
+    const patch = {};
+    if (cleanEmail && existing.email?.toLowerCase() !== cleanEmail) {
+      patch.email = cleanEmail;
+    }
+    if (cleanEmail && !existing.emailVerified) {
+      patch.emailVerified = true;
+    }
+    if (displayName && !existing.displayName) {
+      patch.displayName = displayName.slice(0, 80);
+    }
+    if (Object.keys(patch).length > 0) {
+      await auth.updateUser(uid, patch).catch((error) => {
+        console.warn(`No se pudo actualizar el usuario ${uid} en Firebase Auth:`, error);
+      });
+    }
+    return;
+  } catch (error) {
+    if (!isUserNotFound(error)) {
+      console.warn(`No se pudo leer el usuario ${uid} en Firebase Auth:`, error);
+    }
+  }
+  try {
+    await auth.createUser({
+      uid,
+      email: cleanEmail || void 0,
+      emailVerified: Boolean(cleanEmail),
+      displayName: displayName?.slice(0, 80) || void 0
+    });
+  } catch (error) {
+    if (!isEmailTaken(error)) {
+      console.warn(`No se pudo crear el usuario ${uid} en Firebase Auth:`, error);
+      return;
+    }
+    await auth.createUser({ uid, displayName: displayName?.slice(0, 80) || void 0 }).catch((err) => console.warn(`No se pudo crear el usuario ${uid} sin email:`, err));
+  }
+}
+async function createFirebaseCustomToken(uid, email, displayName) {
+  const status = ensureInitialized();
+  if (!status.ready) throw new Error(status.message);
+  const auth = getAuth();
+  await ensureAuthUser(auth, uid, email, displayName);
+  return auth.createCustomToken(uid);
+}
+
 // server/routes.ts
 var SESSION_COOKIE = "sl_session";
 var SESSION_DAYS_REMEMBER = 30;
@@ -3832,6 +3952,17 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       }
     });
   }));
+  router.post("/auth/firebase-token", requireAuth, asyncRoute(async (req, res) => {
+    const user = req.authUser;
+    if (!user) return;
+    const status = getFirebaseAdminStatus();
+    if (!status.ready) {
+      safeError(res, 503, status.message, "FIREBASE_ADMIN_NOT_CONFIGURED");
+      return;
+    }
+    const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+    res.json({ success: true, data: { token } });
+  }));
   router.post("/auth/change-password", requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
     const user = req.authUser;
@@ -4804,7 +4935,7 @@ function requireCatalogEditor(req, res, next) {
 
 // server.ts
 try {
-  const envFile = path3.resolve(process.cwd(), ".env");
+  const envFile = path4.resolve(process.cwd(), ".env");
   if (fs3.existsSync(envFile)) {
     dotenv.config({ path: envFile });
   } else {
@@ -4840,7 +4971,7 @@ async function startServer() {
     const code = err?.code || "INTERNAL_ERROR";
     res.status(status).json({ success: false, error: message, code });
   });
-  const distPath = path3.resolve(process.cwd(), "dist");
+  const distPath = path4.resolve(process.cwd(), "dist");
   const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     const { createServer: createViteServer } = await import("vite");
@@ -4855,7 +4986,7 @@ async function startServer() {
   } else {
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path3.join(distPath, "index.html"));
+      res.sendFile(path4.join(distPath, "index.html"));
     });
   }
   server.listen(PORT, "0.0.0.0", () => {

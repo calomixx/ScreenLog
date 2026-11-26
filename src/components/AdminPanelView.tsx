@@ -281,13 +281,9 @@ export const AdminPanelView: React.FC = () => {
 
   const handleLinkFirebase = useCallback(async () => {
     if (isLinkingFirebase) return;
-    const password = window.prompt(
-      'Escribe la contraseña con la que entrás a la app para vincular la sesión de Firebase:',
-    );
-    if (!password) return;
     setIsLinkingFirebase(true);
     try {
-      const result = await linkFirebaseSession(password);
+      const result = await linkFirebaseSession('');
       if (result.success) {
         refreshFirebaseDiag();
         flash('Sesión de Firebase vinculada. Recargando la app...');
@@ -1025,7 +1021,7 @@ export const AdminPanelView: React.FC = () => {
                 {!firebaseDiag.session.hasSession && (
                   <>
                     <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] leading-relaxed">
-                      Sin esta sesión, Firestore no guarda tus clasificaciones. Vinculala con tu contraseña de la app.
+                      La sesión se abre sola al iniciar sesión. Si no aparece, el servidor necesita la credencial de servicio de Firebase (Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada) guardada como <code className="font-mono">serviceAccountKey.json</code> en la raíz del proyecto, o en la variable <code className="font-mono">FIREBASE_SERVICE_ACCOUNT_JSON</code>.
                     </div>
                     <button
                       type="button"
