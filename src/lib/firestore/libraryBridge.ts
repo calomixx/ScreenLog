@@ -29,7 +29,7 @@ export class FirebaseSessionMissingError extends Error {
 
   constructor() {
     super(
-      'No hay sesión de Firebase vinculada. Cierra sesión y vuelve a entrar para guardar en la nube.',
+      'No se pudo abrir la sesión de Firebase. La app lo reintenta al guardar; si insiste, revisá la conexión o la configuración del servidor.',
     );
     this.name = 'FirebaseSessionMissingError';
   }

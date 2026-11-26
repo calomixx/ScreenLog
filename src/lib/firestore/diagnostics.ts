@@ -74,8 +74,8 @@ export function getFirestoreDiagnostics(): {
     session,
     writes,
     hint: session.hasSession
-      ? 'Hay sesión de Firebase: las escrituras deberían autenticarse.'
-      : 'No hay sesión de Firebase. Cierra sesión en la app y vuelve a entrar con email y contraseña (o con Google) para vincularla.',
+      ? 'Hay sesión de Firebase: las escrituras se autentican.'
+      : 'Todavía no hay sesión de Firebase. La app la abre sola al iniciar sesión; si insiste, revisá la credencial de servicio del servidor o habilitá Email/Password en Firebase Auth.',
   };
 }
 
