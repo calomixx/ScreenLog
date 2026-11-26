@@ -235,6 +235,11 @@ export async function publishCommunityReviewToFirestore(params: {
   const comment = clampString(params.comment, BLUEPRINT_LIMITS.COMMENT_MAX_LEN, 'Excelente producción.');
 
   try {
+    // Las reglas exigen perfil público para publicar reseñas.
+    const profileSnap = await getDoc(doc(db, 'users_public', uid));
+    if (!profileSnap.exists()) {
+      await syncFirebaseUserProfile(fbUser);
+    }
     await setDoc(doc(db, 'community_reviews', reviewId), {
       userId: uid,
       mediaId,
