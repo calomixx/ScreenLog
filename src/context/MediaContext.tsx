@@ -350,23 +350,66 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Sincronizar títulos personalizados locales a Firestore solo cuando hay sesión verificada de Firebase
-  useEffect(() => {
-    if (!isAuthReady || !auth.currentUser?.uid || !auth.currentUser.emailVerified) return;
+  /**
+   * Sube lo que quedó en localStorage al servidor y a Firestore. La app puede
+   * seguir mostrando datos locales si el contenedor se reinicia, pero con esto
+   * nada se queda solo en el navegador cuando vuelve a entrar.
+   */
+  const syncLocalMediaToCloud = useCallback(async (): Promise<number> => {
+    if (!auth.currentUser?.uid) return 0;
+    let synced = 0;
     try {
       const savedCustom = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
-      if (!savedCustom) return;
-      const parsedCustom = JSON.parse(savedCustom) as MediaItem[];
-      if (!Array.isArray(parsedCustom)) return;
-      parsedCustom.forEach((c) => {
-        saveCatalogMediaToFirestore(c, { onlyIfMissing: true }).catch((e) =>
-          console.warn('Auto-sync custom item to Firestore failed:', c.title, e),
-        );
-      });
+      if (savedCustom) {
+        const parsedCustom = JSON.parse(savedCustom) as MediaItem[];
+        if (Array.isArray(parsedCustom)) {
+          for (const item of parsedCustom) {
+            try {
+              await apiRequest('/api/media', {
+                method: 'POST',
+                body: JSON.stringify(item),
+              });
+            } catch {
+              // Ya existe en el servidor: lo actualizamos en lugar de crear otro.
+              await apiRequest(`/api/media/${encodeURIComponent(item.id)}`, {
+                method: 'PATCH',
+                body: JSON.stringify(item),
+              }).catch(() => undefined);
+            }
+            await saveCatalogMediaToFirestore(item, { onlyIfMissing: true }).catch(() => undefined);
+            synced += 1;
+          }
+        }
+      }
+
+      const savedOverrides = localStorage.getItem(STORAGE_OVERRIDES_KEY);
+      if (savedOverrides) {
+        const overrides = JSON.parse(savedOverrides) as Record<string, Partial<MediaItem>>;
+        for (const [id, patch] of Object.entries(overrides || {})) {
+          const base = mediaListRef.current.find((m) => m.id === id);
+          if (!base) continue;
+          const updated = { ...base, ...patch };
+          await apiRequest(`/api/media/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updated),
+          }).catch(() => undefined);
+          await saveCatalogMediaToFirestore(updated).catch(() => undefined);
+          synced += 1;
+        }
+      }
+      if (synced > 0) {
+        showToast(`${synced} dato(s) local(es) subidos al servidor y a Firebase.`, 'success');
+      }
     } catch (err) {
-      console.warn('Could not auto-sync local custom media to Firestore:', err);
+      console.warn('No se pudo sincronizar los datos locales con la nube:', err);
     }
-  }, [isAuthReady, authUser?.id]);
+    return synced;
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!isAuthReady || !auth.currentUser?.uid || !authUser) return;
+    void syncLocalMediaToCloud();
+  }, [isAuthReady, authUser?.id, syncLocalMediaToCloud]);
 
   // Real-time synchronization with Firebase Firestore cloud catalog
   useEffect(() => {
@@ -727,6 +770,30 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         authUser?.avatar ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
 
+      // La reseña se publica en el servidor y, además, en Firestore. Si el
+      // servidor falla, igual intentamos dejarla en la nube con un id propio.
+      const publishToFirestore = async (id: string) => {
+        try {
+          if (!auth.currentUser?.uid) {
+            const session = await ensureFirebaseCustomSession();
+            if (!session.ok) {
+              console.warn('Reseña sin sesión de Firebase:', session.message);
+              return;
+            }
+          }
+          await publishCommunityReviewToFirestore({
+            id,
+            mediaId,
+            author: authorName,
+            avatar: authorAvatar,
+            rating,
+            comment: trimmed,
+          });
+        } catch (err) {
+          console.error('Firestore review publish error:', err);
+        }
+      };
+
       apiRequest<{ success: boolean; data: ServerReview }>('/api/community/reviews', {
         method: 'POST',
         body: JSON.stringify({ mediaId, comment: trimmed, rating, author: authorName }),
@@ -738,21 +805,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               media.id === mediaId ? withComments(media, [comment, ...media.comments]) : media,
             ),
           );
-          if (auth.currentUser?.uid && auth.currentUser.emailVerified) {
-            publishCommunityReviewToFirestore({
-              id: comment.id,
-              mediaId,
-              author: authorName,
-              avatar: authorAvatar,
-              rating,
-              comment: trimmed,
-            }).catch((err) => console.error('Firestore review publish error:', err));
-          }
+          void publishToFirestore(comment.id);
           showToast('Reseña publicada en la comunidad.', 'success');
         })
         .catch((error) => {
+          const fallbackId = `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
           const fallbackComment = {
-            id: `local-${Date.now()}`,
+            id: fallbackId,
             author: authorName,
             avatar: authorAvatar,
             rating,
@@ -765,6 +824,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               media.id === mediaId ? withComments(media, [fallbackComment, ...media.comments]) : media,
             ),
           );
+          void publishToFirestore(fallbackId);
           showToast(error instanceof ApiError ? error.message : 'Reseña guardada localmente.', 'info');
         });
     },
@@ -923,6 +983,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         method: 'PATCH',
         body: JSON.stringify(original),
       }).catch(() => undefined);
+      saveCatalogMediaToFirestore(original).catch((err) =>
+        console.error('Firestore catalog restore error:', err),
+      );
       showToast(`Datos originales restaurados para ${original.title}.`, 'info');
       return { success: true };
     },
@@ -1178,8 +1241,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const syncOfflineQueue = useCallback(async () => {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLastSyncTime(now);
-    return { success: true, syncedCount: 0 };
-  }, []);
+    const syncedCount = await syncLocalMediaToCloud();
+    return { success: true, syncedCount };
+  }, [syncLocalMediaToCloud]);
 
   const exportLocalBackup = useCallback(() => {
     try {

@@ -230,12 +230,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUid(fbUser?.uid ?? null);
       if (fbUser) {
-        if (fbUser.emailVerified) {
-          try {
-            await syncFirebaseUserProfile(fbUser);
-          } catch (err) {
-            console.error('Error syncing Firebase user profile:', err);
-          }
+        try {
+          await syncFirebaseUserProfile(fbUser);
+        } catch (err) {
+          console.error('Error syncing Firebase user profile:', err);
         }
         try {
           // Entidad `users/{uid}` (cuenta privada + preferencias).
@@ -418,7 +416,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // El servidor verifica este ID token firmado; el uid/email del body
       // ya no se tienen en cuenta.
       const idToken = await fbUser.getIdToken();
-      if (fbUser && fbUser.emailVerified) {
+      if (fbUser) {
         try {
           await syncFirebaseUserProfile(fbUser);
         } catch (err) {
@@ -587,7 +585,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify(data),
       });
       setCurrentUser(response.data.user);
-      if (auth.currentUser && auth.currentUser.emailVerified) {
+      if (auth.currentUser) {
         try {
           await syncFirebaseUserProfile(auth.currentUser, response.data.user);
         } catch (err) {

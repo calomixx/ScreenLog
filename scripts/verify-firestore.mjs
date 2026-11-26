@@ -65,6 +65,15 @@ function writeDoc(path, fields, { create = false, withTimestamps = true } = {}) 
   return write;
 }
 
+/** users_public solo permite `updatedAt`, no `createdAt`. */
+function writePublicProfile(path, fields) {
+  return {
+    update: { name: docName(path), fields },
+    updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }],
+    currentDocument: { exists: false },
+  };
+}
+
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok, detail });
@@ -158,6 +167,72 @@ async function main() {
   const readRating = readBack.body?.fields?.rating?.doubleValue;
   check('Leer la clasificación como dueño', readBack.ok && readRating === 5, `rating=${readRating}`);
 
+  // Perfil público: lo necesitan el catálogo y las reseñas comunitarias.
+  const publicProfile = await commit(idToken, [
+    writePublicProfile(`users_public/${uid}`, {
+      userId: s(uid),
+      name: s('Diagnóstico'),
+      username: s(`diag_${Date.now()}`),
+      avatar: s(''),
+      updatedAt: { nullValue: null },
+    }),
+  ]);
+  check(
+    'Crear users_public sin email verificado',
+    publicProfile.ok,
+    publicProfile.ok ? '' : JSON.stringify(publicProfile.body).slice(0, 400),
+  );
+
+  const catalog = await commit(idToken, [
+    writeDoc(
+      `catalog_media/${mediaId}`,
+      {
+        authorId: s(uid),
+        title: s('Película de diagnóstico'),
+        type: s('pelicula'),
+        year: i(2026),
+        director: s('Diagnóstico'),
+        synopsis: s('Prueba de escritura del catálogo.'),
+        posterUrl: s(''),
+        backdropUrl: s(''),
+        duration: s('2h 00m'),
+        defaultPlatform: s('Cine'),
+        genres: arr(['Drama']),
+        createdAt: { nullValue: null },
+        updatedAt: { nullValue: null },
+      },
+      { create: true },
+    ),
+  ]);
+  check(
+    'Crear catalog_media sin email verificado',
+    catalog.ok,
+    catalog.ok ? '' : JSON.stringify(catalog.body).slice(0, 400),
+  );
+
+  const review = await commit(idToken, [
+    writeDoc(
+      `community_reviews/${mediaId}_review`,
+      {
+        userId: s(uid),
+        mediaId: s(mediaId),
+        author: s('Diagnóstico'),
+        avatar: s(''),
+        rating: n(5),
+        comment: s('Reseña de diagnóstico.'),
+        likes: i(0),
+        createdAt: { nullValue: null },
+        updatedAt: { nullValue: null },
+      },
+      { create: true },
+    ),
+  ]);
+  check(
+    'Crear community_reviews sin email verificado',
+    review.ok,
+    review.ok ? '' : JSON.stringify(review.body).slice(0, 400),
+  );
+
   const foreign = await commit(idToken, [
     writeDoc(`users/${otherUid}`, {
       uid: s(otherUid),
@@ -178,10 +253,15 @@ async function main() {
     { delete: docName(`users/${uid}/movie_classifications/${mediaId}`) },
   ]);
   const deleteAccount = await commit(idToken, [{ delete: docName(`users/${uid}`) }]);
+  const deleteExtras = await commit(idToken, [
+    { delete: docName(`catalog_media/${mediaId}`) },
+    { delete: docName(`community_reviews/${mediaId}_review`) },
+    { delete: docName(`users_public/${uid}`) },
+  ]);
   check(
     'Borrar los documentos de prueba',
-    deleteClassification.ok && deleteAccount.ok,
-    `HTTP ${deleteClassification.status}/${deleteAccount.status}`,
+    deleteClassification.ok && deleteAccount.ok && deleteExtras.ok,
+    `HTTP ${deleteClassification.status}/${deleteAccount.status}/${deleteExtras.status}`,
   );
 
   const failed = results.filter((result) => !result.ok);

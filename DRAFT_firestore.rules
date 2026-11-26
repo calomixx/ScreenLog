@@ -24,25 +24,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isVerifiedUser() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+    // La app crea la identidad de Firebase por su cuenta, sin que el usuario
+    // tenga que verificar el correo. Todo lo que pertenece al usuario se
+    // autoriza con la sesión de Firebase Auth (isAccountOwner), no con
+    // email_verified.
+    function isAccountOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function isOwner(userId) {
-      return isVerifiedUser() && request.auth.uid == userId;
-    }
-
-    // Datos privados (biblioteca, preferencias): basta con estar autenticado.
-    // Las acciones públicas (reseñas, catálogo, perfil público) sí exigen
-    // email verificado mediante isOwner().
-    function isAccountOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isAccountOwner(userId);
     }
 
     // SECURITY FIX: Removed hardcoded email from admin check.
     // Admin access is now determined solely by presence in /admins collection.
     function isAdmin() {
-      return isVerifiedUser() &&
+      return isSignedIn() &&
         exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
@@ -388,11 +385,11 @@ service cloud.firestore {
       // admin puede listar la colección legada. Los usuarios migran desde el
       // servidor, no consultando esta colección directamente.
       allow list: if isAdmin();
-      allow create: if isVerifiedUser() && isValidId(entryId) &&
+      allow create: if isSignedIn() && isValidId(entryId) &&
         isValidUserLibraryEntry(incoming()) &&
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
-      allow update: if isVerifiedUser() && isValidId(entryId) &&
+      allow update: if isSignedIn() && isValidId(entryId) &&
         isValidUserLibraryEntry(incoming()) && (
           isAdmin() ||
           (
@@ -409,13 +406,13 @@ service cloud.firestore {
     match /community_reviews/{reviewId} {
       allow get: if isValidId(reviewId) && (resource == null || existing().rating >= 1);
       allow list: if existing().rating >= 1 && existing().rating <= 5;
-      allow create: if isVerifiedUser() && isValidId(reviewId) &&
+      allow create: if isSignedIn() && isValidId(reviewId) &&
         isValidCommunityReview(incoming()) &&
         incoming().userId == request.auth.uid &&
         incoming().likes == 0 &&
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
-      allow update: if isVerifiedUser() && isValidId(reviewId) &&
+      allow update: if isSignedIn() && isValidId(reviewId) &&
         isValidCommunityReview(incoming()) && (
           isAdmin() ||
           // Action 1: Author edits their own review text or rating
@@ -440,21 +437,21 @@ service cloud.firestore {
             incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'updatedAt'])
           )
         );
-      allow delete: if isValidId(reviewId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(reviewId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
     }
 
     // Shared Catalog Media Items
     match /catalog_media/{mediaId} {
       // Catálogo público: lo puede leer cualquiera (incluso sin sesión) para
-      // que la app cargue sin depender de Firebase Auth. Las escrituras siguen
-      // restringidas a usuarios verificados/admin.
+      // que la app cargue sin depender de Firebase Auth. Las escrituras
+      // requieren sesión de Firebase (el autor o un admin).
       allow get, list: if true;
-      allow create: if isVerifiedUser() && isValidId(mediaId) &&
+      allow create: if isSignedIn() && isValidId(mediaId) &&
         isValidCatalogMediaItem(incoming()) &&
         incoming().authorId == request.auth.uid &&
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/users_public/$(request.auth.uid));
-      allow update: if isVerifiedUser() && isValidId(mediaId) && (
+      allow update: if isSignedIn() && isValidId(mediaId) && (
         (
           isValidCatalogMediaItem(incoming()) && (
             isAdmin() ||
@@ -474,7 +471,8 @@ service cloud.firestore {
           incoming().addedToListCount == existing().addedToListCount + 1
         )
       );
-      allow delete: if isValidId(mediaId) && isAdmin();
+      allow delete: if isValidId(mediaId) && isSignedIn() &&
+        (existing().authorId == request.auth.uid || isAdmin());
     }
   }
 }

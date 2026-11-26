@@ -129,7 +129,7 @@ export async function syncFirebaseUserProfile(
   fbUser: FirebaseUser,
   overrides?: Partial<UserProfile>,
 ): Promise<void> {
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
+  if (!fbUser?.uid) return;
   const uid = sanitizeFirestoreId(fbUser.uid);
   if (!BLUEPRINT_LIMITS.ID_REGEX.test(uid)) return;
 
@@ -219,7 +219,7 @@ export async function publishCommunityReviewToFirestore(params: {
   comment: string;
 }): Promise<void> {
   const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
+  if (!fbUser?.uid) return;
 
   const uid = sanitizeFirestoreId(fbUser.uid);
   const reviewId = sanitizeFirestoreId(params.id);
@@ -259,7 +259,7 @@ export async function saveCatalogMediaToFirestore(
   options?: { onlyIfMissing?: boolean },
 ): Promise<boolean> {
   const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) {
+  if (!fbUser?.uid) {
     return false;
   }
 
@@ -350,10 +350,8 @@ export async function saveCatalogMediaToFirestore(
  */
 export async function seedCatalogToFirestore(items: MediaItem[]): Promise<{ success: number; failed: number }> {
   const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) {
-    throw new Error(
-      'Inicia sesión con una cuenta de Firebase verificada (por ejemplo, con Google) para subir el catálogo a Firestore.',
-    );
+  if (!fbUser?.uid) {
+    throw new Error('Inicia sesión para sincronizar el catálogo con Firestore.');
   }
 
   let success = 0;
@@ -376,7 +374,7 @@ export async function seedCatalogToFirestore(items: MediaItem[]): Promise<{ succ
  */
 export async function deleteCatalogMediaFromFirestore(mediaId: string): Promise<void> {
   const fbUser = auth.currentUser;
-  if (!fbUser?.uid || !fbUser.emailVerified) return;
+  if (!fbUser?.uid) return;
 
   const safeId = sanitizeFirestoreId(mediaId);
   const path = `catalog_media/${safeId}`;

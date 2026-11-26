@@ -280,8 +280,9 @@ escriba nada: al iniciar sesión, `AuthContext` abre la sesión de Firebase sola
 algún guardado llega antes, `MediaContext` la abre en ese momento antes de escribir.
 
 El servidor también crea el usuario de Firebase (`uid` = id del usuario de la app) con
-el email verificado la primera vez, así que aparece en *Authentication → Users* y las
-reglas que exigen `email_verified` funcionan igual.
+el email verificado la primera vez. Si el servidor desplegado no tiene la credencial,
+la app usa Email/Password y el usuario queda sin verificar: las reglas ya **no exigen**
+`email_verified` para las acciones del dueño, solo una sesión válida de Firebase Auth.
 
 Requisito de una sola vez (servidor, no usuarios finales): una credencial de servicio.
 
@@ -348,12 +349,11 @@ Los índices de un solo campo (`updatedAt`) los crea Firestore automáticamente.
 Principios:
 
 1. **Deny por defecto** (`match /{document=**} { allow read, write: if false }`).
-2. **Dos niveles de confianza**:
-   - `isAccountOwner(uid)` = autenticado y `request.auth.uid == uid`. Habilita la
-     **cuenta privada, clasificaciones y listas**. Basta con tener sesión de Firebase
-     (también para usuarios de login por contraseña).
-   - `isOwner(uid)` = además `email_verified == true`. Se exige en todo lo **público**
-     (`users_public`, `community_reviews`, escrituras de catálogo).
+2. **Un nivel de confianza para el usuario**: `isAccountOwner(uid)` = autenticado y
+   `request.auth.uid == uid`. Habilita cuenta privada, clasificaciones, listas, perfil
+   público, reseñas y escrituras de catálogo. `isOwner(uid)` es un alias; ya no se
+   exige `email_verified` porque la app crea la identidad sola y el usuario final
+   no tiene que verificar nada.
 3. **Propietario único**: solo `request.auth.uid == userId` puede leer/escribir su
    subárbol `users/{uid}/**`.
 4. `list` deshabilitado en `users/{uid}`: no se pueden enumerar cuentas.
@@ -455,7 +455,7 @@ getDoc(doc(db, 'users', uid, 'movie_classifications', mediaId));
 
 | Error | Causa | Mitigación implementada |
 | --- | --- | --- |
-| `permission-denied` al guardar | Reglas sin desplegar o email no verificado | Mensaje claro + `isOwner` exige verificación; desplegar reglas antes de probar. |
+| `permission-denied` al guardar | Reglas sin desplegar o sin sesión de Firebase | Mensaje claro + desplegar reglas antes de probar; basta la sesión, no el email verificado. |
 | `failed-precondition` | Falta un índice compuesto | `firestore.indexes.json` + mensaje que apunta al archivo. |
 | Duplicados de la misma película | ID compuesto o auto-ID | ID de documento = `mediaId`. |
 | Documento huérfano | Película borrada del catálogo | El catálogo se resuelve por ID; la UI ignora IDs desconocidos y se puede limpiar con `deleteClassification`. |
@@ -488,7 +488,7 @@ npm run build    # vite + esbuild
 
 ### 11.3 Prueba manual (usuario normal)
 
-1. Inicia sesión con un usuario con email verificado.
+1. Inicia sesión con un usuario normal de la app (no hace falta verificar el email).
 2. En Firestore debe aparecer `users/{uid}` con `preferences: {}`.
 3. Añade una película a "Mi lista" → debe crearse
    `users/{uid}/movie_classifications/{mediaId}` con `status`, `schemaVersion: 1` y
@@ -505,8 +505,9 @@ npm run build    # vite + esbuild
 2. Intenta crear `users/{uidA}/movie_classifications/x` con `uid: uidB` → denegado.
 3. Intenta escribir `updatedAt` con una fecha manual → denegado.
 4. Intenta escribir `rating: 9` → denegado.
-5. Usuario autenticado sin email verificado → puede escribir **su** biblioteca privada,
-   pero no `users_public`, `community_reviews` ni el catálogo.
+5. Usuario autenticado sin email verificado → puede escribir su biblioteca, su perfil
+   público, sus reseñas y títulos del catálogo; lo que no puede es suplantar a otro
+   usuario (`request.auth.uid` debe coincidir siempre).
 
 ### 11.5 Migración
 
