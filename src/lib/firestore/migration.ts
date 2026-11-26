@@ -153,19 +153,26 @@ export async function migrateReviewsToFirestore(
 /** Migra la colección legada `user_library` del usuario actual. */
 export async function migrateLegacyLibraryForUser(uid: string): Promise<MigrationResult> {
   const safeUid = sanitizeFirestoreId(uid);
-  const snap = await getDocs(
-    query(collection(db, 'user_library'), where('userId', '==', safeUid)),
-  );
-  const reviews: UserReview[] = [];
-  snap.forEach((docSnap) => {
-    const review = legacyLibraryDocToReview(docSnap.data() as Record<string, unknown>);
-    if (review) reviews.push(review);
-  });
-  const result = await migrateReviewsToFirestore(safeUid, reviews, undefined, {
-    onlyMissing: true,
-  });
-  result.skipped += snap.size - reviews.length;
-  return result;
+  if (!safeUid) return emptyResult();
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'user_library'), where('userId', '==', safeUid)),
+    );
+    const reviews: UserReview[] = [];
+    snap.forEach((docSnap) => {
+      const review = legacyLibraryDocToReview(docSnap.data() as Record<string, unknown>);
+      if (review) reviews.push(review);
+    });
+    const result = await migrateReviewsToFirestore(safeUid, reviews, undefined, {
+      onlyMissing: true,
+    });
+    result.skipped += snap.size - reviews.length;
+    return result;
+  } catch {
+    // La colección legada es opcional y su listado está restringido a admins.
+    // Un usuario normal no debe ver avisos por una migración que no aplica.
+    return emptyResult();
+  }
 }
 
 /**

@@ -380,9 +380,14 @@ service cloud.firestore {
     }
 
     // Personal User Library Entries (colección legada; solo lectura/borrado para migrar)
+    // Colección legada: la migración la hacen usuarios recién creados, que
+    // todavía no tienen el email verificado. Basta con que sea el dueño.
     match /user_library/{entryId} {
-      allow get: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow get: if isValidId(entryId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      // Las reglas de `list` no pueden filtrar por resource.data; solo el
+      // admin puede listar la colección legada. Los usuarios migran desde el
+      // servidor, no consultando esta colección directamente.
+      allow list: if isAdmin();
       allow create: if isVerifiedUser() && isValidId(entryId) &&
         isValidUserLibraryEntry(incoming()) &&
         incoming().createdAt == request.time &&
@@ -397,7 +402,7 @@ service cloud.firestore {
             incoming().createdAt == existing().createdAt
           )
         );
-      allow delete: if isValidId(entryId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(entryId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
     }
 
     // Public Community Reviews

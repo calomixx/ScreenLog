@@ -14,13 +14,34 @@ const FIREBASE_ERROR_MESSAGES: Record<string, string> = {
   'auth/operation-not-allowed':
     'El acceso con email/contraseña está desactivado en Firebase. Actívalo en Authentication → Sign-in method.',
   'auth/email-already-in-use':
-    'Ya existe una cuenta de Firebase con este email. Inicia sesión con la contraseña correcta.',
-  'auth/weak-password': 'La contraseña es demasiado débil para Firebase (mínimo 6 caracteres).',
+    'Ya existe una cuenta de Firebase con este email pero la contraseña no coincide. Borrá esa cuenta en Authentication → Users y volvé a entrar.',
   'auth/invalid-email': 'El email no es válido.',
-  'auth/network-request-failed': 'Sin conexión con Firebase. Revisa tu red.',
-  'auth/too-many-requests': 'Demasiados intentos en Firebase. Espera unos minutos.',
-  'auth/invalid-credential': 'La contraseña no coincide con la cuenta de Firebase.',
+  'auth/network-request-failed': 'Sin conexión con Firebase. Revisá tu red.',
+  'auth/too-many-requests': 'Demasiados intentos en Firebase. Esperá unos minutos.',
 };
+
+/**
+ * Firebase exige mínimo 6 caracteres; la app no. Derivamos una contraseña
+ * larga y determinista a partir de la contraseña de la app, para que la
+ * identidad de Firebase se cree sola sin pedirle nada al usuario.
+ */
+export async function deriveFirebasePassword(email: string, password: string): Promise<string> {
+  const data = new TextEncoder().encode(`screenlog|${email.trim().toLowerCase()}|${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return `sl!${hex}`;
+}
+
+function canCreateAccount(code: string): boolean {
+  return [
+    'auth/user-not-found',
+    'auth/invalid-credential',
+    'auth/invalid-login-credentials',
+    'auth/wrong-password',
+  ].includes(code);
+}
 
 /**
  * Crea o reutiliza la identidad de Firebase Auth para un usuario que ya se
@@ -43,20 +64,32 @@ export async function ensureFirebasePasswordSession(
       return { ok: true, uid: already.uid, created: false };
     }
 
+    const derived = await deriveFirebasePassword(cleanEmail, password);
+    let lastCode = '';
     let created = false;
     let user = null;
-    try {
-      const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      user = credential.user;
-    } catch (loginError) {
-      const code = (loginError as { code?: string })?.code || '';
-      const canCreate = [
-        'auth/user-not-found',
-        'auth/invalid-credential',
-        'auth/invalid-login-credentials',
-      ].includes(code);
-      if (!canCreate) throw loginError;
-      const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+
+    // Probamos la contraseña derivada y, por compatibilidad con cuentas
+    // creadas antes de este cambio, la contraseña original de la app.
+    for (const candidate of [derived, password]) {
+      try {
+        const credential = await signInWithEmailAndPassword(auth, cleanEmail, candidate);
+        user = credential.user;
+        break;
+      } catch (loginError) {
+        lastCode = (loginError as { code?: string })?.code || '';
+      }
+    }
+
+    if (!user) {
+      if (!canCreateAccount(lastCode)) {
+        return {
+          ok: false,
+          code: lastCode || 'unknown',
+          message: FIREBASE_ERROR_MESSAGES[lastCode] || 'No se pudo abrir la sesión de Firebase.',
+        };
+      }
+      const credential = await createUserWithEmailAndPassword(auth, cleanEmail, derived);
       user = credential.user;
       created = true;
       if (displayName) {
@@ -69,18 +102,10 @@ export async function ensureFirebasePasswordSession(
       try {
         await sendEmailVerification(user);
       } catch {
-        // Sin verificación el usuario puede usar su biblioteca privada;
-        // las acciones públicas seguirán requiriendo email verificado.
+        // La biblioteca privada funciona sin verificación.
       }
     }
 
-    if (!user) {
-      return {
-        ok: false,
-        code: 'unknown',
-        message: 'No se pudo crear la sesión de Firebase.',
-      };
-    }
     return { ok: true, uid: user.uid, created };
   } catch (error) {
     const code = (error as { code?: string })?.code || 'unknown';

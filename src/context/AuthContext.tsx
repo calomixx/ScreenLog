@@ -257,28 +257,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const syncFirebaseIdentity = useCallback(
-    async (email: string, password: string, name?: string) => {
+    async (
+      email: string,
+      password: string,
+      profile?: { name?: string; avatar?: string },
+    ) => {
       // 1) Vía preferida: el servidor firma un token para el usuario de la app.
       const custom = await ensureFirebaseCustomSession();
-      if (custom.ok) {
-        setFirebaseLinkError(null);
-        return;
-      }
-      const customMessage = custom.message || 'No se pudo crear la sesión de Firebase.';
+      if (!custom.ok) {
+        const customMessage = custom.message || 'No se pudo crear la sesión de Firebase.';
 
-      // 2) Respaldo: proveedor Email/Password (si está habilitado).
-      try {
-        const result = await ensureFirebasePasswordSession(email, password, name);
-        if (result.ok) {
-          setFirebaseLinkError(null);
+        // 2) Respaldo: proveedor Email/Password (si está habilitado).
+        try {
+          const result = await ensureFirebasePasswordSession(
+            email,
+            password,
+            profile?.name,
+          );
+          if (!result.ok) {
+            const message = 'message' in result ? result.message : customMessage;
+            setFirebaseLinkError(message);
+            console.warn('Firestore sin sesión de Firebase:', message);
+            return;
+          }
+        } catch (err) {
+          setFirebaseLinkError(customMessage);
+          console.warn('No se pudo sincronizar la sesión con Firebase:', err);
           return;
         }
-        const message = 'message' in result ? result.message : customMessage;
-        setFirebaseLinkError(message);
-        console.warn('Firestore sin sesión de Firebase:', message);
-      } catch (err) {
-        setFirebaseLinkError(customMessage);
-        console.warn('No se pudo sincronizar la sesión con Firebase:', err);
+      }
+
+      // Con la sesión de Firebase abierta creamos el documento `users/{uid}`
+      // aquí mismo. No dependemos de que `onAuthStateChanged` ya haya corrido:
+      // así el usuario aparece en Firestore apenas entra.
+      setFirebaseLinkError(null);
+      const fbUser = auth.currentUser;
+      if (fbUser?.uid) {
+        try {
+          await ensureUserAccount({
+            uid: fbUser.uid,
+            displayName: profile?.name || fbUser.displayName || fbUser.email?.split('@')[0],
+            email: email || fbUser.email,
+            photoURL: profile?.avatar || fbUser.photoURL,
+          });
+        } catch (err) {
+          console.warn('No se pudo crear la cuenta en Firestore:', err);
+        }
       }
     },
     [],
@@ -290,6 +314,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const custom = await ensureFirebaseCustomSession();
       if (custom.ok) {
         setFirebaseLinkError(null);
+        if (auth.currentUser?.uid && currentUser?.email) {
+          try {
+            await ensureUserAccount({
+              uid: auth.currentUser.uid,
+              displayName: currentUser?.name || auth.currentUser.displayName,
+              email: currentUser.email,
+              photoURL: currentUser?.avatar || auth.currentUser.photoURL,
+            });
+          } catch (err) {
+            console.warn('No se pudo crear la cuenta en Firestore:', err);
+          }
+        }
         return { success: true };
       }
 
@@ -307,6 +343,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await ensureFirebasePasswordSession(email, password, currentUser?.name);
       if (result.ok) {
         setFirebaseLinkError(null);
+        if (auth.currentUser?.uid) {
+          try {
+            await ensureUserAccount({
+              uid: auth.currentUser.uid,
+              displayName: currentUser?.name || auth.currentUser.displayName,
+              email,
+              photoURL: currentUser?.avatar || auth.currentUser.photoURL,
+            });
+          } catch (err) {
+            console.warn('No se pudo crear la cuenta en Firestore:', err);
+          }
+        }
         return { success: true };
       }
       if ('message' in result) {
@@ -343,7 +391,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ignore
       }
       // Sesión de Firebase Auth para que Firestore autentique las escrituras.
-      await syncFirebaseIdentity(response.data.user.email, password, response.data.user.name);
+      await syncFirebaseIdentity(response.data.user.email, password, {
+        name: response.data.user.name,
+        avatar: response.data.user.avatar,
+      });
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -423,7 +474,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
-      await syncFirebaseIdentity(data.email, data.password, data.name);
+      await syncFirebaseIdentity(data.email, data.password, {
+        name: data.name,
+        avatar: 'avatar' in data ? data.avatar : undefined,
+      });
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setIsGuest(false);
@@ -453,7 +507,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
-      await syncFirebaseIdentity(data.email, data.password, data.name);
+      await syncFirebaseIdentity(data.email, data.password, { name: data.name });
       setCurrentUser(response.data.user);
       setSessionInfo(response.data.session);
       setNeedsSetup(false);
