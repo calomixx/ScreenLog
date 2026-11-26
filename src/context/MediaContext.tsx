@@ -16,6 +16,7 @@ import { apiRequest, ApiError } from '../lib/api';
 import { ensureFirebaseCustomSession } from '../lib/firebaseCustomToken';
 import {
   auth,
+  loadCommunityReviewsFromFirestore,
   publishCommunityReviewToFirestore,
   saveCatalogMediaToFirestore,
   deleteCatalogMediaFromFirestore,
@@ -337,12 +338,19 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Could not restore local media overrides:', err);
       }
 
-      try {
-        const reviewResponse = await apiRequest<{ success: boolean; data: ServerReview[] }>('/api/community/reviews');
-        if (Array.isArray(reviewResponse.data)) reviews = reviewResponse.data;
-      } catch {
-        reviews = [];
+      // Reseñas: servidor + Firestore. Si el contenedor se reinicia y pierde el
+      // JSON, las reseñas siguen disponibles en la nube.
+      const [serverReviews, cloudReviews] = await Promise.all([
+        apiRequest<{ success: boolean; data: ServerReview[] }>('/api/community/reviews')
+          .then((response) => (Array.isArray(response.data) ? response.data : []))
+          .catch(() => [] as ServerReview[]),
+        loadCommunityReviewsFromFirestore(),
+      ]);
+      const mergedReviews = new Map<string, ServerReview>();
+      for (const review of [...cloudReviews, ...serverReviews]) {
+        if (review?.id && review.mediaId) mergedReviews.set(review.id, review);
       }
+      reviews = [...mergedReviews.values()];
       if (!cancelled) setMediaList(attachCommunityReviews(items, reviews));
     })();
     return () => {

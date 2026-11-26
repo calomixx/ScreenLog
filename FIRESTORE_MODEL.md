@@ -284,6 +284,24 @@ el email verificado la primera vez. Si el servidor desplegado no tiene la creden
 la app usa Email/Password y el usuario queda sin verificar: las reglas ya **no exigen**
 `email_verified` para las acciones del dueño, solo una sesión válida de Firebase Auth.
 
+### Bases de datos desplegadas
+
+`firebase.json` despliega las mismas reglas a las dos bases del proyecto:
+`(default)` y `ai-studio-screenlogclasifi-...` (la que usa la app desplegada por
+AI Studio). `firebase-applet-config.json` apunta a la segunda; por eso es
+imprescindible desplegar reglas a ambas. Para comprobar la que usa la app:
+
+```bash
+FIRESTORE_DATABASE_ID=ai-studio-screenlogclasifi-... npm run firebase:verify
+```
+
+Para subir el catálogo que quedó en el JSON del servidor o en `(default)` a la
+base activa (y rescatar películas huérfanas de la biblioteca):
+
+```bash
+npm run firebase:sync-catalog
+```
+
 Requisito de una sola vez (servidor, no usuarios finales): una credencial de servicio.
 
 ```bash

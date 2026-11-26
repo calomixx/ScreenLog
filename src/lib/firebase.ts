@@ -252,6 +252,47 @@ export async function publishCommunityReviewToFirestore(params: {
 }
 
 /**
+ * Reseñas guardadas en Firestore. El JSON del servidor puede desaparecer al
+ * reiniciar el contenedor; esto evita que una reseña publicada se pierda.
+ */
+export async function loadCommunityReviewsFromFirestore(): Promise<
+  Array<{
+    id: string;
+    mediaId: string;
+    author: string;
+    avatar: string;
+    rating: number;
+    comment: string;
+    date: string;
+    likes: number;
+  }>
+> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'community_reviews'), where('rating', '>=', 1), where('rating', '<=', 5)),
+    );
+    return snapshot.docs.map((item) => {
+      const data = item.data();
+      const timestamp = data.createdAt as { toDate?: () => Date } | undefined;
+      const createdAt = timestamp?.toDate ? timestamp.toDate().toISOString() : '';
+      return {
+        id: item.id,
+        mediaId: String(data.mediaId || ''),
+        author: String(data.author || 'Invitado Cinéfilo'),
+        avatar: String(data.avatar || ''),
+        rating: Number(data.rating) || 0,
+        comment: String(data.comment || ''),
+        date: createdAt,
+        likes: Number(data.likes) || 0,
+      };
+    });
+  } catch (error) {
+    console.warn('No se pudieron leer las reseñas de Firestore:', error);
+    return [];
+  }
+}
+
+/**
  * Saves or updates a custom/curated catalog media item in Firestore.
  */
 export async function saveCatalogMediaToFirestore(

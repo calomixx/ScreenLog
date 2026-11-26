@@ -12,7 +12,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "firebase:check": "tsx server/check-firebase.ts",
-    "firebase:verify": "node scripts/verify-firestore.mjs"
+    "firebase:verify": "node scripts/verify-firestore.mjs",
+    "firebase:sync-catalog": "node scripts/sync-catalog-firestore.mjs"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",

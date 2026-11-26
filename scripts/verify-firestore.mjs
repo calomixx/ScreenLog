@@ -13,8 +13,9 @@ import { getAuth } from 'firebase-admin/auth';
 
 const config = JSON.parse(readFileSync('firebase-applet-config.json', 'utf8'));
 const serviceAccount = JSON.parse(readFileSync('serviceAccountKey.json', 'utf8'));
-const projectId = config.projectId;
-const databaseId = config.firestoreDatabaseId || '(default)';
+const projectId = process.env.FIREBASE_PROJECT_ID || config.projectId;
+// Permite probar la base que usa la app desplegada sin editar la configuración.
+const databaseId = process.env.FIRESTORE_DATABASE_ID || config.firestoreDatabaseId || '(default)';
 const apiKey = config.apiKey;
 const base = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
 
