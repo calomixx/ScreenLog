@@ -657,7 +657,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       void (async () => {
         try {
-          if (!auth.currentUser?.uid) {
+          const fb = auth.currentUser;
+          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
             // La sesión de Firebase se abre sola con el token que firma el
             // servidor; el usuario no tiene que hacer nada.
             const session = await ensureFirebaseCustomSession();
@@ -751,7 +752,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       void (async () => {
         try {
-          if (!auth.currentUser?.uid) {
+          const fb = auth.currentUser;
+          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
             const session = await ensureFirebaseCustomSession();
             if (!session.ok) return;
           }
@@ -782,7 +784,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // servidor falla, igual intentamos dejarla en la nube con un id propio.
       const publishToFirestore = async (id: string) => {
         try {
-          if (!auth.currentUser?.uid) {
+          const fb = auth.currentUser;
+          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
             const session = await ensureFirebaseCustomSession();
             if (!session.ok) {
               console.warn('Reseña sin sesión de Firebase:', session.message);
