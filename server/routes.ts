@@ -534,7 +534,10 @@ export function createApiRouter(): Router {
       }
     } catch (error) {
       firestore = {
-        status: `Sin conexión: ${error instanceof Error ? error.message : String(error)}`,
+        serverAccess: 'denied',
+        message:
+          'El hosting no tiene credenciales de Firestore, así que el respaldo del servidor queda desactivado. La app no se ve afectada: los usuarios, el catálogo y las reseñas se leen desde Firestore en el navegador.',
+        detail: error instanceof Error ? error.message : String(error),
       };
     }
 

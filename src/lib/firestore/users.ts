@@ -174,8 +174,11 @@ export interface FirestoreUserSummary {
 }
 
 export async function listUserAccounts(): Promise<FirestoreUserSummary[]> {
-  if (!auth.currentUser) return [];
   try {
+    // Al recargar la página Firebase tarda unos milisegundos en restaurar la
+    // sesión guardada; sin esperar, la lista de usuarios saldría vacía.
+    await auth.authStateReady();
+    if (!auth.currentUser) return [];
     const snapshot = await getDocs(collection(db, 'users'));
     return snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
