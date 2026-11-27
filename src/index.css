@@ -11,6 +11,10 @@
 }
 
 @layer base {
+  html, body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }

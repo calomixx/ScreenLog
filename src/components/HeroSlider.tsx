@@ -200,8 +200,8 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
   };
 
   return (
-    <div className="relative my-4">
-      {/* DYNAMIC AMBILIGHT AURA: Proyecta los colores reales del póster/escena fuera del marco */}
+    <div className="relative my-2 sm:my-4">
+      {/* DYNAMIC AMBILIGHT AURA: Proyecta los colores reales del póster/escena fuera del marco sin desbordar en móvil */}
       <AnimatePresence mode="wait">
         <motion.div
           key={`ambilight-${activeMedia.id}`}
@@ -209,7 +209,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           animate={{ opacity: 0.7 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2, ease: 'easeOut' }}
-          className="pointer-events-none absolute -inset-8 sm:-inset-20 lg:-inset-32 z-0"
+          className="pointer-events-none absolute inset-0 sm:-inset-16 lg:-inset-28 z-0 overflow-hidden sm:overflow-visible rounded-2xl sm:rounded-3xl"
           aria-hidden="true"
         >
           <img
@@ -218,7 +218,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
             loading="lazy"
             decoding="async"
             onError={(event) => handleImageError(event, FALLBACK_BACKDROP)}
-            className="w-full h-full object-cover scale-125 blur-[90px] sm:blur-[140px] lg:blur-[180px] saturate-200 brightness-125 opacity-80"
+            className="w-full h-full object-cover scale-100 sm:scale-125 blur-[60px] sm:blur-[140px] lg:blur-[180px] saturate-200 brightness-125 opacity-80"
             referrerPolicy="no-referrer"
           />
         </motion.div>
@@ -226,7 +226,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
       <section 
         id="hero-cinematic-slider"
-        className="relative z-10 w-full min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A0B]/40 backdrop-blur-sm shadow-[0_25px_75px_-15px_rgba(0,0,0,0.85)]"
+        className="relative z-10 w-full min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-[#0A0A0B]/40 backdrop-blur-sm shadow-[0_25px_75px_-15px_rgba(0,0,0,0.85)]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -260,19 +260,19 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
       </AnimatePresence>
 
       {/* Hero Content Layer */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 py-10 lg:py-14 flex flex-col justify-between min-h-[600px] lg:min-h-[700px]">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-10 lg:px-14 py-5 sm:py-10 lg:py-14 flex flex-col justify-between min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] min-w-0">
         
         {/* Top Badges & Category */}
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-900/30 text-xs font-bold tracking-wide uppercase">
-              <Sparkles className="w-3.5 h-3.5" />
+        <div className="flex items-start sm:items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0">
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-900/30 text-[10px] sm:text-xs font-bold tracking-wide uppercase whitespace-nowrap">
+              <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               Destacado en Cartelera
             </span>
-            <span className={`px-3 py-1 rounded-full backdrop-blur-md text-xs font-black uppercase tracking-wider border shadow-sm ${activeBadge.bg}`}>
+            <span className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider border shadow-sm whitespace-nowrap ${activeBadge.bg}`}>
               {activeBadge.text}
             </span>
-            <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-slate-200 text-xs font-medium border border-white/10">
+            <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-white/10 backdrop-blur-md text-slate-200 text-[10px] sm:text-xs font-medium border border-white/10 whitespace-nowrap">
               {activeMedia.defaultPlatform}
             </span>
             {activeMedia.duration && (
@@ -284,14 +284,14 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
           </div>
 
           {/* Quick Carousel Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               id="hero-prev-btn"
               onClick={handlePrev}
-              className="p-2.5 rounded-full bg-white/10 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 transition-all shadow-lg active:scale-95"
+              className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 transition-all shadow-lg active:scale-95"
               aria-label="Anterior película"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <span className="text-xs font-mono font-bold text-slate-400 px-1 hidden sm:inline-block">
               {currentIndex + 1} / {displayList.length}
@@ -299,10 +299,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
             <button
               id="hero-next-btn"
               onClick={handleNext}
-              className="p-2.5 rounded-full bg-white/10 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 transition-all shadow-lg active:scale-95"
+              className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-rose-600 hover:text-white text-slate-200 border border-white/10 transition-all shadow-lg active:scale-95"
               aria-label="Siguiente película"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
@@ -320,27 +320,27 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
             >
               {/* Title & Metadata */}
               <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold text-white tracking-tight leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                <h1 className="text-2xl sm:text-4xl lg:text-5xl font-display font-extrabold text-white tracking-tight leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                   {activeMedia.title}
                 </h1>
                 {activeMedia.originalTitle && activeMedia.originalTitle !== activeMedia.title && (
-                  <p className="text-sm text-slate-400 mt-1 italic">
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1 italic">
                     Original: {activeMedia.originalTitle}
                   </p>
                 )}
               </div>
 
               {/* Meta row */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-slate-300">
-                <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-300">
+                <div className="flex items-center gap-1.5 bg-white/5 px-2.5 sm:px-3 py-1 rounded-xl border border-white/10">
                   {activeMedia.communityVotesCount > 0 ? (
                     <>
-                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 fill-amber-400" />
                       <span className="font-bold text-amber-400">{activeMedia.communityRating.toFixed(1)}</span>
-                      <span className="text-xs text-slate-400">({activeMedia.communityVotesCount.toLocaleString()} votos)</span>
+                      <span className="text-[11px] sm:text-xs text-slate-400">({activeMedia.communityVotesCount.toLocaleString()} votos)</span>
                     </>
                   ) : (
-                    <span className="text-xs text-slate-400">Nuevo en catálogo</span>
+                    <span className="text-[11px] sm:text-xs text-slate-400">Nuevo en catálogo</span>
                   )}
                 </div>
 
@@ -355,11 +355,11 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
               </div>
 
               {/* Genre Pills */}
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-0.5 sm:pt-1">
                 {activeMedia.genres.map((genre) => (
                   <span
                     key={genre}
-                    className="px-2.5 py-0.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300 font-medium"
+                    className="px-2.5 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[11px] sm:text-xs text-slate-300 font-medium"
                   >
                     {genre}
                   </span>
@@ -367,18 +367,18 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
               </div>
 
               {/* Synopsis */}
-              <p className="text-sm sm:text-base text-slate-200 line-clamp-3 leading-relaxed max-w-xl font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+              <p className="text-xs sm:text-base text-slate-200 line-clamp-3 leading-relaxed max-w-xl font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                 {activeMedia.synopsis}
               </p>
 
               {/* Call to Actions */}
-              <div className="flex flex-wrap items-center gap-3 pt-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-2 sm:pt-3">
                 {/* Watch Trailer Button */}
                 {activeMedia.trailerYoutubeId && (
                   <button
                     id="hero-play-trailer-btn"
                     onClick={() => openTrailer(activeMedia.trailerYoutubeId)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-rose-600 text-black hover:text-white font-bold text-sm shadow-xl shadow-rose-900/20 active:scale-95 transition-all duration-300"
+                    className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white hover:bg-rose-600 text-black hover:text-white font-bold text-xs sm:text-sm shadow-xl shadow-rose-900/20 active:scale-95 transition-all duration-300"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     Ver Tráiler
@@ -389,7 +389,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
                 <button
                   id="hero-view-details-btn"
                   onClick={() => setSelectedMediaId(activeMedia.id)}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm border border-white/10 shadow-lg active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm border border-white/10 shadow-lg active:scale-95 transition-all"
                 >
                   <Info className="w-4 h-4 text-rose-400" />
                   Ver Ficha & Votaciones
@@ -400,7 +400,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
                   <button
                     id="hero-add-list-btn"
                     onClick={() => setShowStatusMenu(!showStatusMenu)}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border transition-all active:scale-95 ${
+                    className={`flex items-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold border transition-all active:scale-95 ${
                       userReview
                         ? 'bg-rose-600/20 text-rose-300 border-rose-500/40'
                         : 'bg-white/10 hover:bg-white/15 text-slate-200 border-white/10'
@@ -457,13 +457,13 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
         </div>
 
         {/* Bottom Filmstrip Thumbnails & Apartados Controls */}
-        <div className="pt-6 border-t border-white/10 mt-6">
-          <div className="flex flex-col gap-3.5 sm:gap-4 p-3.5 sm:p-4 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60">
+        <div className="pt-5 sm:pt-6 border-t border-white/10 mt-5 sm:mt-6 min-w-0 w-full">
+          <div className="flex flex-col gap-3 sm:gap-4 p-2.5 sm:p-4 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60 min-w-0 w-full">
             
             {/* Filmstrip thumbnails (Child div:nth-of-type(1) - exact selector target) */}
             <div 
               ref={filmstripRef}
-              className="flex items-center gap-3 overflow-x-auto py-2 px-1.5 max-w-full scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent scroll-smooth focus-visible:outline-none"
+              className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto py-2 px-1 max-w-full scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent scroll-smooth focus-visible:outline-none"
               tabIndex={0}
               aria-label="Carrusel de películas de todos los apartados"
             >
@@ -534,15 +534,15 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
               className="flex flex-col lg:flex-row items-center justify-between gap-3 pt-2 border-t border-white/10"
             >
               {/* Apartados Filter Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
+              <div className="flex flex-nowrap sm:flex-wrap overflow-x-auto sm:overflow-visible items-center gap-1.5 w-full lg:w-auto pb-1 sm:pb-0">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1 shrink-0 whitespace-nowrap">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-rose-400" />
                   Apartado:
                 </span>
 
                 <button
                   onClick={() => handleSelectApartado('todos')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'todos'
                       ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-1 ring-rose-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -555,7 +555,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('pelicula')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'pelicula'
                       ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-1 ring-rose-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -568,7 +568,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('serie')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'serie'
                       ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-1 ring-rose-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -581,7 +581,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('anime')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'anime'
                       ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40 ring-1 ring-purple-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -594,7 +594,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('novela')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'novela'
                       ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40 ring-1 ring-amber-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -607,7 +607,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('top_rated')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'top_rated'
                       ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40 ring-1 ring-amber-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -619,7 +619,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ items }) => {
 
                 <button
                   onClick={() => handleSelectApartado('tendencias')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     apartado === 'tendencias'
                       ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 ring-1 ring-emerald-400'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'

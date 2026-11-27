@@ -148,7 +148,7 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-dvh bg-ink text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
+    <div className="min-h-dvh bg-ink text-slate-100 flex flex-col overflow-x-clip selection:bg-rose-500 selection:text-white">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-rose-600 focus:text-white focus:text-sm focus:font-bold"
@@ -174,7 +174,7 @@ const MainAppContent: React.FC = () => {
         </div>
       )}
 
-      <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
+      <main id="main-content" className="flex-1 max-w-7xl w-full min-w-0 mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 md:pb-10">
         <ErrorBoundary section="esta vista">
           <Suspense fallback={<ViewLoader />}>{renderTab()}</Suspense>
         </ErrorBoundary>
@@ -192,11 +192,11 @@ const MainAppContent: React.FC = () => {
         {isRouletteOpen && <CineRouletteModal />}
       </Suspense>
 
-      <footer className="border-t border-white/5 bg-surface text-slate-400 py-6 mt-auto md:mb-0">
+      <footer className="border-t border-white/5 bg-surface text-slate-400 pt-6 pb-24 md:py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <LogoLockup size={34} showTagline={false} />
 
-          <nav className="flex items-center gap-5 text-xs font-semibold" aria-label="Navegación interna">
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:gap-5 text-xs font-semibold" aria-label="Navegación interna">
             <button type="button" onClick={() => setActiveTab('sistema')} className="hover:text-white transition-colors">
               Mi Sala
             </button>

@@ -237,14 +237,14 @@ export const Navbar: React.FC = () => {
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/35 to-transparent pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-2 sm:gap-3 h-16">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3 h-16">
             <button
               type="button"
               onClick={handleGoHome}
-              className="flex items-center shrink-0 focus:outline-none"
+              className="flex items-center min-w-0 shrink focus:outline-none"
               title="TakeVault Pro - Ir al inicio"
             >
-              <LogoLockup size={36} showTagline={false} />
+              <LogoLockup size={32} showTagline={false} textClassName="text-base sm:text-lg" />
             </button>
 
             <nav className="hidden xl:flex items-center gap-0.5 2xl:gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/10 min-w-0 max-w-full overflow-x-auto shrink" aria-label="Navegación principal">
@@ -281,7 +281,7 @@ export const Navbar: React.FC = () => {
               })}
             </nav>
 
-            <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 min-w-0">
+            <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0 min-w-0">
               <div ref={searchRef} className="relative hidden md:block">
                 <div className="relative flex items-center">
                   <Search className="absolute left-3 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
@@ -342,7 +342,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openRoulette()}
-                className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-rose-500/25 text-amber-300 hover:text-white border border-amber-500/35 text-xs font-bold transition-all shadow-sm active:scale-95"
+                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-rose-500/25 text-amber-300 hover:text-white border border-amber-500/35 text-xs font-bold transition-all shadow-sm active:scale-95"
                 title="¿Qué Veo Hoy? Ruleta de azar cinéfilo"
                 aria-label="Abrir ruleta ¿Qué Veo Hoy?"
               >
@@ -503,7 +503,7 @@ export const Navbar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
                   title="Cerrar sesión y salir afuera"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -531,7 +531,7 @@ export const Navbar: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => exitToPublic(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all"
                     title="Salir a la portada pública"
                   >
                     <LogOut className="w-3.5 h-3.5" />

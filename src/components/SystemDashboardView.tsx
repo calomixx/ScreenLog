@@ -59,7 +59,7 @@ export const SystemDashboardView: React.FC = () => {
   const customUserCreated = mediaList.filter((m) => m.isCustomUserCreated);
 
   return (
-    <div id="system-dashboard-view" className="space-y-12 pb-16 scroll-mt-20">
+    <div id="system-dashboard-view" className="space-y-8 sm:space-y-12 pb-12 sm:pb-16 min-w-0 scroll-mt-20">
             {/* WORKSPACE ACTIVE STATUS BAR (Claramente dentro del sistema) */}
       <div className="relative z-10 isolate flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#202028] via-[#17171E] to-[#261A1F] border border-white/15 ring-1 ring-white/5 backdrop-blur-xl shadow-[0_18px_45px_-12px_rgba(0,0,0,0.9),0_10px_30px_-14px_rgba(225,29,72,0.45),inset_0_1px_0_rgba(255,255,255,0.09)]">
         <div className="flex items-center gap-3.5 min-w-0">
@@ -255,7 +255,7 @@ export const SystemDashboardView: React.FC = () => {
       )}
 
       {/* Banner CTA: Añade tus películas y califica */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-950/60 via-[#161618] to-[#161618] border border-rose-500/30 p-8 sm:p-12 shadow-2xl">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-950/60 via-[#161618] to-[#161618] border border-rose-500/30 p-5 sm:p-12 shadow-2xl">
         <div className="relative z-10 max-w-2xl space-y-4">
           <span className="px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-md shadow-rose-900/30">
             ¡Tu Criterio Cuenta!
