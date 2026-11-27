@@ -275,6 +275,12 @@ porque no está en el alcance de la app.
   con la sesión del navegador (regla `users → list: if isAdmin()`), así que
   muestra a todos aunque el servidor se haya reiniciado. Los administradores se
   marcan con `npm run firebase:seed-admins` (documento `admins/{uid}`).
+- **Botón «Sincronizar»:** en la pestaña Usuarios. Vuelve a leer Firestore y
+  manda la lista a `POST /api/admin/sync-users`, que restaura en el servidor las
+  cuentas perdidas (sin tocar roles, bloqueos ni sesiones). Las cuentas
+  importadas quedan sin contraseña local; al entrar, el login las valida contra
+  Firebase Auth y guarda el hash. Probado: crea 1 la primera vez y no duplica en
+  las siguientes.
 - **Diagnóstico:** `GET /api/db-status` devuelve cantidades del JSON y de
   Firestore (`users`, `catalogMedia`, `reviews`, `serverUsers`) para comprobar
   la conexión sin exponer datos privados.

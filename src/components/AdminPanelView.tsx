@@ -375,6 +375,48 @@ export const AdminPanelView: React.FC = () => {
     }
   };
 
+  const [isSyncingUsers, setIsSyncingUsers] = useState(false);
+
+  const handleSyncUsers = async () => {
+    if (isSyncingUsers) return;
+    setIsSyncingUsers(true);
+    setError('');
+    try {
+      const cloudUsers = await listUserAccounts();
+      if (cloudUsers.length === 0) {
+        setError(
+          'No se pudieron leer los usuarios de Firestore. Revisá que la sesión de Firebase esté activa.',
+        );
+        return;
+      }
+      const response = await apiRequest<{
+        success: boolean;
+        data: { created: number; updated: number; skipped: number; total: number };
+      }>('/api/admin/sync-users', {
+        method: 'POST',
+        body: JSON.stringify({
+          users: cloudUsers.map((user) => ({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            favoriteGenres: user.favoriteGenres,
+            createdAt: user.createdAt ? user.createdAt.toISOString() : null,
+          })),
+        }),
+      });
+      const { created, updated, total } = response.data;
+      flash(
+        `Sincronizado: ${created} recuperados, ${updated} actualizados. Total en el servidor: ${total}.`,
+      );
+      await loadCore();
+    } catch (syncError) {
+      handleError(syncError);
+    } finally {
+      setIsSyncingUsers(false);
+    }
+  };
+
   const isOwnerUser = isOwner(currentUser?.role);
   const tabs = useMemo(() => {
     const base: { id: AdminTab; label: string; icon: React.ElementType }[] = [
@@ -1412,7 +1454,23 @@ export const AdminPanelView: React.FC = () => {
               <option value="active">Activos</option>
               <option value="blocked">Bloqueados</option>
             </select>
+            <button
+              type="button"
+              onClick={() => void handleSyncUsers()}
+              disabled={isSyncingUsers}
+              className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 transition-colors disabled:opacity-50 md:w-auto"
+              title="Recupera en el servidor los usuarios que solo existen en Firestore"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingUsers ? 'animate-spin' : ''}`} />
+              {isSyncingUsers ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
           </div>
+
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            El panel lee los usuarios directamente de Firestore. «Sincronizar» vuelve a traerlos y
+            restaura en el servidor las cuentas que se hayan perdido al reiniciarse, sin perder
+            roles ni bloqueos.
+          </p>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

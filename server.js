@@ -4025,7 +4025,16 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       res.setHeader("Retry-After", String(retry));
       return safeError(res, 429, "Cuenta bloqueada temporalmente por intentos fallidos.", "TEMPORARILY_LOCKED");
     }
-    const valid = verifyPassword(password, user.salt, user.passwordHash);
+    let valid = verifyPassword(password, user.salt, user.passwordHash);
+    if (!valid) {
+      const identity = await verifyFirebasePassword(user.email, password);
+      if (identity) {
+        const { salt, hash } = hashPassword(password);
+        user.salt = salt;
+        user.passwordHash = hash;
+        valid = true;
+      }
+    }
     if (!valid) {
       user.failedLoginCount += 1;
       if (user.failedLoginCount >= 5) {
@@ -4588,6 +4597,114 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       return true;
     }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json({ success: true, data: items });
+  }));
+  router.post("/admin/sync-users", staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const incoming = Array.isArray(req.body?.users) ? req.body.users : [];
+    if (incoming.length === 0) {
+      return safeError(res, 400, "No se recibieron usuarios para sincronizar.", "EMPTY_SYNC");
+    }
+    const takenUsernames = new Set(store.users.map((u) => (u.username || "").toLowerCase()));
+    const uniqueUsername = (base) => {
+      const clean = cleanUsername(base) || "usuario";
+      if (!takenUsernames.has(clean)) {
+        takenUsernames.add(clean);
+        return clean;
+      }
+      for (let i = 2; i < 1e3; i += 1) {
+        const candidate = `${clean}${i}`;
+        if (!takenUsernames.has(candidate)) {
+          takenUsernames.add(candidate);
+          return candidate;
+        }
+      }
+      return `${clean}${Date.now()}`;
+    };
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    for (const raw of incoming.slice(0, 500)) {
+      if (!raw || typeof raw !== "object") {
+        skipped += 1;
+        continue;
+      }
+      const item = raw;
+      const uid = sanitizeText(item.uid, 128);
+      const email = sanitizeText(item.email, 160).toLowerCase();
+      if (!uid || !email || !/^[a-zA-Z0-9_-]+$/.test(uid) || !email.includes("@")) {
+        skipped += 1;
+        continue;
+      }
+      const name = sanitizeText(item.displayName, 80) || email.split("@")[0] || "Cin\xE9filo";
+      const avatar = typeof item.photoURL === "string" && item.photoURL.length <= 1e3 ? item.photoURL : "";
+      const genres = Array.isArray(item.favoriteGenres) ? item.favoriteGenres.filter((genre) => typeof genre === "string").map((genre) => sanitizeText(genre, 40)).filter(Boolean).slice(0, 10) : [];
+      const existing = store.users.find((user) => user.id === uid) || store.users.find((user) => user.email === email);
+      if (existing) {
+        let changed = false;
+        if (name && existing.name !== name) {
+          existing.name = name;
+          changed = true;
+        }
+        if (avatar && existing.avatar !== avatar) {
+          existing.avatar = avatar;
+          changed = true;
+        }
+        if (genres.length > 0) {
+          const current = existing.favoriteGenres || [];
+          const same = current.length === genres.length && current.every((genre, index) => genre === genres[index]);
+          if (!same) {
+            existing.favoriteGenres = genres;
+            changed = true;
+          }
+        }
+        if (changed) {
+          existing.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
+        continue;
+      }
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      store.users.push({
+        id: uid,
+        name,
+        username: uniqueUsername(name || email.split("@")[0]),
+        email,
+        // Contraseña vacía: se valida contra Firebase Auth al entrar.
+        passwordHash: "",
+        salt: "",
+        role: "user",
+        avatar: avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+        bio: "",
+        favoriteGenres: genres,
+        city: "",
+        platforms: [],
+        socialLinks: {},
+        customFields: [],
+        blocked: false,
+        mustChangePassword: false,
+        createdAt: typeof item.createdAt === "string" && item.createdAt.length <= 40 ? item.createdAt : now,
+        updatedAt: now,
+        lastLoginAt: null,
+        failedLoginCount: 0,
+        lockedUntil: null
+      });
+      created += 1;
+    }
+    addLog(store, {
+      level: "info",
+      category: "admin",
+      message: `Sincronizaci\xF3n de usuarios desde Firestore: ${created} creados, ${updated} actualizados, ${skipped} sin cambios`,
+      actorId: req.authUser?.id,
+      actorName: req.authUser?.name,
+      ip: getClientIp(req)
+    });
+    await saveStore();
+    res.json({
+      success: true,
+      data: { created, updated, skipped, total: store.users.length }
+    });
   }));
   router.post("/admin/users/:id/block", staffOnly, asyncRoute(async (req, res) => {
     const store = await getStore();
