@@ -967,9 +967,171 @@ import { promises as dns } from "node:dns";
 // server/store.ts
 init_initialMedia();
 import { promises as fs } from "node:fs";
+import path2 from "node:path";
+
+// server/firebase-admin.ts
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-var DATA_DIR = path.join(process.cwd(), "server", "data");
-var STORE_FILE = path.join(DATA_DIR, "store.json");
+import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
+
+// firebase-applet-config.json
+var firebase_applet_config_default = {
+  projectId: "screeamlog",
+  appId: "1:902900722838:web:aee7c230037efe643466b7",
+  apiKey: "AIzaSyAZgINMqvi9CETXyIBznGic1QfTyLB44ec",
+  authDomain: "screeamlog.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-screenlogclasifi-9e808bfd-5bc7-44a8-ab49-74fba977ae4a",
+  storageBucket: "screeamlog.firebasestorage.app",
+  messagingSenderId: "902900722838",
+  measurementId: "G-BNC0EBKEEY",
+  oAuthClientId: "902900722838-0oscbu813j94k9v19vd1qtmll6l5l0m9.apps.googleusercontent.com",
+  recaptchaSiteKey: ""
+};
+
+// server/firebase-admin.ts
+var cached = null;
+function candidateFiles() {
+  const fromEnv = (process.env.FIREBASE_SERVICE_ACCOUNT_FILE || "").trim();
+  const files = [
+    fromEnv,
+    path.resolve(process.cwd(), "serviceAccountKey.json"),
+    path.resolve(process.cwd(), "server", "serviceAccountKey.json"),
+    path.resolve(process.cwd(), "firebase-service-account.json")
+  ];
+  return files.filter(Boolean);
+}
+function loadServiceAccount() {
+  const rawJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (rawJson) {
+    try {
+      return JSON.parse(rawJson);
+    } catch {
+      console.warn("FIREBASE_SERVICE_ACCOUNT_JSON no es un JSON v\xE1lido.");
+    }
+  }
+  for (const file of candidateFiles()) {
+    if (!existsSync(file)) continue;
+    try {
+      return JSON.parse(readFileSync(file, "utf8"));
+    } catch (error) {
+      console.warn(`No se pudo leer ${file}:`, error);
+    }
+  }
+  return null;
+}
+function ensureInitialized() {
+  if (cached?.ready) return cached;
+  const serviceAccount = loadServiceAccount();
+  try {
+    if (getApps().length === 0) {
+      if (serviceAccount) {
+        initializeApp({
+          credential: cert(serviceAccount),
+          projectId: serviceAccount.project_id || (process.env.FIREBASE_PROJECT_ID || "").trim() || firebase_applet_config_default.projectId || "screeamlog"
+        });
+      } else {
+        initializeApp({
+          credential: applicationDefault(),
+          projectId: (process.env.FIREBASE_PROJECT_ID || "").trim() || firebase_applet_config_default.projectId
+        });
+      }
+    }
+    cached = {
+      ready: true,
+      message: serviceAccount ? "Firebase Admin inicializado con credencial de servicio." : "Firebase Admin inicializado con las credenciales del entorno."
+    };
+  } catch (error) {
+    cached = {
+      ready: false,
+      message: `No se pudo inicializar Firebase Admin: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+  return cached;
+}
+function getFirebaseAdminStatus() {
+  return ensureInitialized();
+}
+function isUserNotFound(error) {
+  const code = error?.code;
+  return code === "auth/user-not-found";
+}
+function isEmailTaken(error) {
+  const code = error?.code;
+  return code === "auth/email-already-exists" || code === "auth/uid-already-exists";
+}
+async function ensureAuthUser(auth, uid, email, displayName) {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  try {
+    const existing = await auth.getUser(uid);
+    const patch = {};
+    if (cleanEmail && existing.email?.toLowerCase() !== cleanEmail) {
+      patch.email = cleanEmail;
+    }
+    if (cleanEmail && !existing.emailVerified) {
+      patch.emailVerified = true;
+    }
+    if (displayName && !existing.displayName) {
+      patch.displayName = displayName.slice(0, 80);
+    }
+    if (Object.keys(patch).length > 0) {
+      await auth.updateUser(uid, patch).catch((error) => {
+        console.warn(`No se pudo actualizar el usuario ${uid} en Firebase Auth:`, error);
+      });
+    }
+    return;
+  } catch (error) {
+    if (!isUserNotFound(error)) {
+      console.warn(`No se pudo leer el usuario ${uid} en Firebase Auth:`, error);
+    }
+  }
+  try {
+    await auth.createUser({
+      uid,
+      email: cleanEmail || void 0,
+      emailVerified: Boolean(cleanEmail),
+      displayName: displayName?.slice(0, 80) || void 0
+    });
+  } catch (error) {
+    if (!isEmailTaken(error)) {
+      console.warn(`No se pudo crear el usuario ${uid} en Firebase Auth:`, error);
+      return;
+    }
+    await auth.createUser({ uid, displayName: displayName?.slice(0, 80) || void 0 }).catch((err) => console.warn(`No se pudo crear el usuario ${uid} sin email:`, err));
+  }
+}
+async function createFirebaseCustomToken(uid, email, displayName) {
+  const status = ensureInitialized();
+  if (!status.ready) throw new Error(status.message);
+  const auth = getAuth();
+  let resolvedUid = uid;
+  const cleanEmail = (email || "").trim().toLowerCase();
+  if (cleanEmail) {
+    try {
+      const existing = await auth.getUserByEmail(cleanEmail);
+      resolvedUid = existing.uid;
+    } catch (error) {
+      if (!isUserNotFound(error)) {
+        console.warn(`No se pudo buscar ${cleanEmail} en Firebase Auth:`, error);
+      }
+    }
+  }
+  await ensureAuthUser(auth, resolvedUid, email, displayName);
+  return auth.createCustomToken(resolvedUid);
+}
+function getFirestoreDatabaseId() {
+  return (process.env.FIRESTORE_DATABASE_ID || "").trim() || firebase_applet_config_default.firestoreDatabaseId || "(default)";
+}
+function getFirebaseFirestore() {
+  const status = ensureInitialized();
+  if (!status.ready || getApps().length === 0) return null;
+  return getFirestore(getApps()[0], getFirestoreDatabaseId());
+}
+
+// server/store.ts
+var DATA_DIR = path2.join(process.cwd(), "server", "data");
+var STORE_FILE = path2.join(DATA_DIR, "store.json");
 var defaultSettings = {
   portalName: "ScreenLog Pro",
   tagline: "Explora, clasifica y comparte tu pasi\xF3n por el cine",
@@ -1058,6 +1220,64 @@ function getDefaultUsers() {
     }
   ];
 }
+function normalizeStoredUser(raw, id) {
+  const email = typeof raw.email === "string" ? raw.email.trim().toLowerCase() : "";
+  if (!id || !email) return null;
+  const role = raw.role === "owner" || raw.role === "admin" ? raw.role : "user";
+  const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id,
+    name: typeof raw.name === "string" && raw.name ? raw.name : email.split("@")[0],
+    username: typeof raw.username === "string" ? raw.username : void 0,
+    email,
+    passwordHash: typeof raw.passwordHash === "string" ? raw.passwordHash : "",
+    salt: typeof raw.salt === "string" ? raw.salt : "",
+    role,
+    avatar: typeof raw.avatar === "string" ? raw.avatar : "",
+    bio: typeof raw.bio === "string" ? raw.bio : "",
+    favoriteGenres: Array.isArray(raw.favoriteGenres) ? raw.favoriteGenres.filter((g) => typeof g === "string").slice(0, 20) : [],
+    city: typeof raw.city === "string" ? raw.city : "",
+    platforms: Array.isArray(raw.platforms) ? raw.platforms.filter((p) => typeof p === "string").slice(0, 20) : [],
+    socialLinks: raw.socialLinks && typeof raw.socialLinks === "object" ? raw.socialLinks : {},
+    customFields: Array.isArray(raw.customFields) ? raw.customFields.slice(0, 12) : [],
+    blocked: Boolean(raw.blocked),
+    mustChangePassword: Boolean(raw.mustChangePassword),
+    createdAt,
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt,
+    lastLoginAt: typeof raw.lastLoginAt === "string" ? raw.lastLoginAt : null,
+    failedLoginCount: Number(raw.failedLoginCount) || 0,
+    lockedUntil: typeof raw.lockedUntil === "string" ? raw.lockedUntil : null
+  };
+}
+async function loadUsersFromFirestore() {
+  const db = getFirebaseFirestore();
+  if (!db) return [];
+  try {
+    const snapshot = await db.collection("server_users").get();
+    return snapshot.docs.map((doc) => normalizeStoredUser(doc.data(), doc.id)).filter((user) => Boolean(user));
+  } catch (error) {
+    console.warn("No se pudieron leer las cuentas de Firestore:", error);
+    return [];
+  }
+}
+async function persistUsersToFirestore(users) {
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  try {
+    const existing = await db.collection("server_users").get();
+    const ids = new Set(users.map((user) => user.id));
+    const batch = db.batch();
+    for (const user of users) {
+      batch.set(db.collection("server_users").doc(user.id), user, { merge: true });
+    }
+    for (const doc of existing.docs) {
+      if (!ids.has(doc.id)) batch.delete(doc.ref);
+    }
+    await batch.commit();
+  } catch (error) {
+    console.warn("No se pudieron guardar las cuentas en Firestore:", error);
+  }
+}
 async function getStore() {
   if (cache) return cache;
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -1095,6 +1315,14 @@ async function getStore() {
     cache.media = JSON.parse(JSON.stringify(INITIAL_MEDIA_LIST));
     await persistNow(cache);
   }
+  const cloudUsers = await loadUsersFromFirestore();
+  if (cloudUsers.length > 0) {
+    const merged = new Map(cache.users.map((user) => [user.id, user]));
+    for (const user of cloudUsers) merged.set(user.id, user);
+    cache.users = [...merged.values()];
+  } else if (cache.users.length > 0) {
+    await persistUsersToFirestore(cache.users);
+  }
   return cache;
 }
 async function persistNow(data) {
@@ -1102,6 +1330,7 @@ async function persistNow(data) {
   const tmp = `${STORE_FILE}.${process.pid}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
   await fs.rename(tmp, STORE_FILE);
+  await persistUsersToFirestore(data.users);
 }
 async function saveStore() {
   if (!cache) return;
@@ -1161,7 +1390,7 @@ function ownerExists(store) {
 
 // server/security.ts
 import { promises as fs2 } from "node:fs";
-import path2 from "node:path";
+import path3 from "node:path";
 import {
   createCipheriv,
   createDecipheriv,
@@ -1199,7 +1428,7 @@ async function getAppSecret() {
     cachedSecret = createHash("sha256").update(fromEnv).digest();
     return cachedSecret;
   }
-  const secretFile = path2.join(DATA_DIR, ".session-secret");
+  const secretFile = path3.join(DATA_DIR, ".session-secret");
   await fs2.mkdir(DATA_DIR, { recursive: true });
   try {
     const stored = await fs2.readFile(secretFile, "utf8");
@@ -2439,124 +2668,70 @@ async function verifyGoogleIdToken(idToken, projectId) {
 }
 var FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog";
 
-// server/firebase-admin.ts
-import { existsSync, readFileSync } from "node:fs";
-import path3 from "node:path";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-var cached = null;
-function candidateFiles() {
-  const fromEnv = (process.env.FIREBASE_SERVICE_ACCOUNT_FILE || "").trim();
-  const files = [
-    fromEnv,
-    path3.resolve(process.cwd(), "serviceAccountKey.json"),
-    path3.resolve(process.cwd(), "server", "serviceAccountKey.json"),
-    path3.resolve(process.cwd(), "firebase-service-account.json")
-  ];
-  return files.filter(Boolean);
-}
-function loadServiceAccount() {
-  const rawJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
-  if (rawJson) {
-    try {
-      return JSON.parse(rawJson);
-    } catch {
-      console.warn("FIREBASE_SERVICE_ACCOUNT_JSON no es un JSON v\xE1lido.");
-    }
-  }
-  for (const file of candidateFiles()) {
-    if (!existsSync(file)) continue;
-    try {
-      return JSON.parse(readFileSync(file, "utf8"));
-    } catch (error) {
-      console.warn(`No se pudo leer ${file}:`, error);
-    }
-  }
+// server/firestore-users.ts
+import { FieldValue } from "firebase-admin/firestore";
+import { getAuth as getAuth2 } from "firebase-admin/auth";
+function toIso(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  const candidate = value;
+  if (typeof candidate.toDate === "function") return candidate.toDate().toISOString();
+  if (typeof candidate.seconds === "number") return new Date(candidate.seconds * 1e3).toISOString();
   return null;
 }
-function ensureInitialized() {
-  if (cached?.ready) return cached;
-  const serviceAccount = loadServiceAccount();
-  if (!serviceAccount) {
-    cached = {
-      ready: false,
-      message: "Falta la credencial de servicio de Firebase en el servidor. Firebase Console \u2192 Configuraci\xF3n del proyecto \u2192 Cuentas de servicio \u2192 Generar nueva clave privada, y guarda el JSON como serviceAccountKey.json en la ra\xEDz del proyecto (o define FIREBASE_SERVICE_ACCOUNT_JSON)."
-    };
-    return cached;
-  }
+async function listFirestoreUsers() {
+  const db = getFirebaseFirestore();
+  if (!db) return [];
   try {
-    if (getApps().length === 0) {
-      initializeApp({
-        credential: cert(serviceAccount),
-        projectId: serviceAccount.project_id || (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog"
-      });
-    }
-    cached = { ready: true, message: "Firebase Admin inicializado." };
-  } catch (error) {
-    cached = {
-      ready: false,
-      message: `No se pudo inicializar Firebase Admin: ${error instanceof Error ? error.message : String(error)}`
-    };
-  }
-  return cached;
-}
-function getFirebaseAdminStatus() {
-  return ensureInitialized();
-}
-function isUserNotFound(error) {
-  const code = error?.code;
-  return code === "auth/user-not-found";
-}
-function isEmailTaken(error) {
-  const code = error?.code;
-  return code === "auth/email-already-exists" || code === "auth/uid-already-exists";
-}
-async function ensureAuthUser(auth, uid, email, displayName) {
-  const cleanEmail = (email || "").trim().toLowerCase();
-  try {
-    const existing = await auth.getUser(uid);
-    const patch = {};
-    if (cleanEmail && existing.email?.toLowerCase() !== cleanEmail) {
-      patch.email = cleanEmail;
-    }
-    if (cleanEmail && !existing.emailVerified) {
-      patch.emailVerified = true;
-    }
-    if (displayName && !existing.displayName) {
-      patch.displayName = displayName.slice(0, 80);
-    }
-    if (Object.keys(patch).length > 0) {
-      await auth.updateUser(uid, patch).catch((error) => {
-        console.warn(`No se pudo actualizar el usuario ${uid} en Firebase Auth:`, error);
-      });
-    }
-    return;
-  } catch (error) {
-    if (!isUserNotFound(error)) {
-      console.warn(`No se pudo leer el usuario ${uid} en Firebase Auth:`, error);
-    }
-  }
-  try {
-    await auth.createUser({
-      uid,
-      email: cleanEmail || void 0,
-      emailVerified: Boolean(cleanEmail),
-      displayName: displayName?.slice(0, 80) || void 0
+    const snapshot = await db.collection("users").get();
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const preferences = data.preferences || {};
+      const genres = Array.isArray(preferences.favoriteGenres) ? preferences.favoriteGenres.filter((g) => typeof g === "string").slice(0, 10) : [];
+      return {
+        uid: doc.id,
+        email: typeof data.email === "string" ? data.email : "",
+        displayName: typeof data.displayName === "string" ? data.displayName : "",
+        photoURL: typeof data.photoURL === "string" ? data.photoURL : "",
+        favoriteGenres: genres,
+        createdAt: toIso(data.createdAt)
+      };
     });
   } catch (error) {
-    if (!isEmailTaken(error)) {
-      console.warn(`No se pudo crear el usuario ${uid} en Firebase Auth:`, error);
-      return;
-    }
-    await auth.createUser({ uid, displayName: displayName?.slice(0, 80) || void 0 }).catch((err) => console.warn(`No se pudo crear el usuario ${uid} sin email:`, err));
+    console.warn("No se pudieron leer los usuarios de Firestore:", error);
+    return [];
   }
 }
-async function createFirebaseCustomToken(uid, email, displayName) {
-  const status = ensureInitialized();
-  if (!status.ready) throw new Error(status.message);
-  const auth = getAuth();
-  await ensureAuthUser(auth, uid, email, displayName);
-  return auth.createCustomToken(uid);
+async function syncUserToFirestore(user) {
+  const db = getFirebaseFirestore();
+  if (!db || !user.email) return false;
+  try {
+    const auth = getAuth2();
+    const fbUser = await auth.getUserByEmail(user.email);
+    const ref = db.collection("users").doc(fbUser.uid);
+    const snapshot = await ref.get();
+    const existing = snapshot.exists ? snapshot.data() : null;
+    const existingPreferences = existing?.preferences || {};
+    await ref.set(
+      {
+        uid: fbUser.uid,
+        displayName: user.name,
+        email: user.email,
+        photoURL: user.avatar || "",
+        preferences: {
+          ...existingPreferences,
+          favoriteGenres: user.favoriteGenres || []
+        },
+        createdAt: existing?.createdAt ?? FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (error) {
+    console.warn(`No se pudo sincronizar ${user.email} con Firestore:`, error);
+    return false;
+  }
 }
 
 // server/routes.ts
@@ -2887,6 +3062,30 @@ function createApiRouter() {
   }));
   router.get("/db-status", asyncRoute(async (_req, res) => {
     const store = await getStore();
+    let firestore = null;
+    try {
+      const db = getFirebaseFirestore();
+      if (db) {
+        const [users, catalog, reviews, serverUsers] = await Promise.all([
+          db.collection("users").count().get(),
+          db.collection("catalog_media").count().get(),
+          db.collection("community_reviews").count().get(),
+          db.collection("server_users").count().get()
+        ]);
+        firestore = {
+          users: users.data().count,
+          catalogMedia: catalog.data().count,
+          reviews: reviews.data().count,
+          serverUsers: serverUsers.data().count
+        };
+      } else {
+        firestore = { status: "Firebase Admin no configurado" };
+      }
+    } catch (error) {
+      firestore = {
+        status: `Sin conexi\xF3n: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
     res.json({
       success: true,
       database: "Almacenamiento JSON del servidor",
@@ -2897,7 +3096,8 @@ function createApiRouter() {
         reviews: store.reviews.filter((review) => !review.deleted).length,
         testimonials: store.testimonials.length,
         tickets: store.tickets.length
-      }
+      },
+      firestore
     });
   }));
   const TMDB_DEFAULT_KEY = "5aeed13f63f1071425b9ab7815b80949";
@@ -3683,6 +3883,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       ip: getClientIp(req)
     });
     await saveStore();
+    void syncUserToFirestore(user).catch(() => void 0);
     res.json({ success: true, data: { user: publicUser(user), session: safeSession(session), token } });
   }));
   router.post("/auth/login", asyncRoute(async (req, res) => {
@@ -3771,6 +3972,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       ip
     });
     await saveStore();
+    void syncUserToFirestore(user).catch(() => void 0);
     res.json({
       success: true,
       data: {
@@ -3864,6 +4066,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       ip
     });
     await saveStore();
+    void syncUserToFirestore(user).catch(() => void 0);
     res.json({
       success: true,
       data: {
@@ -3960,8 +4163,17 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       safeError(res, 503, status.message, "FIREBASE_ADMIN_NOT_CONFIGURED");
       return;
     }
-    const token = await createFirebaseCustomToken(user.id, user.email, user.name);
-    res.json({ success: true, data: { token } });
+    try {
+      const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+      res.json({ success: true, data: { token } });
+    } catch (error) {
+      safeError(
+        res,
+        503,
+        `No se pudo firmar la sesi\xF3n de Firebase: ${error instanceof Error ? error.message : String(error)}`,
+        "FIREBASE_ADMIN_UNAVAILABLE"
+      );
+    }
   }));
   router.post("/auth/change-password", requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
@@ -4064,6 +4276,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     }
     user.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
     await saveStore();
+    void syncUserToFirestore(user).catch(() => void 0);
     res.json({ success: true, data: { user: publicUser(user) } });
   }));
   router.get("/me/library", requireAuth, asyncRoute(async (req, res) => {
@@ -4244,16 +4457,50 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const search = sanitizeText(req.query.search, 100).toLowerCase();
     const roleFilter = sanitizeText(req.query.role, 20);
     const statusFilter = sanitizeText(req.query.status, 20);
-    const items = store.users.filter((u) => {
+    const rows = store.users.map((u) => ({
+      ...publicUser(u),
+      sessionsCount: store.sessions.filter((s) => s.userId === u.id).length
+    }));
+    try {
+      const cloudUsers = await listFirestoreUsers();
+      const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()));
+      for (const cloud of cloudUsers) {
+        const email = cloud.email.trim().toLowerCase();
+        if (!email || knownEmails.has(email)) continue;
+        const name = cloud.displayName || email.split("@")[0] || "Cin\xE9filo";
+        const createdAt = cloud.createdAt || (/* @__PURE__ */ new Date()).toISOString();
+        rows.push({
+          id: cloud.uid,
+          name,
+          username: name.toLowerCase().replace(/[^a-z0-9._-]/g, "") || email.split("@")[0],
+          email: cloud.email,
+          role: "user",
+          avatar: cloud.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
+          bio: "",
+          favoriteGenres: cloud.favoriteGenres,
+          city: "",
+          platforms: [],
+          socialLinks: {},
+          customFields: [],
+          blocked: false,
+          mustChangePassword: false,
+          joinedDate: createdAt.slice(0, 10),
+          createdAt,
+          lastLoginAt: null,
+          sessionsCount: 0
+        });
+        knownEmails.add(email);
+      }
+    } catch (error) {
+      console.warn("El panel seguir\xE1 mostrando solo las cuentas del servidor:", error);
+    }
+    const items = rows.filter((u) => {
       if (search && !`${u.name} ${u.email}`.toLowerCase().includes(search)) return false;
       if (roleFilter && u.role !== roleFilter) return false;
       if (statusFilter === "blocked" && !u.blocked) return false;
       if (statusFilter === "active" && u.blocked) return false;
       return true;
-    }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((u) => ({
-      ...publicUser(u),
-      sessionsCount: store.sessions.filter((s) => s.userId === u.id).length
-    }));
+    }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json({ success: true, data: items });
   }));
   router.post("/admin/users/:id/block", staffOnly, asyncRoute(async (req, res) => {

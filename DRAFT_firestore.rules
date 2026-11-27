@@ -7,6 +7,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Cuentas internas del servidor (incluye passwordHash/salt). Solo las toca
+    // el Admin SDK; ningún cliente puede leerlas ni escribirlas.
+    match /server_users/{docId} {
+      allow read, write: if false;
+    }
+
     // 2. Hardened Global Helpers
     function isValidId(id) {
       return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');

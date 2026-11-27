@@ -43,7 +43,12 @@ import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
 import { FIREBASE_PROJECT_ID, verifyGoogleIdToken } from './firebase-auth';
-import { createFirebaseCustomToken, getFirebaseAdminStatus } from './firebase-admin';
+import {
+  createFirebaseCustomToken,
+  getFirebaseAdminStatus,
+  getFirebaseFirestore,
+} from './firebase-admin';
+import { listFirestoreUsers, syncUserToFirestore } from './firestore-users';
 
 interface AuthedRequest extends Request {
   authUser?: StoredUser;
@@ -503,6 +508,34 @@ export function createApiRouter(): Router {
 
   router.get('/db-status', asyncRoute(async (_req, res) => {
     const store = await getStore();
+
+    // Diagnóstico de la conexión real con Firestore. No expone emails ni datos
+    // privados, solo cantidades para comprobar que la nube está conectada.
+    let firestore: Record<string, number | string> | null = null;
+    try {
+      const db = getFirebaseFirestore();
+      if (db) {
+        const [users, catalog, reviews, serverUsers] = await Promise.all([
+          db.collection('users').count().get(),
+          db.collection('catalog_media').count().get(),
+          db.collection('community_reviews').count().get(),
+          db.collection('server_users').count().get(),
+        ]);
+        firestore = {
+          users: users.data().count,
+          catalogMedia: catalog.data().count,
+          reviews: reviews.data().count,
+          serverUsers: serverUsers.data().count,
+        };
+      } else {
+        firestore = { status: 'Firebase Admin no configurado' };
+      }
+    } catch (error) {
+      firestore = {
+        status: `Sin conexión: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+
     res.json({
       success: true,
       database: 'Almacenamiento JSON del servidor',
@@ -514,6 +547,7 @@ export function createApiRouter(): Router {
         testimonials: store.testimonials.length,
         tickets: store.tickets.length,
       },
+      firestore,
     });
   }));
 
@@ -1376,6 +1410,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       ip: getClientIp(req),
     });
     await saveStore();
+    void syncUserToFirestore(user).catch(() => undefined);
     res.json({ success: true, data: { user: publicUser(user), session: safeSession(session), token } });
   }));
 
@@ -1470,6 +1505,8 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       ip,
     });
     await saveStore();
+    // Firestore sobrevive a los reinicios del contenedor; el JSON no.
+    void syncUserToFirestore(user).catch(() => undefined);
     res.json({
       success: true,
       data: {
@@ -1573,6 +1610,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       ip,
     });
     await saveStore();
+    void syncUserToFirestore(user).catch(() => undefined);
 
     res.json({
       success: true,
@@ -1681,8 +1719,20 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       return;
     }
 
-    const token = await createFirebaseCustomToken(user.id, user.email, user.name);
-    res.json({ success: true, data: { token } });
+    try {
+      const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+      res.json({ success: true, data: { token } });
+    } catch (error) {
+      // Sin credenciales del entorno, Email/Password sigue siendo el respaldo.
+      safeError(
+        res,
+        503,
+        `No se pudo firmar la sesión de Firebase: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        'FIREBASE_ADMIN_UNAVAILABLE',
+      );
+    }
   }));
 
   router.post('/auth/change-password', requireAuth, asyncRoute(async (req, res) => {
@@ -1800,6 +1850,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     }
     user.updatedAt = new Date().toISOString();
     await saveStore();
+    void syncUserToFirestore(user).catch(() => undefined);
     res.json({ success: true, data: { user: publicUser(user) } });
   }));
 
@@ -1999,7 +2050,54 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const search = sanitizeText(req.query.search, 100).toLowerCase();
     const roleFilter = sanitizeText(req.query.role, 20);
     const statusFilter = sanitizeText(req.query.status, 20);
-    const items = store.users
+
+    type AdminUserRow = ReturnType<typeof publicUser> & { sessionsCount: number };
+
+    // 1. Cuentas del servidor (roles, bloqueo, sesiones).
+    const rows: AdminUserRow[] = store.users.map((u) => ({
+      ...publicUser(u),
+      sessionsCount: store.sessions.filter((s) => s.userId === u.id).length,
+    }));
+
+    // 2. Cuentas que solo viven en Firestore (sobreviven a los reinicios de
+    //    Cloud Run). Se deduplican por email contra las del servidor.
+    try {
+      const cloudUsers = await listFirestoreUsers();
+      const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()));
+      for (const cloud of cloudUsers) {
+        const email = cloud.email.trim().toLowerCase();
+        if (!email || knownEmails.has(email)) continue;
+        const name = cloud.displayName || email.split('@')[0] || 'Cinéfilo';
+        const createdAt = cloud.createdAt || new Date().toISOString();
+        rows.push({
+          id: cloud.uid,
+          name,
+          username: name.toLowerCase().replace(/[^a-z0-9._-]/g, '') || email.split('@')[0],
+          email: cloud.email,
+          role: 'user',
+          avatar:
+            cloud.photoURL ||
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+          bio: '',
+          favoriteGenres: cloud.favoriteGenres,
+          city: '',
+          platforms: [],
+          socialLinks: {},
+          customFields: [],
+          blocked: false,
+          mustChangePassword: false,
+          joinedDate: createdAt.slice(0, 10),
+          createdAt,
+          lastLoginAt: null,
+          sessionsCount: 0,
+        });
+        knownEmails.add(email);
+      }
+    } catch (error) {
+      console.warn('El panel seguirá mostrando solo las cuentas del servidor:', error);
+    }
+
+    const items = rows
       .filter((u) => {
         if (search && !`${u.name} ${u.email}`.toLowerCase().includes(search)) return false;
         if (roleFilter && u.role !== roleFilter) return false;
@@ -2007,11 +2105,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
         if (statusFilter === 'active' && u.blocked) return false;
         return true;
       })
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((u) => ({
-        ...publicUser(u),
-        sessionsCount: store.sessions.filter((s) => s.userId === u.id).length,
-      }));
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json({ success: true, data: items });
   }));
 

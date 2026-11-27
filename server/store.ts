@@ -1,7 +1,9 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { MediaItem, UserReview } from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
+import { getFirebaseFirestore } from './firebase-admin';
 
 export type Role = 'owner' | 'admin' | 'user';
 
@@ -253,6 +255,84 @@ function getDefaultUsers(): StoredUser[] {
   ];
 }
 
+/**
+ * Cuentas del servidor persistidas en Firestore (`server_users`).
+ * Esa colección es privada: las reglas de cliente la niegan y solo la toca el
+ * Admin SDK. Guarda passwordHash/salt, por eso NO puede vivir en `users`.
+ */
+function normalizeStoredUser(raw: Record<string, unknown>, id: string): StoredUser | null {
+  const email = typeof raw.email === 'string' ? raw.email.trim().toLowerCase() : '';
+  if (!id || !email) return null;
+  const role = raw.role === 'owner' || raw.role === 'admin' ? raw.role : 'user';
+  const createdAt =
+    typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString();
+  return {
+    id,
+    name: typeof raw.name === 'string' && raw.name ? raw.name : email.split('@')[0],
+    username: typeof raw.username === 'string' ? raw.username : undefined,
+    email,
+    passwordHash: typeof raw.passwordHash === 'string' ? raw.passwordHash : '',
+    salt: typeof raw.salt === 'string' ? raw.salt : '',
+    role,
+    avatar: typeof raw.avatar === 'string' ? raw.avatar : '',
+    bio: typeof raw.bio === 'string' ? raw.bio : '',
+    favoriteGenres: Array.isArray(raw.favoriteGenres)
+      ? raw.favoriteGenres.filter((g): g is string => typeof g === 'string').slice(0, 20)
+      : [],
+    city: typeof raw.city === 'string' ? raw.city : '',
+    platforms: Array.isArray(raw.platforms)
+      ? raw.platforms.filter((p): p is string => typeof p === 'string').slice(0, 20)
+      : [],
+    socialLinks:
+      raw.socialLinks && typeof raw.socialLinks === 'object'
+        ? (raw.socialLinks as StoredUser['socialLinks'])
+        : {},
+    customFields: Array.isArray(raw.customFields)
+      ? (raw.customFields as StoredUser['customFields']).slice(0, 12)
+      : [],
+    blocked: Boolean(raw.blocked),
+    mustChangePassword: Boolean(raw.mustChangePassword),
+    createdAt,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : createdAt,
+    lastLoginAt: typeof raw.lastLoginAt === 'string' ? raw.lastLoginAt : null,
+    failedLoginCount: Number(raw.failedLoginCount) || 0,
+    lockedUntil: typeof raw.lockedUntil === 'string' ? raw.lockedUntil : null,
+  };
+}
+
+async function loadUsersFromFirestore(): Promise<StoredUser[]> {
+  const db = getFirebaseFirestore();
+  if (!db) return [];
+  try {
+    const snapshot = await db.collection('server_users').get();
+    return snapshot.docs
+      .map((doc) => normalizeStoredUser(doc.data() as Record<string, unknown>, doc.id))
+      .filter((user): user is StoredUser => Boolean(user));
+  } catch (error) {
+    console.warn('No se pudieron leer las cuentas de Firestore:', error);
+    return [];
+  }
+}
+
+async function persistUsersToFirestore(users: StoredUser[]): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  try {
+    const existing = await db.collection('server_users').get();
+    const ids = new Set(users.map((user) => user.id));
+    const batch = db.batch();
+    for (const user of users) {
+      batch.set(db.collection('server_users').doc(user.id), user, { merge: true });
+    }
+    for (const doc of existing.docs) {
+      if (!ids.has(doc.id)) batch.delete(doc.ref);
+    }
+    await batch.commit();
+  } catch (error) {
+    console.warn('No se pudieron guardar las cuentas en Firestore:', error);
+  }
+}
+
 export async function getStore(): Promise<StoreData> {
   if (cache) return cache;
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -290,6 +370,18 @@ export async function getStore(): Promise<StoreData> {
     cache.media = JSON.parse(JSON.stringify(INITIAL_MEDIA_LIST)) as MediaItem[];
     await persistNow(cache);
   }
+
+  // Firestore manda: si el contenedor se reinició, recupera las cuentas que
+  // el JSON local ya no tiene (con rol, bloqueo y hash de contraseña).
+  const cloudUsers = await loadUsersFromFirestore();
+  if (cloudUsers.length > 0) {
+    const merged = new Map(cache.users.map((user) => [user.id, user]));
+    for (const user of cloudUsers) merged.set(user.id, user);
+    cache.users = [...merged.values()];
+  } else if (cache.users.length > 0) {
+    await persistUsersToFirestore(cache.users);
+  }
+
   return cache;
 }
 
@@ -298,6 +390,8 @@ async function persistNow(data: StoreData): Promise<void> {
   const tmp = `${STORE_FILE}.${process.pid}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
   await fs.rename(tmp, STORE_FILE);
+  // Respaldo en Firestore para que Cloud Run no pierda las cuentas.
+  await persistUsersToFirestore(data.users);
 }
 
 export async function saveStore(): Promise<void> {

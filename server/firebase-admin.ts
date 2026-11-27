@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
 /**
  * Sesión de Firebase para los usuarios de la app sin depender del proveedor
@@ -63,26 +65,34 @@ function ensureInitialized(): AdminStatus {
   if (cached?.ready) return cached;
 
   const serviceAccount = loadServiceAccount();
-  if (!serviceAccount) {
-    cached = {
-      ready: false,
-      message:
-        'Falta la credencial de servicio de Firebase en el servidor. Firebase Console → Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada, y guarda el JSON como serviceAccountKey.json en la raíz del proyecto (o define FIREBASE_SERVICE_ACCOUNT_JSON).',
-    };
-    return cached;
-  }
 
   try {
     if (getApps().length === 0) {
-      initializeApp({
-        credential: cert(serviceAccount as Parameters<typeof cert>[0]),
-        projectId:
-          (serviceAccount.project_id as string | undefined) ||
-          (process.env.FIREBASE_PROJECT_ID || '').trim() ||
-          'screeamlog',
-      });
+      if (serviceAccount) {
+        initializeApp({
+          credential: cert(serviceAccount as Parameters<typeof cert>[0]),
+          projectId:
+            (serviceAccount.project_id as string | undefined) ||
+            (process.env.FIREBASE_PROJECT_ID || '').trim() ||
+            firebaseConfig.projectId ||
+            'screeamlog',
+        });
+      } else {
+        // En Cloud Run / App Hosting la credencial viene del service account
+        // del propio servicio. Así el panel puede leer Firestore sin subir
+        // manualmente una clave privada.
+        initializeApp({
+          credential: applicationDefault(),
+          projectId: (process.env.FIREBASE_PROJECT_ID || '').trim() || firebaseConfig.projectId,
+        });
+      }
     }
-    cached = { ready: true, message: 'Firebase Admin inicializado.' };
+    cached = {
+      ready: true,
+      message: serviceAccount
+        ? 'Firebase Admin inicializado con credencial de servicio.'
+        : 'Firebase Admin inicializado con las credenciales del entorno.',
+    };
   } catch (error) {
     cached = {
       ready: false,
@@ -177,6 +187,43 @@ export async function createFirebaseCustomToken(
   if (!status.ready) throw new Error(status.message);
 
   const auth = getAuth();
-  await ensureAuthUser(auth, uid, email, displayName);
-  return auth.createCustomToken(uid);
+
+  // Si el email ya tiene un UID de Firebase Auth (por ejemplo, porque el
+  // usuario entró antes con Email/Password), usamos ese UID. Así no se crea
+  // una segunda cuenta con el id interno del servidor (`usr_...`).
+  let resolvedUid = uid;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (cleanEmail) {
+    try {
+      const existing = await auth.getUserByEmail(cleanEmail);
+      resolvedUid = existing.uid;
+    } catch (error) {
+      if (!isUserNotFound(error)) {
+        console.warn(`No se pudo buscar ${cleanEmail} en Firebase Auth:`, error);
+      }
+    }
+  }
+
+  await ensureAuthUser(auth, resolvedUid, email, displayName);
+  return auth.createCustomToken(resolvedUid);
+}
+
+/** Base que usa la app desplegada (la misma de firebase-applet-config.json). */
+export function getFirestoreDatabaseId(): string {
+  return (
+    (process.env.FIRESTORE_DATABASE_ID || '').trim() ||
+    firebaseConfig.firestoreDatabaseId ||
+    '(default)'
+  );
+}
+
+/**
+ * Firestore con permisos de administrador. Devuelve null si Firebase Admin no
+ * está configurado, para que la API pueda seguir funcionando con el JSON local
+ * como respaldo.
+ */
+export function getFirebaseFirestore(): Firestore | null {
+  const status = ensureInitialized();
+  if (!status.ready || getApps().length === 0) return null;
+  return getFirestore(getApps()[0], getFirestoreDatabaseId());
 }

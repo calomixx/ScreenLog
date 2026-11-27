@@ -103,7 +103,14 @@ catalog_media/{movieId}                      catálogo compartido
 community_reviews/{reviewId}                 reseñas públicas
 user_library/{entryId}                       legado, solo migración/lectura
 admins/{uid}                                 marca de administrador
+server_users/{id}                            cuentas internas del servidor
+                                              (hash/salt; solo Admin SDK)
 ```
+
+`server_users` es privada: las reglas de cliente la niegan por completo. Guarda
+las cuentas de login del servidor para que Cloud Run no las pierda al reiniciar
+el contenedor. El panel de administración combina esas cuentas con las que solo
+existen en `users/{uid}`.
 
 Base activa: `ai-studio-screenlogclasifi-...`. Base heredada: `(default)`.
 Ambas tienen las mismas reglas y los mismos índices. El catálogo fue copiado a
@@ -253,6 +260,13 @@ porque no está en el alcance de la app.
   `updatedAt` siempre lo escribe el servidor. Las reglas lo exigen.
 - **Perfil público:** las escrituras públicas (reseñas, catálogo) exigen que
   exista `users_public/{uid}`; el servicio lo crea automáticamente.
+- **Cuentas de login:** el servidor guarda sus cuentas (con `passwordHash` y
+  `salt`) en `server_users/{id}`, una colección privada que solo toca el Admin
+  SDK. Así Cloud Run no las pierde al reiniciar. El panel de administración
+  combina `server_users` con los perfiles de `users/{uid}`.
+- **Diagnóstico:** `GET /api/db-status` devuelve cantidades del JSON y de
+  Firestore (`users`, `catalogMedia`, `reviews`, `serverUsers`) para comprobar
+  la conexión sin exponer datos privados.
 
 ---
 
