@@ -43,6 +43,7 @@ import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
 import { FIREBASE_PROJECT_ID, verifyGoogleIdToken } from './firebase-auth';
+import { verifyFirebasePassword } from './firebase-rest-auth';
 import {
   createFirebaseCustomToken,
   getFirebaseAdminStatus,
@@ -160,6 +161,7 @@ function createUserRecord(input: {
   password: string;
   role: Role;
   avatar?: string;
+  id?: string;
 }): StoredUser {
   const now = new Date().toISOString();
   const { salt, hash } = hashPassword(input.password);
@@ -167,7 +169,7 @@ function createUserRecord(input: {
   const finalUsername =
     userChosen || cleanUsername(input.name) || cleanUsername(input.email.split('@')[0]) || 'usuario';
   return {
-    id: randomUUID(),
+    id: input.id || randomUUID(),
     name: sanitizeText(input.name, 80) || 'Cinéfilo',
     username: finalUsername,
     email: input.email.trim().toLowerCase(),
@@ -1442,15 +1444,53 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
 
     const user = findUserByIdentifier(store, identifier);
     if (!user) {
-      registerLoginFailure(rateKey);
+      // Respaldo permanente: Firebase Auth conserva la identidad aunque el JSON
+      // del servidor se haya reiniciado. Si las credenciales son válidas,
+      // recreamos la cuenta local con el mismo UID de Firebase.
+      const identity = await verifyFirebasePassword(identifier, password);
+      if (!identity) {
+        registerLoginFailure(rateKey);
+        addLog(store, {
+          level: 'warning',
+          category: 'security',
+          message: `Inicio de sesión fallido: cuenta inexistente (${identifier || 'vacío'})`,
+          ip,
+        });
+        await saveStore();
+        return safeError(res, 401, 'Usuario o contraseña incorrectos.', 'INVALID_CREDENTIALS');
+      }
+
+      const recovered = createUserRecord({
+        id: identity.uid,
+        name: identity.displayName || identifier.split('@')[0],
+        email: identity.email,
+        password,
+        role: 'user',
+        avatar: identity.photoUrl || undefined,
+      });
+      store.users.push(recovered);
+      clearLoginFailures(rateKey);
+      const { session, token } = await createSession(req, res, store, recovered, remember);
       addLog(store, {
-        level: 'warning',
-        category: 'security',
-        message: `Inicio de sesión fallido: cuenta inexistente (${identifier || 'vacío'})`,
+        level: 'info',
+        category: 'auth',
+        message: `Cuenta recuperada desde Firebase Auth: ${recovered.email}`,
+        actorId: recovered.id,
+        actorName: recovered.name,
         ip,
       });
       await saveStore();
-      return safeError(res, 401, 'Usuario o contraseña incorrectos.', 'INVALID_CREDENTIALS');
+      void syncUserToFirestore(recovered).catch(() => undefined);
+      res.json({
+        success: true,
+        data: {
+          user: publicUser(recovered),
+          session: safeSession(session),
+          token,
+          mustChangePassword: recovered.mustChangePassword,
+        },
+      });
+      return;
     }
     if (user.blocked) {
       addLog(store, {

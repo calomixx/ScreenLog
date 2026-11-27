@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "firebase:check": "tsx server/check-firebase.ts",
     "firebase:verify": "node scripts/verify-firestore.mjs",
-    "firebase:sync-catalog": "node scripts/sync-catalog-firestore.mjs"
+    "firebase:sync-catalog": "node scripts/sync-catalog-firestore.mjs",
+    "firebase:seed-admins": "node scripts/seed-admins.mjs"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",

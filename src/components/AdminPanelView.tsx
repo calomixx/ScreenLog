@@ -60,6 +60,7 @@ import type { MediaItem, MediaType } from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
 import { pingFirestore, seedCatalogToFirestore } from '../lib/firebase';
 import { getFirestoreDiagnostics } from '../lib/firestore';
+import { listUserAccounts, type FirestoreUserSummary } from '../lib/firestore/users';
 
 type AdminTab =
   | 'summary'
@@ -76,6 +77,67 @@ type AdminTab =
 
 interface AdminUser extends UserAccount {
   sessionsCount: number;
+}
+
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+
+function slugifyUsername(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9._-]/g, '') || 'cinefilo'
+  );
+}
+
+/**
+ * Convierte un perfil de `users/{uid}` en una fila del panel.
+ * Sirve para mostrar cuentas que solo viven en Firestore (por ejemplo, cuando
+ * el servidor se reinició y perdió su JSON local).
+ */
+function cloudUserToAdminUser(cloud: FirestoreUserSummary): AdminUser {
+  const createdAt = cloud.createdAt ? cloud.createdAt.toISOString() : new Date().toISOString();
+  const name = cloud.displayName || cloud.email.split('@')[0] || 'Cinéfilo';
+  return {
+    id: cloud.uid,
+    name,
+    username: slugifyUsername(name),
+    email: cloud.email,
+    role: 'user',
+    avatar: cloud.photoURL || DEFAULT_AVATAR,
+    bio: '',
+    favoriteGenres: cloud.favoriteGenres,
+    city: '',
+    platforms: [],
+    socialLinks: {},
+    customFields: [],
+    blocked: false,
+    mustChangePassword: false,
+    joinedDate: createdAt.slice(0, 10),
+    createdAt,
+    lastLoginAt: null,
+    sessionsCount: 0,
+  };
+}
+
+/** Une las cuentas del servidor con las de Firestore, sin duplicar. */
+function mergeAdminUsers(serverUsers: AdminUser[], cloudUsers: FirestoreUserSummary[]): AdminUser[] {
+  const rows = [...serverUsers];
+  const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()).filter(Boolean));
+  const knownIds = new Set(rows.map((row) => row.id));
+
+  for (const cloud of cloudUsers) {
+    const email = cloud.email.trim().toLowerCase();
+    if (knownIds.has(cloud.uid)) continue;
+    if (email && knownEmails.has(email)) continue;
+    rows.push(cloudUserToAdminUser(cloud));
+    if (email) knownEmails.add(email);
+    knownIds.add(cloud.uid);
+  }
+
+  return rows.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
 interface ModerationItem {
@@ -347,20 +409,24 @@ export const AdminPanelView: React.FC = () => {
   const loadCore = useCallback(async () => {
     setLoading(true);
     setError('');
+    // Firestore sobrevive a los reinicios del servidor: es la fuente principal
+    // de la lista de usuarios. La API solo aporta roles, bloqueos y sesiones.
+    const cloudUsers = await listUserAccounts();
+    let serverUsers: AdminUser[] = [];
     try {
       const [usersResponse, moderationResponse, historyResponse] = await Promise.all([
         apiRequest<{ success: boolean; data: AdminUser[] }>('/api/admin/users'),
         apiRequest<{ success: boolean; data: ModerationItem[] }>('/api/admin/moderation'),
         apiRequest<{ success: boolean; data: AuditLog[] }>('/api/admin/history'),
       ]);
-      setUsers(usersResponse.data || []);
+      serverUsers = usersResponse.data || [];
       setModeration(moderationResponse.data || []);
       setHistory(historyResponse.data || []);
     } catch (requestError) {
       handleError(requestError);
-    } finally {
-      setLoading(false);
     }
+    setUsers(mergeAdminUsers(serverUsers, cloudUsers));
+    setLoading(false);
   }, []);
 
   useEffect(() => {

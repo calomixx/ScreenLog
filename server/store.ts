@@ -204,6 +204,25 @@ function emptyStore(): StoreData {
 let cache: StoreData | null = null;
 let writeChain: Promise<void> = Promise.resolve();
 
+/**
+ * Si el entorno no tiene permisos de Firestore (por ejemplo, un hosting que no
+ * es del proyecto), no reintentamos en cada petición: se desactiva el respaldo
+ * en la nube y el servidor sigue funcionando con el JSON local.
+ */
+let cloudSyncDisabled = false;
+
+function disableCloudSyncIfPermission(error: unknown): void {
+  const code = (error as { code?: number | string })?.code;
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    code === 7 ||
+    code === 'permission-denied' ||
+    /PERMISSION_DENIED|insufficient permissions/i.test(message)
+  ) {
+    cloudSyncDisabled = true;
+  }
+}
+
 function getDefaultUsers(): StoredUser[] {
   return [
     {
@@ -301,6 +320,7 @@ function normalizeStoredUser(raw: Record<string, unknown>, id: string): StoredUs
 }
 
 async function loadUsersFromFirestore(): Promise<StoredUser[]> {
+  if (cloudSyncDisabled) return [];
   const db = getFirebaseFirestore();
   if (!db) return [];
   try {
@@ -309,12 +329,14 @@ async function loadUsersFromFirestore(): Promise<StoredUser[]> {
       .map((doc) => normalizeStoredUser(doc.data() as Record<string, unknown>, doc.id))
       .filter((user): user is StoredUser => Boolean(user));
   } catch (error) {
+    disableCloudSyncIfPermission(error);
     console.warn('No se pudieron leer las cuentas de Firestore:', error);
     return [];
   }
 }
 
 async function persistUsersToFirestore(users: StoredUser[]): Promise<void> {
+  if (cloudSyncDisabled) return;
   const db = getFirebaseFirestore();
   if (!db) return;
   try {
@@ -329,6 +351,7 @@ async function persistUsersToFirestore(users: StoredUser[]): Promise<void> {
     }
     await batch.commit();
   } catch (error) {
+    disableCloudSyncIfPermission(error);
     console.warn('No se pudieron guardar las cuentas en Firestore:', error);
   }
 }

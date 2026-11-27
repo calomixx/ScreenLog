@@ -1,6 +1,8 @@
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -154,6 +156,44 @@ export async function markLegacyLibraryMigrated(uid: string): Promise<void> {
     { legacyLibraryMigratedAt: serverTimestamp(), updatedAt: serverTimestamp() },
     { merge: true },
   );
+}
+
+/**
+ * Resumen de una cuenta para el panel de administración. Se lee con la sesión
+ * de Firebase del navegador, así que funciona aunque el servidor no tenga
+ * credenciales de servicio. Requiere que la regla de `users` permita `list`
+ * a un administrador.
+ */
+export interface FirestoreUserSummary {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string;
+  favoriteGenres: string[];
+  createdAt: Date | null;
+}
+
+export async function listUserAccounts(): Promise<FirestoreUserSummary[]> {
+  if (!auth.currentUser) return [];
+  try {
+    const snapshot = await getDocs(collection(db, 'users'));
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const preferences = sanitizePreferences(data.preferences);
+      const createdAt = data.createdAt as { toDate?: () => Date } | null | undefined;
+      return {
+        uid: docSnap.id,
+        displayName: clampString(data.displayName, DISPLAY_NAME_MAX) || 'Cinéfilo',
+        email: clampString(data.email, EMAIL_MAX),
+        photoURL: clampString(data.photoURL, PHOTO_MAX),
+        favoriteGenres: preferences.favoriteGenres ?? [],
+        createdAt: typeof createdAt?.toDate === 'function' ? createdAt.toDate() : null,
+      };
+    });
+  } catch (error) {
+    console.warn('No se pudieron listar las cuentas de Firestore:', error);
+    return [];
+  }
 }
 
 export function subscribeUserAccount(

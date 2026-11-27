@@ -1170,6 +1170,14 @@ function emptyStore() {
 }
 var cache = null;
 var writeChain = Promise.resolve();
+var cloudSyncDisabled = false;
+function disableCloudSyncIfPermission(error) {
+  const code = error?.code;
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === 7 || code === "permission-denied" || /PERMISSION_DENIED|insufficient permissions/i.test(message)) {
+    cloudSyncDisabled = true;
+  }
+}
 function getDefaultUsers() {
   return [
     {
@@ -1250,17 +1258,20 @@ function normalizeStoredUser(raw, id) {
   };
 }
 async function loadUsersFromFirestore() {
+  if (cloudSyncDisabled) return [];
   const db = getFirebaseFirestore();
   if (!db) return [];
   try {
     const snapshot = await db.collection("server_users").get();
     return snapshot.docs.map((doc) => normalizeStoredUser(doc.data(), doc.id)).filter((user) => Boolean(user));
   } catch (error) {
+    disableCloudSyncIfPermission(error);
     console.warn("No se pudieron leer las cuentas de Firestore:", error);
     return [];
   }
 }
 async function persistUsersToFirestore(users) {
+  if (cloudSyncDisabled) return;
   const db = getFirebaseFirestore();
   if (!db) return;
   try {
@@ -1275,6 +1286,7 @@ async function persistUsersToFirestore(users) {
     }
     await batch.commit();
   } catch (error) {
+    disableCloudSyncIfPermission(error);
     console.warn("No se pudieron guardar las cuentas en Firestore:", error);
   }
 }
@@ -2668,6 +2680,44 @@ async function verifyGoogleIdToken(idToken, projectId) {
 }
 var FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID || "").trim() || "screeamlog";
 
+// server/firebase-rest-auth.ts
+import { createHash as createHash2 } from "node:crypto";
+function deriveFirebasePassword(email, password) {
+  return `sl!${createHash2("sha256").update(`screenlog|${email.trim().toLowerCase()}|${password}`).digest("hex")}`;
+}
+async function verifyFirebasePassword(email, password) {
+  const cleanEmail = email.trim().toLowerCase();
+  const apiKey = (process.env.FIREBASE_WEB_API_KEY || firebase_applet_config_default.apiKey || "").trim();
+  if (!apiKey || !cleanEmail.includes("@") || !password) return null;
+  const derived = deriveFirebasePassword(cleanEmail, password);
+  const candidates = [derived];
+  if (password.length >= 6 && password !== derived) candidates.push(password);
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password: candidate, returnSecureToken: true })
+        }
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      const uid = typeof data.localId === "string" ? data.localId : "";
+      if (!uid) continue;
+      return {
+        uid,
+        email: typeof data.email === "string" ? data.email : cleanEmail,
+        displayName: typeof data.displayName === "string" ? data.displayName : "",
+        photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : ""
+      };
+    } catch {
+    }
+  }
+  return null;
+}
+
 // server/firestore-users.ts
 import { FieldValue } from "firebase-admin/firestore";
 import { getAuth as getAuth2 } from "firebase-admin/auth";
@@ -2814,7 +2864,7 @@ function createUserRecord(input) {
   const userChosen = input.username ? cleanUsername(input.username) : "";
   const finalUsername = userChosen || cleanUsername(input.name) || cleanUsername(input.email.split("@")[0]) || "usuario";
   return {
-    id: randomUUID(),
+    id: input.id || randomUUID(),
     name: sanitizeText(input.name, 80) || "Cin\xE9filo",
     username: finalUsername,
     email: input.email.trim().toLowerCase(),
@@ -3912,15 +3962,49 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     }
     const user = findUserByIdentifier(store, identifier);
     if (!user) {
-      registerLoginFailure(rateKey);
+      const identity = await verifyFirebasePassword(identifier, password);
+      if (!identity) {
+        registerLoginFailure(rateKey);
+        addLog(store, {
+          level: "warning",
+          category: "security",
+          message: `Inicio de sesi\xF3n fallido: cuenta inexistente (${identifier || "vac\xEDo"})`,
+          ip
+        });
+        await saveStore();
+        return safeError(res, 401, "Usuario o contrase\xF1a incorrectos.", "INVALID_CREDENTIALS");
+      }
+      const recovered = createUserRecord({
+        id: identity.uid,
+        name: identity.displayName || identifier.split("@")[0],
+        email: identity.email,
+        password,
+        role: "user",
+        avatar: identity.photoUrl || void 0
+      });
+      store.users.push(recovered);
+      clearLoginFailures(rateKey);
+      const { session: session2, token: token2 } = await createSession(req, res, store, recovered, remember);
       addLog(store, {
-        level: "warning",
-        category: "security",
-        message: `Inicio de sesi\xF3n fallido: cuenta inexistente (${identifier || "vac\xEDo"})`,
+        level: "info",
+        category: "auth",
+        message: `Cuenta recuperada desde Firebase Auth: ${recovered.email}`,
+        actorId: recovered.id,
+        actorName: recovered.name,
         ip
       });
       await saveStore();
-      return safeError(res, 401, "Usuario o contrase\xF1a incorrectos.", "INVALID_CREDENTIALS");
+      void syncUserToFirestore(recovered).catch(() => void 0);
+      res.json({
+        success: true,
+        data: {
+          user: publicUser(recovered),
+          session: safeSession(session2),
+          token: token2,
+          mustChangePassword: recovered.mustChangePassword
+        }
+      });
+      return;
     }
     if (user.blocked) {
       addLog(store, {

@@ -334,7 +334,10 @@ service cloud.firestore {
     // Cuenta privada + clasificaciones personales (solo el dueño)
     match /users/{userId} {
       allow get: if isValidId(userId) && (isAccountOwner(userId) || isAdmin());
-      allow list: if false;
+      // El panel de administración lista las cuentas directamente desde
+      // Firestore: es la única fuente que sobrevive a los reinicios del
+      // servidor. Solo un administrador puede enumerarlas.
+      allow list: if isAdmin();
       allow create: if isAccountOwner(userId) && isValidId(userId) &&
         isValidUserAccount(incoming(), userId) &&
         incoming().createdAt == request.time;

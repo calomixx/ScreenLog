@@ -262,8 +262,19 @@ porque no está en el alcance de la app.
   exista `users_public/{uid}`; el servicio lo crea automáticamente.
 - **Cuentas de login:** el servidor guarda sus cuentas (con `passwordHash` y
   `salt`) en `server_users/{id}`, una colección privada que solo toca el Admin
-  SDK. Así Cloud Run no las pierde al reiniciar. El panel de administración
-  combina `server_users` con los perfiles de `users/{uid}`.
+  SDK. Es un respaldo: si el hosting no tiene permisos de Firestore, el
+  servidor lo desactiva solo y no reintenta en cada petición.
+- **Respaldo real del login:** al registrarse o entrar, el navegador crea la
+  identidad de Firebase Auth con una contraseña derivada
+  (`sl!` + SHA-256 de `screenlog|email|contraseña`). Firebase Auth es
+  permanente. Si el servidor perdió la cuenta, `/api/auth/login` la recupera
+  verificando esas credenciales contra la API pública de Firebase y recrea el
+  registro local con el mismo UID. Probado: una cuenta que solo existía en
+  Firebase Auth pudo entrar después de borrarla del JSON.
+- **Panel de administración:** lista los usuarios directamente desde Firestore
+  con la sesión del navegador (regla `users → list: if isAdmin()`), así que
+  muestra a todos aunque el servidor se haya reiniciado. Los administradores se
+  marcan con `npm run firebase:seed-admins` (documento `admins/{uid}`).
 - **Diagnóstico:** `GET /api/db-status` devuelve cantidades del JSON y de
   Firestore (`users`, `catalogMedia`, `reviews`, `serverUsers`) para comprobar
   la conexión sin exponer datos privados.
@@ -278,7 +289,7 @@ Puntos clave:
 ```text
 match /users/{userId} {
   get    → isAccountOwner(userId) || isAdmin()
-  list   → false
+  list   → isAdmin()   // panel de administración (lee desde Firestore)
   create → isAccountOwner(userId) && createdAt == request.time && campos válidos
   update → isAccountOwner(userId) && uid/createdAt inmutables
   delete → isAccountOwner(userId) || isAdmin()
