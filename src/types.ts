@@ -28,6 +28,9 @@ export interface UserProfile {
   createdAt?: string;
   lastLoginAt?: string | null;
   joinedDate: string;
+  monitorOnly?: boolean;
+  firebaseUid?: string | null;
+  syncedWithFirebase?: boolean;
 }
 
 export type MediaType = 'pelicula' | 'serie' | 'anime' | 'documental' | 'novela';
@@ -218,4 +221,124 @@ export interface CineMatchResponse {
   aestheticAnalysis: CineMatchAestheticAnalysis;
   recommendations: CineMatchItem[];
   message?: string;
+}
+
+export interface PortalModulesConfig {
+  explorar: boolean;
+  match: boolean;
+  miLista: boolean;
+  estadisticas: boolean;
+  ruleta: boolean;
+  asistenteIA: boolean;
+  addTitle: boolean;
+  comentarios: boolean;
+  soporte: boolean;
+}
+
+export interface RatingBoxesConfig {
+  stars: boolean;
+  evaluation: boolean;
+  critique: boolean;
+  detailedAxes: boolean;
+  wouldRewatch: boolean;
+  watchedDate: boolean;
+  watchPlatform: boolean;
+  favoriteMoment: boolean;
+  shortVerdict: boolean;
+  favoriteCharacter: boolean;
+  quote: boolean;
+  recommendation: boolean;
+  moodRecommendation: boolean;
+  tags: boolean;
+}
+
+export interface SystemPortalSettings {
+  portalName: string;
+  tagline: string;
+  logoUrl?: string;
+  allowPublicRegistration: boolean;
+  communityCommentsEnabled: boolean;
+  catalogPerPage?: number;
+  modules: PortalModulesConfig;
+  ratingBoxes: RatingBoxesConfig;
+  monitorModeEnforced?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export type SupportTicketStatus = 'abierto' | 'en_revision' | 'resuelto' | 'cerrado';
+export type SupportTicketPriority = 'baja' | 'media' | 'alta';
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  adminNote?: string;
+  resolvedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  source?: 'firestore' | 'server' | 'both';
+}
+
+export const DEFAULT_PORTAL_MODULES: PortalModulesConfig = {
+  explorar: true,
+  match: true,
+  miLista: true,
+  estadisticas: true,
+  ruleta: true,
+  asistenteIA: true,
+  addTitle: true,
+  comentarios: true,
+  soporte: true,
+};
+
+export const DEFAULT_RATING_BOXES: RatingBoxesConfig = {
+  stars: true,
+  evaluation: true,
+  critique: true,
+  detailedAxes: true,
+  wouldRewatch: true,
+  watchedDate: true,
+  watchPlatform: true,
+  favoriteMoment: true,
+  shortVerdict: true,
+  favoriteCharacter: true,
+  quote: true,
+  recommendation: true,
+  moodRecommendation: true,
+  tags: true,
+};
+
+export function mergePortalModules(input?: Partial<PortalModulesConfig> | null): PortalModulesConfig {
+  return {
+    ...DEFAULT_PORTAL_MODULES,
+    ...(input || {}),
+  };
+}
+
+export function mergeRatingBoxes(input?: Partial<RatingBoxesConfig> | null): RatingBoxesConfig {
+  return {
+    ...DEFAULT_RATING_BOXES,
+    ...(input || {}),
+  };
+}
+
+export function isSystemMonitorUser(
+  user?: Pick<UserProfile, 'role' | 'email' | 'monitorOnly' | 'id'> | null,
+): boolean {
+  if (!user) return false;
+  const normalizedEmail = String(user.email || '').trim().toLowerCase();
+  return (
+    user.role === 'owner' ||
+    Boolean(user.monitorOnly) ||
+    normalizedEmail === 'daemon@screenlog.app' ||
+    normalizedEmail === 'daemon@takevault.app' ||
+    user.id === 'usr_daemon_owner'
+  );
 }

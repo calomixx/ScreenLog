@@ -1,8 +1,19 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { UserProfile, Role } from '../types';
+import {
+  DEFAULT_PORTAL_MODULES,
+  DEFAULT_RATING_BOXES,
+  mergePortalModules,
+  mergeRatingBoxes,
+  type PortalModulesConfig,
+  type RatingBoxesConfig,
+  type Role,
+  type SystemPortalSettings,
+  type UserProfile,
+} from '../types';
 import { apiRequest, ApiError, setStoredAuthToken } from '../lib/api';
 import {
   auth,
+  doesFirebaseUserMatchAccount,
   googleProvider,
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -12,6 +23,7 @@ import {
 import { ensureFirebasePasswordSession } from '../lib/firebaseAuthBridge';
 import { ensureFirebaseCustomSession } from '../lib/firebaseCustomToken';
 import { ensureUserAccount } from '../lib/firestore/users';
+import { getSystemConfig, subscribeToSystemConfig } from '../lib/firestore/systemConfig';
 
 export type { Role };
 
@@ -57,12 +69,16 @@ export interface AuditLog {
   createdAt: string;
 }
 
-export interface PublicSettings {
+export interface PublicSettings extends SystemPortalSettings {
   portalName: string;
   tagline: string;
   allowPublicRegistration: boolean;
   logoUrl?: string;
-  communityCommentsEnabled?: boolean;
+  communityCommentsEnabled: boolean;
+  modules: PortalModulesConfig;
+  ratingBoxes: RatingBoxesConfig;
+  catalogPerPage?: number;
+  monitorModeEnforced?: boolean;
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -108,6 +124,10 @@ const defaultSettings: PublicSettings = {
   allowPublicRegistration: true,
   logoUrl: '/favicon.svg',
   communityCommentsEnabled: true,
+  modules: DEFAULT_PORTAL_MODULES,
+  ratingBoxes: DEFAULT_RATING_BOXES,
+  catalogPerPage: 24,
+  monitorModeEnforced: true,
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -169,13 +189,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (!data.user) {
       setStoredAuthToken(null);
     }
-    setSettings({ ...defaultSettings, ...data.settings });
+    setSettings((prev) => ({
+      ...defaultSettings,
+      ...data.settings,
+      modules: mergePortalModules(data.settings?.modules || prev.modules),
+      ratingBoxes: mergeRatingBoxes(data.settings?.ratingBoxes || prev.ratingBoxes),
+    }));
     if (data.user) {
       setIsGuest(false);
       setIsWorkspaceGuest(false);
       setJustLoggedOut(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
     }
+  }, []);
+
+  // Sincroniza en tiempo real las casillas/módulos y configuración global desde Firestore.
+  useEffect(() => {
+    let active = true;
+    void getSystemConfig().then((remote) => {
+      if (active && remote) {
+        setSettings((prev) => ({
+          ...prev,
+          ...remote,
+          modules: mergePortalModules(remote.modules),
+          ratingBoxes: mergeRatingBoxes(remote.ratingBoxes),
+        }));
+      }
+    });
+    const unsub = subscribeToSystemConfig((remote) => {
+      if (!active) return;
+      setSettings((prev) => ({
+        ...prev,
+        ...remote,
+        modules: mergePortalModules(remote.modules),
+        ratingBoxes: mergeRatingBoxes(remote.ratingBoxes),
+      }));
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const refresh = useCallback(async () => {
@@ -195,18 +248,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let cancelled = false;
     (async () => {
       try {
+        await auth.authStateReady();
         const response = await apiRequest<StatusResponse>('/api/auth/status');
         if (cancelled) return;
         if (response.data.user) {
-          // Sesión de Firebase automática para sesiones recordadas: el servidor
-          // firma un token con el id del usuario ya autenticado. Se resuelve
-          // antes de publicar el usuario para que la biblioteca no intente
-          // escribir en Firestore sin credenciales.
-          const custom = await ensureFirebaseCustomSession();
-          if (!cancelled && !custom.ok) {
-            const message = custom.message || 'No se pudo crear la sesión de Firebase.';
-            setFirebaseLinkError(message);
-            console.warn('Firestore sin sesión de Firebase:', message);
+          // Si hay una sesión de Firebase previa de OTRO usuario (p. ej. Daemon),
+          // cerrarla antes de intentar vincular al usuario actual para evitar fugas.
+          if (auth.currentUser && !doesFirebaseUserMatchAccount(auth.currentUser, response.data.user)) {
+            await firebaseSignOut(auth).catch(() => undefined);
+          }
+
+          if (auth.currentUser && doesFirebaseUserMatchAccount(auth.currentUser, response.data.user)) {
+            setFirebaseLinkError(null);
+          } else {
+            const custom = await ensureFirebaseCustomSession();
+            if (!cancelled && !custom.ok) {
+              const message = custom.message || 'No se pudo crear la sesión de Firebase.';
+              setFirebaseLinkError(message);
+              console.warn('Firestore sin sesión de Firebase:', message);
+            }
           }
         }
         if (cancelled) return;
@@ -258,53 +318,117 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (
       email: string,
       password: string,
-      profile?: { name?: string; avatar?: string },
-    ) => {
+      profile?: { name?: string; username?: string; avatar?: string; userId?: string },
+    ): Promise<{ ok: boolean; uid?: string; message?: string }> => {
+      const cleanEmail = String(email || '').trim().toLowerCase();
+
+      // Crítico para evitar fuga entre usuarios: nunca mantener activa la sesión
+      // Firebase de otra cuenta (p. ej. Daemon) al cambiar o registrar cuenta.
+      if (
+        auth.currentUser &&
+        !doesFirebaseUserMatchAccount(auth.currentUser, { id: profile?.userId, email: cleanEmail })
+      ) {
+        await firebaseSignOut(auth).catch(() => undefined);
+      }
+
       // 1) Vía preferida: el servidor firma un token para el usuario de la app.
-      const custom = await ensureFirebaseCustomSession();
+      let custom = await ensureFirebaseCustomSession();
+      if (
+        custom.ok &&
+        auth.currentUser &&
+        cleanEmail &&
+        auth.currentUser.email &&
+        auth.currentUser.email.toLowerCase() !== cleanEmail
+      ) {
+        // El token personalizado no coincide con el correo esperado; reiniciar.
+        await firebaseSignOut(auth).catch(() => undefined);
+        custom = { ok: false, message: 'Sesión Firebase desalineada.' };
+      }
+
       if (!custom.ok) {
         const customMessage = custom.message || 'No se pudo crear la sesión de Firebase.';
 
         // 2) Respaldo: proveedor Email/Password (si está habilitado).
         try {
           const result = await ensureFirebasePasswordSession(
-            email,
+            cleanEmail,
             password,
             profile?.name,
           );
           if (!result.ok) {
             const message = 'message' in result ? result.message : customMessage;
+            if (
+              auth.currentUser &&
+              !doesFirebaseUserMatchAccount(auth.currentUser, { id: profile?.userId, email: cleanEmail })
+            ) {
+              await firebaseSignOut(auth).catch(() => undefined);
+            }
             setFirebaseLinkError(message);
             console.warn('Firestore sin sesión de Firebase:', message);
-            return;
+            return { ok: false, message };
           }
         } catch (err) {
           setFirebaseLinkError(customMessage);
           console.warn('No se pudo sincronizar la sesión con Firebase:', err);
-          return;
+          return { ok: false, message: customMessage };
         }
       }
 
-      // Con la sesión de Firebase abierta creamos el documento `users/{uid}`
-      // aquí mismo. No dependemos de que `onAuthStateChanged` ya haya corrido:
-      // así el usuario aparece en Firestore apenas entra.
-      setFirebaseLinkError(null);
+      // Con la sesión de Firebase abierta creamos ambos documentos en Firestore:
+      // `users/{uid}` + `users_public/{uid}` + `users/{uid}/private/info`.
       const fbUser = auth.currentUser;
       if (fbUser?.uid) {
+        setFirebaseUid(fbUser.uid);
         try {
-          await ensureUserAccount({
-            uid: fbUser.uid,
-            displayName: profile?.name || fbUser.displayName || fbUser.email?.split('@')[0],
-            email: email || fbUser.email,
-            photoURL: profile?.avatar || fbUser.photoURL,
-          });
+          await Promise.all([
+            ensureUserAccount({
+              uid: fbUser.uid,
+              displayName: profile?.name || fbUser.displayName || fbUser.email?.split('@')[0],
+              email: cleanEmail || fbUser.email,
+              photoURL: profile?.avatar || fbUser.photoURL,
+            }),
+            syncFirebaseUserProfile(fbUser, {
+              name: profile?.name,
+              username: profile?.username,
+              avatar: profile?.avatar,
+              email: cleanEmail || fbUser.email || undefined,
+            }),
+          ]);
+          setFirebaseLinkError(null);
+          void fbUser
+            .getIdToken()
+            .then((idToken) =>
+              apiRequest('/api/auth/link-firebase', {
+                method: 'POST',
+                body: JSON.stringify({ idToken }),
+              }),
+            )
+            .catch(() => undefined);
         } catch (err) {
+          const errMsg = err instanceof Error ? err.message : 'No se pudo registrar el perfil en Firestore.';
           console.warn('No se pudo crear la cuenta en Firestore:', err);
+          setFirebaseLinkError(errMsg);
+          return { ok: false, uid: fbUser.uid, message: errMsg };
         }
+        return { ok: true, uid: fbUser.uid };
       }
+
+      setFirebaseLinkError('No se pudo inicializar la sesión de Firebase Auth.');
+      return { ok: false, message: 'No se pudo inicializar la sesión de Firebase Auth.' };
     },
     [],
   );
+
+  // Garantiza que nunca quede un auth.currentUser activo perteneciente a otra persona.
+  useEffect(() => {
+    if (!currentUser || !auth.currentUser) return;
+    if (!doesFirebaseUserMatchAccount(auth.currentUser, currentUser)) {
+      console.warn(
+        '[AuthIsolation] Sesión Firebase desalineada detectada. Cerrando sesión cruzada para proteger cuentas.',
+      );
+      void firebaseSignOut(auth).catch(() => undefined);
+    }
+  }, [currentUser, firebaseUid]);
 
   const linkFirebaseSession = useCallback(
     async (password: string): Promise<AuthResult> => {
@@ -389,11 +513,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ignore
       }
       // Sesión de Firebase Auth para que Firestore autentique las escrituras.
-      await syncFirebaseIdentity(response.data.user.email, password, {
+      const syncResult = await syncFirebaseIdentity(response.data.user.email, password, {
+        userId: response.data.user.id,
         name: response.data.user.name,
+        username: response.data.user.username,
         avatar: response.data.user.avatar,
       });
-      setCurrentUser(response.data.user);
+      setCurrentUser({
+        ...response.data.user,
+        firebaseUid: syncResult.uid || null,
+        syncedWithFirebase: syncResult.ok,
+      });
       setSessionInfo(response.data.session);
       setIsGuest(false);
       setIsWorkspaceGuest(false);
@@ -407,7 +537,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: false, message: 'No se pudo iniciar sesión. Inténtalo de nuevo.' };
     }
-  }, []);
+  }, [syncFirebaseIdentity]);
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     try {
@@ -460,6 +590,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = useCallback(async (data: { name: string; username?: string; email: string; password: string; avatar?: string }): Promise<AuthResult> => {
     try {
+      // Cerramos cualquier sesión Firebase previa (p. ej. Daemon) antes de registrar otra cuenta.
+      if (auth.currentUser) {
+        await firebaseSignOut(auth).catch(() => undefined);
+      }
+
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/register',
         { method: 'POST', body: JSON.stringify(data) },
@@ -472,27 +607,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
-      await syncFirebaseIdentity(data.email, data.password, {
+      const syncResult = await syncFirebaseIdentity(data.email, data.password, {
+        userId: response.data.user.id,
         name: data.name,
+        username: data.username,
         avatar: 'avatar' in data ? data.avatar : undefined,
       });
-      setCurrentUser(response.data.user);
+      setCurrentUser({
+        ...response.data.user,
+        firebaseUid: syncResult.uid || null,
+        syncedWithFirebase: syncResult.ok,
+      });
       setSessionInfo(response.data.session);
       setIsGuest(false);
       setIsWorkspaceGuest(false);
       setJustLoggedOut(false);
       try { sessionStorage.removeItem('screenlog_guest'); } catch {}
-      return { success: true };
+      return {
+        success: true,
+        message: syncResult.ok ? undefined : syncResult.message,
+      };
     } catch (error) {
       if (error instanceof ApiError) {
         return { success: false, message: error.message, code: error.code };
       }
       return { success: false, message: 'No se pudo crear la cuenta. Inténtalo de nuevo.' };
     }
-  }, []);
+  }, [syncFirebaseIdentity]);
 
   const setupOwner = useCallback(async (data: { name: string; username?: string; email: string; password: string }): Promise<AuthResult> => {
     try {
+      if (auth.currentUser) {
+        await firebaseSignOut(auth).catch(() => undefined);
+      }
       const response = await apiRequest<{ success: boolean; data: { user: UserAccount; session: SessionInfo; token?: string } }>(
         '/api/auth/setup',
         { method: 'POST', body: JSON.stringify(data) },
@@ -505,8 +652,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
-      await syncFirebaseIdentity(data.email, data.password, { name: data.name });
-      setCurrentUser(response.data.user);
+      const syncResult = await syncFirebaseIdentity(data.email, data.password, {
+        userId: response.data.user.id,
+        name: data.name,
+        username: data.username,
+      });
+      setCurrentUser({
+        ...response.data.user,
+        firebaseUid: syncResult.uid || null,
+        syncedWithFirebase: syncResult.ok,
+      });
       setSessionInfo(response.data.session);
       setNeedsSetup(false);
       setIsGuest(false);
@@ -520,7 +675,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: false, message: 'No se pudo completar la configuración inicial.' };
     }
-  }, []);
+  }, [syncFirebaseIdentity]);
 
   const logout = useCallback(async () => {
     try {

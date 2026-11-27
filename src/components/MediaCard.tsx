@@ -12,7 +12,7 @@ import {
   Film,
   Edit3
 } from 'lucide-react';
-import { MediaItem, WatchStatus } from '../types';
+import { isSystemMonitorUser, MediaItem, WatchStatus } from '../types';
 import { useMedia } from '../context/MediaContext';
 import { RatingStars } from './RatingStars';
 import { getMediaTypeLabel } from '../lib/mediaLabels';
@@ -51,6 +51,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
   });
 
   const userReview = userReviews[media.id];
+  const isMonitor = isSystemMonitorUser(currentUser);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!parallax || !cardRef.current) return;
@@ -205,7 +206,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
           </span>
 
           <div className="flex items-center gap-1">
-            {currentUser?.role === 'admin' && (
+            {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -213,13 +214,13 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   openEditMediaModal(media);
                 }}
                 className="p-1 rounded-md bg-black/75 hover:bg-rose-600 text-slate-200 hover:text-white border border-white/10 transition-colors shadow"
-                title="Editar título (Admin demon)"
+                title="Editar título (Admin)"
                 aria-label={`Editar ${media.title}`}
               >
                 <Edit3 className="w-3 h-3" />
               </button>
             )}
-            {getStatusBadge()}
+            {!isMonitor && getStatusBadge()}
           </div>
         </div>
 
@@ -234,7 +235,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
             </span>
 
             <div className="flex items-center gap-1">
-              {currentUser?.role === 'admin' && (
+              {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -242,7 +243,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     openEditMediaModal(media);
                   }}
                   className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40 shadow transition-all active:scale-95"
-                  title="Editar catálogo (Admin demon)"
+                  title="Editar catálogo (Admin)"
                   aria-label={`Editar ${media.title}`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -257,7 +258,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                     setIsMenuOpen(!isMenuOpen);
                   }}
                   className="p-1.5 rounded-full bg-white/10 text-slate-200 hover:text-rose-400 hover:bg-white/20 border border-white/15 transition-colors"
-                  title="Opciones de estado"
+                  title={isMonitor ? 'Opciones de catálogo' : 'Opciones de estado'}
                   aria-label={`Opciones de ${media.title}`}
                   aria-haspopup="menu"
                   aria-expanded={isMenuOpen}
@@ -271,41 +272,45 @@ export const MediaCard: React.FC<MediaCardProps> = ({ media, layout = 'grid', pa
                   className="absolute right-0 top-full mt-1 w-48 bg-surface border border-white/10 rounded-xl p-1.5 shadow-2xl z-30 animate-in fade-in"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">
-                    Cambiar estado
-                  </div>
-                  <button
-                    onClick={(e) => handleStatusChange(e, 'pendiente')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
-                  >
-                    <Bookmark className="w-3.5 h-3.5 text-sky-400" />
-                    Pendiente
-                  </button>
-                  <button
-                    onClick={(e) => handleStatusChange(e, 'en_proceso')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    En proceso
-                  </button>
-                  <button
-                    onClick={(e) => handleStatusChange(e, 'terminada')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
-                  >
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    Terminada (Calificar)
-                  </button>
-
-                  {userReview && (
-                    <div className="pt-1 mt-1 border-t border-white/10">
+                  {!isMonitor && (
+                    <>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">
+                        Cambiar estado
+                      </div>
                       <button
-                        onClick={handleRemove}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                        onClick={(e) => handleStatusChange(e, 'pendiente')}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Quitar de mi lista
+                        <Bookmark className="w-3.5 h-3.5 text-sky-400" />
+                        Pendiente
                       </button>
-                    </div>
+                      <button
+                        onClick={(e) => handleStatusChange(e, 'en_proceso')}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        En proceso
+                      </button>
+                      <button
+                        onClick={(e) => handleStatusChange(e, 'terminada')}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-white/10 flex items-center gap-2"
+                      >
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        Terminada (Calificar)
+                      </button>
+
+                      {userReview && (
+                        <div className="pt-1 mt-1 border-t border-white/10">
+                          <button
+                            onClick={handleRemove}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Quitar de mi lista
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (

@@ -56,14 +56,43 @@ import {
   useAuth,
 } from '../context/AuthContext';
 import { useMedia } from '../context/MediaContext';
-import type { MediaItem, MediaType } from '../types';
+import {
+  DEFAULT_PORTAL_MODULES,
+  DEFAULT_RATING_BOXES,
+  mergePortalModules,
+  mergeRatingBoxes,
+  type MediaItem,
+  type MediaType,
+  type PortalModulesConfig,
+  type RatingBoxesConfig,
+  type SupportTicket,
+  type SupportTicketStatus,
+} from '../types';
 import { apiRequest, ApiError, formatDate } from '../lib/api';
 import { pingFirestore, seedCatalogToFirestore } from '../lib/firebase';
-import { getFirestoreDiagnostics } from '../lib/firestore';
+import { provisionFirebaseUserAsAdmin } from '../lib/firebaseAuthBridge';
+import {
+  getFirestoreDiagnostics,
+  clearMonitorWatchlistEntries,
+  getSystemConfig,
+  grantAdminInFirestore,
+  inspectDatabaseMonitoringSnapshot,
+  revokeAdminInFirestore,
+  saveSystemConfigToFirestore,
+  updateUserBlockedFlagInFirestore,
+  type DatabaseMonitoringSnapshot,
+} from '../lib/firestore';
+import {
+  subscribeToSupportTickets,
+  updateSupportTicketInFirestore,
+  deleteSupportTicketInFirestore,
+} from '../lib/firestore/support';
 import { listUserAccounts, type FirestoreUserSummary } from '../lib/firestore/users';
 
 type AdminTab =
   | 'summary'
+  | 'modules'
+  | 'support'
   | 'catalog'
   | 'users'
   | 'moderation'
@@ -122,18 +151,35 @@ function cloudUserToAdminUser(cloud: FirestoreUserSummary): AdminUser {
   };
 }
 
-/** Une las cuentas del servidor con las de Firestore, sin duplicar. */
+/** Une las cuentas del servidor con las de Firestore, sin duplicar, propagando firebaseUid. */
 function mergeAdminUsers(serverUsers: AdminUser[], cloudUsers: FirestoreUserSummary[]): AdminUser[] {
-  const rows = [...serverUsers];
-  const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()).filter(Boolean));
-  const knownIds = new Set(rows.map((row) => row.id));
+  const rows = serverUsers.map((row) => ({ ...row }));
+  const byEmail = new Map<string, AdminUser>();
+  const knownIds = new Set<string>();
+
+  for (const row of rows) {
+    const email = row.email.trim().toLowerCase();
+    if (email) byEmail.set(email, row);
+    knownIds.add(row.id);
+    if (row.firebaseUid) knownIds.add(row.firebaseUid);
+  }
 
   for (const cloud of cloudUsers) {
     const email = cloud.email.trim().toLowerCase();
+    const existingByEmail = email ? byEmail.get(email) : undefined;
+    if (existingByEmail) {
+      if (!existingByEmail.firebaseUid) existingByEmail.firebaseUid = cloud.uid;
+      existingByEmail.syncedWithFirebase = true;
+      continue;
+    }
     if (knownIds.has(cloud.uid)) continue;
-    if (email && knownEmails.has(email)) continue;
-    rows.push(cloudUserToAdminUser(cloud));
-    if (email) knownEmails.add(email);
+    const mapped: AdminUser = {
+      ...cloudUserToAdminUser(cloud),
+      firebaseUid: cloud.uid,
+      syncedWithFirebase: true,
+    };
+    rows.push(mapped);
+    if (email) byEmail.set(email, mapped);
     knownIds.add(cloud.uid);
   }
 
@@ -163,8 +209,39 @@ interface AdminSettings {
   allowPublicRegistration: boolean;
   communityCommentsEnabled: boolean;
   catalogPerPage?: number;
+  modules?: PortalModulesConfig;
+  ratingBoxes?: RatingBoxesConfig;
+  monitorModeEnforced?: boolean;
   updatedAt?: string;
 }
+
+const MODULE_CHECKBOX_ITEMS: { key: keyof PortalModulesConfig; label: string; desc: string }[] = [
+  { key: 'explorar', label: 'Explorar catálogo', desc: 'Muestra la pestaña Explorar para navegar todo el catálogo.' },
+  { key: 'match', label: 'CineMatch', desc: 'Muestra el recomendador inteligente por afinidad o ambiente.' },
+  { key: 'miLista', label: 'Mi Lista personal', desc: 'Permite a los usuarios gestionar su watchlist y reseñas.' },
+  { key: 'estadisticas', label: 'Estadísticas y rangos', desc: 'Muestra gráficos y métricas cinéfilas del usuario.' },
+  { key: 'ruleta', label: 'Ruleta ¿Qué veo hoy?', desc: 'Activa el botón rápido de ruleta en la barra superior.' },
+  { key: 'asistenteIA', label: 'Asistente IA', desc: 'Habilita el chat de asistencia cinematográfica.' },
+  { key: 'addTitle', label: 'Botón Añadir Título', desc: 'Permite añadir nuevas películas o series al catálogo.' },
+  { key: 'comentarios', label: 'Comentarios públicos', desc: 'Muestra la pestaña y publicación de comentarios por título.' },
+  { key: 'soporte', label: 'Centro de Soporte', desc: 'Habilita la sección pública de contacto y tickets.' },
+];
+
+const RATING_BOX_ITEMS: { key: keyof RatingBoxesConfig; label: string; desc: string }[] = [
+  { key: 'stars', label: 'Calificación con estrellas', desc: 'Selector principal de 0.5 a 5 estrellas.' },
+  { key: 'evaluation', label: 'Etiqueta de evaluación general', desc: 'Botones rápidos (Obra Maestra, Excelente, Regular...).' },
+  { key: 'critique', label: 'Crítica / Opinión personal', desc: 'Caja de texto libre para análisis detallado.' },
+  { key: 'detailedAxes', label: 'Desglose técnico (7 ejes)', desc: 'Guión, Actuaciones, Dirección, Audio, Visuales, Ritmo, Emoción.' },
+  { key: 'watchedDate', label: 'Fecha en que la vi', desc: 'Selector de fecha de visualización.' },
+  { key: 'watchPlatform', label: 'Dónde la vi (Plataforma)', desc: 'Selector de plataforma o sitio personalizado.' },
+  { key: 'wouldRewatch', label: '¿La volvería a ver?', desc: 'Opciones de re-visionado.' },
+  { key: 'recommendation', label: '¿La recomiendas?', desc: 'Sí / Con reservas / No.' },
+  { key: 'moodRecommendation', label: 'Estado de ánimo / Momento ideal', desc: 'Chips y texto de cuándo conviene verla.' },
+  { key: 'shortVerdict', label: 'Veredicto en pocas palabras', desc: 'Titular corto de la reseña.' },
+  { key: 'favoriteCharacter', label: 'Personaje favorito', desc: 'Campo de personaje o interpretación destacada.' },
+  { key: 'quote', label: 'Frase o diálogo memorable', desc: 'Cita destacada de la película.' },
+  { key: 'tags', label: 'Etiquetas cinéfilas', desc: 'Chips de sensaciones y atributos.' },
+];
 
 interface BillingState {
   planName: string;
@@ -292,6 +369,25 @@ export const AdminPanelView: React.FC = () => {
 
   const [promoteEmail, setPromoteEmail] = useState('');
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '' });
+  const [showCreateUserForm, setShowCreateUserForm] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    role: 'user' as 'user' | 'admin',
+  });
+  const [dbSnapshot, setDbSnapshot] = useState<DatabaseMonitoringSnapshot | null>(null);
+  const [loadingDbSnapshot, setLoadingDbSnapshot] = useState(false);
+  const [cleaningMonitor, setCleaningMonitor] = useState(false);
+  const [modulesDraft, setModulesDraft] = useState<PortalModulesConfig>({ ...DEFAULT_PORTAL_MODULES });
+  const [ratingBoxesDraft, setRatingBoxesDraft] = useState<RatingBoxesConfig>({ ...DEFAULT_RATING_BOXES });
+  const [savingModules, setSavingModules] = useState(false);
+  const [firestoreTickets, setFirestoreTickets] = useState<SupportTicket[]>([]);
+  const [serverTickets, setServerTickets] = useState<SupportTicket[]>([]);
+  const [ticketDrafts, setTicketDrafts] = useState<Record<string, { status: SupportTicketStatus; adminNote: string }>>({});
+  const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [transferForm, setTransferForm] = useState({ email: '', password: '', confirmation: '', doubleConfirm: false });
   const [showTransferPassword, setShowTransferPassword] = useState(false);
 
@@ -420,9 +516,11 @@ export const AdminPanelView: React.FC = () => {
   const isOwnerUser = isOwner(currentUser?.role);
   const tabs = useMemo(() => {
     const base: { id: AdminTab; label: string; icon: React.ElementType }[] = [
-      { id: 'summary', label: 'Resumen', icon: BarChart3 },
-      { id: 'catalog', label: 'Catálogo', icon: Film },
+      { id: 'summary', label: 'Monitoreo BD', icon: BarChart3 },
+      { id: 'modules', label: 'Casillas', icon: Sparkles },
+      { id: 'support', label: 'Soporte', icon: MessageSquare },
       { id: 'users', label: 'Usuarios', icon: Users },
+      { id: 'catalog', label: 'Catálogo', icon: Film },
       { id: 'moderation', label: 'Moderación', icon: ShieldAlert },
       { id: 'settings', label: 'Ajustes', icon: Settings },
       { id: 'history', label: 'Historial', icon: History },
@@ -471,22 +569,65 @@ export const AdminPanelView: React.FC = () => {
     setLoading(false);
   }, []);
 
+  const refreshDbMonitoring = useCallback(async () => {
+    setLoadingDbSnapshot(true);
+    try {
+      const diag = getFirestoreDiagnostics();
+      const snapshot = await inspectDatabaseMonitoringSnapshot(diag.session.uid);
+      setDbSnapshot(snapshot);
+    } catch (err) {
+      console.warn('No se pudo obtener telemetría de Firestore:', err);
+    } finally {
+      setLoadingDbSnapshot(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadCore();
     void checkFirestore();
-  }, [loadCore, checkFirestore]);
+    void refreshDbMonitoring();
+  }, [loadCore, checkFirestore, refreshDbMonitoring]);
+
+  useEffect(() => {
+    if (activeTab !== 'support' && activeTab !== 'summary') return;
+    const unsub = subscribeToSupportTickets({ isAdmin: true }, (list) => {
+      setFirestoreTickets(list);
+    });
+    apiRequest<{ success: boolean; data: SupportTicket[] }>('/api/admin/tickets')
+      .then((res) => setServerTickets(res.data || []))
+      .catch(() => undefined);
+    return () => unsub();
+  }, [activeTab]);
 
   useEffect(() => {
     if (!activeTab) return;
     let cancelled = false;
     (async () => {
       try {
-        if (activeTab === 'settings') {
-          const response = await apiRequest<{ success: boolean; data: AdminSettings }>('/api/admin/settings');
-          if (!cancelled) {
-            setSettings(response.data);
-            setSettingsForm(response.data);
-          }
+        if (activeTab === 'settings' || activeTab === 'modules') {
+          const [serverRes, cloudConfig] = await Promise.all([
+            apiRequest<{ success: boolean; data: AdminSettings }>('/api/admin/settings').catch(() => null),
+            getSystemConfig(),
+          ]);
+          if (cancelled) return;
+          const merged: AdminSettings = {
+            portalName: cloudConfig?.portalName || serverRes?.data?.portalName || 'TakeVault',
+            tagline: cloudConfig?.tagline || serverRes?.data?.tagline || 'Tu Diario Cinematográfico Privado',
+            logoUrl: cloudConfig?.logoUrl || serverRes?.data?.logoUrl || '/favicon.svg',
+            allowPublicRegistration:
+              cloudConfig?.allowPublicRegistration ?? serverRes?.data?.allowPublicRegistration ?? true,
+            communityCommentsEnabled:
+              cloudConfig?.communityCommentsEnabled ?? serverRes?.data?.communityCommentsEnabled ?? true,
+            catalogPerPage: cloudConfig?.catalogPerPage ?? serverRes?.data?.catalogPerPage ?? 24,
+            modules: mergePortalModules(cloudConfig?.modules || serverRes?.data?.modules),
+            ratingBoxes: mergeRatingBoxes(cloudConfig?.ratingBoxes || serverRes?.data?.ratingBoxes),
+            monitorModeEnforced:
+              cloudConfig?.monitorModeEnforced ?? serverRes?.data?.monitorModeEnforced ?? true,
+          };
+          setSettings(merged);
+          setSettingsForm(merged);
+          setModulesDraft(mergePortalModules(merged.modules));
+          setRatingBoxesDraft(mergeRatingBoxes(merged.ratingBoxes));
         }
         if (activeTab === 'billing') {
           const response = await apiRequest<{ success: boolean; data: BillingState }>('/api/owner/billing');
@@ -621,6 +762,11 @@ export const AdminPanelView: React.FC = () => {
       await loadCore();
       setConfirmDialog(null);
 
+      if (action === 'block' || action === 'unblock') {
+        const targetUid = user.firebaseUid || response.data?.firebaseUid || user.id;
+        await updateUserBlockedFlagInFirestore(targetUid, user.email, action === 'block');
+      }
+
       // Keep user in modal in sync if open
       if (response.data) {
         setSelectedUserForModal((prev) => (prev?.id === user.id ? { ...prev, ...response.data } : prev));
@@ -722,16 +868,222 @@ export const AdminPanelView: React.FC = () => {
     event.preventDefault();
     if (!settingsForm) return;
     try {
-      const response = await apiRequest<{ success: boolean; data: AdminSettings }>('/api/admin/settings', {
-        method: 'PUT',
-        body: JSON.stringify(settingsForm),
-      });
-      setSettings(response.data);
-      setSettingsForm(response.data);
-      flash('Configuración guardada.');
+      const payload = {
+        ...settingsForm,
+        modules: modulesDraft,
+        ratingBoxes: ratingBoxesDraft,
+      };
+      const [serverRes] = await Promise.all([
+        apiRequest<{ success: boolean; data: AdminSettings }>('/api/admin/settings', {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }),
+        saveSystemConfigToFirestore(payload, currentUser.id).catch((err) => {
+          console.warn('No se pudo guardar config en Firestore:', err);
+          return null;
+        }),
+      ]);
+      setSettings(serverRes.data);
+      setSettingsForm(serverRes.data);
+      flash('Configuración general y de Firestore guardadas.');
       await refresh();
     } catch (requestError) {
       handleError(requestError);
+    }
+  };
+
+  const handleSaveModulesAndBoxes = async (
+    nextModules: PortalModulesConfig = modulesDraft,
+    nextBoxes: RatingBoxesConfig = ratingBoxesDraft,
+  ) => {
+    setSavingModules(true);
+    setError('');
+    try {
+      const base = settingsForm || settings || {
+        portalName: 'TakeVault',
+        tagline: 'Tu Diario Cinematográfico Privado',
+        logoUrl: '/favicon.svg',
+        allowPublicRegistration: true,
+        communityCommentsEnabled: true,
+        catalogPerPage: 24,
+      };
+      const payload = {
+        ...base,
+        communityCommentsEnabled: nextModules.comentarios,
+        modules: nextModules,
+        ratingBoxes: nextBoxes,
+        monitorModeEnforced: true,
+      };
+      await Promise.all([
+        saveSystemConfigToFirestore(payload, currentUser.id),
+        apiRequest('/api/admin/settings', {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }).catch(() => undefined),
+      ]);
+      setSettingsForm((prev) => (prev ? { ...prev, ...payload } : (payload as AdminSettings)));
+      flash('Casillas y módulos actualizados en tiempo real en Firestore.');
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron guardar las casillas en Firestore.',
+      );
+    } finally {
+      setSavingModules(false);
+    }
+  };
+
+  const handleCreateUserFromAdmin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (creatingUser) return;
+    setError('');
+    setCreatingUser(true);
+    try {
+      const fbProvision = await provisionFirebaseUserAsAdmin({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        name: newUserForm.name,
+        username: newUserForm.username || undefined,
+      });
+      if (!fbProvision.ok) {
+        setError(
+          `Firebase: ${'message' in fbProvision ? fbProvision.message : 'No se pudo provisionar el usuario.'}`,
+        );
+        return;
+      }
+
+      await apiRequest('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newUserForm.name.trim(),
+          username: newUserForm.username.trim() || undefined,
+          email: newUserForm.email.trim(),
+          password: newUserForm.password,
+          role: newUserForm.role,
+          firebaseUid: fbProvision.uid,
+        }),
+      });
+
+      if (newUserForm.role === 'admin' && isOwnerUser) {
+        await grantAdminInFirestore({
+          uid: fbProvision.uid,
+          email: newUserForm.email.trim().toLowerCase(),
+          name: newUserForm.name.trim(),
+          grantedBy: firebaseDiag.session.uid || currentUser.id,
+        }).catch(() => undefined);
+      }
+
+      setNewUserForm({ name: '', username: '', email: '', password: '', role: 'user' });
+      setShowCreateUserForm(false);
+      flash(
+        `Usuario creado y registrado en Firebase Auth + Firestore (UID: ${fbProvision.uid}).`,
+      );
+      await Promise.all([loadCore(), refreshDbMonitoring()]);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleCleanupMonitorLibrary = async () => {
+    if (cleaningMonitor) return;
+    setCleaningMonitor(true);
+    setError('');
+    try {
+      const uid = firebaseDiag.session.uid || 'bZGMhRTm7aOUoRDlYbabZN2Aotk2';
+      const [cloudRes, serverRes] = await Promise.all([
+        clearMonitorWatchlistEntries(uid),
+        apiRequest<{ success: boolean; data: { removedCount: number } }>(
+          '/api/admin/cleanup-monitor-library',
+          { method: 'POST' },
+        ).catch(() => ({ data: { removedCount: 0 } })),
+      ]);
+      const totalCleaned =
+        cloudRes.removedClassifications +
+        cloudRes.removedLegacy +
+        (serverRes.data?.removedCount || 0);
+      flash(
+        `Limpieza de cuenta monitor completada: ${totalCleaned} película(s) personal(es) eliminada(s) de Daemon.`,
+      );
+      await refreshDbMonitoring();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setCleaningMonitor(false);
+    }
+  };
+
+  const mergedTickets = useMemo(() => {
+    const map = new Map<string, SupportTicket>();
+    for (const s of serverTickets) map.set(s.id, s);
+    for (const f of firestoreTickets) {
+      const prev = map.get(f.id);
+      map.set(f.id, prev ? { ...prev, ...f, source: 'both' } : f);
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''),
+    );
+  }, [firestoreTickets, serverTickets]);
+
+  const handleSaveTicket = async (ticket: SupportTicket) => {
+    const draft = ticketDrafts[ticket.id] || {
+      status: ticket.status,
+      adminNote: ticket.adminNote || '',
+    };
+    setSavingTicketId(ticket.id);
+    try {
+      const ops: Promise<unknown>[] = [];
+      if (ticket.source === 'firestore' || ticket.source === 'both') {
+        ops.push(
+          updateSupportTicketInFirestore(ticket.id, {
+            status: draft.status,
+            adminNote: draft.adminNote,
+            resolvedBy: currentUser.name,
+          }),
+        );
+      }
+      if (ticket.source === 'server' || ticket.source === 'both') {
+        ops.push(
+          apiRequest(`/api/admin/tickets/${encodeURIComponent(ticket.id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: draft.status,
+              adminNote: draft.adminNote,
+            }),
+          }).catch(() => undefined),
+        );
+      }
+      await Promise.all(ops);
+      flash(`Ticket "${ticket.subject}" actualizado.`);
+      if (ticket.source === 'server' || ticket.source === 'both') {
+        apiRequest<{ success: boolean; data: SupportTicket[] }>('/api/admin/tickets')
+          .then((res) => setServerTickets(res.data || []))
+          .catch(() => undefined);
+      }
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setSavingTicketId(null);
+    }
+  };
+
+  const handleDeleteTicket = async (ticket: SupportTicket) => {
+    try {
+      if (ticket.source === 'firestore' || ticket.source === 'both') {
+        await deleteSupportTicketInFirestore(ticket.id);
+      }
+      if (ticket.source === 'server' || ticket.source === 'both') {
+        await apiRequest(`/api/admin/tickets/${encodeURIComponent(ticket.id)}`, {
+          method: 'DELETE',
+        }).catch(() => undefined);
+      }
+      setServerTickets((prev) => prev.filter((t) => t.id !== ticket.id));
+      flash('Ticket eliminado.');
+    } catch (err) {
+      handleError(err);
     }
   };
 
@@ -798,15 +1150,26 @@ export const AdminPanelView: React.FC = () => {
     event.preventDefault();
     if (!promoteEmail.trim()) return;
     try {
+      const targetEmail = promoteEmail.trim().toLowerCase();
       await apiRequest('/api/owner/admins', {
         method: 'POST',
-        body: JSON.stringify({ mode: 'promote', email: promoteEmail.trim() }),
+        body: JSON.stringify({ mode: 'promote', email: targetEmail }),
       });
+      const matchedUser = users.find((u) => u.email.trim().toLowerCase() === targetEmail);
+      const targetUid = matchedUser?.firebaseUid || matchedUser?.id;
+      if (targetUid) {
+        await grantAdminInFirestore({
+          uid: targetUid,
+          email: targetEmail,
+          name: matchedUser?.name,
+          grantedBy: firebaseDiag.session.uid || currentUser.id,
+        }).catch(() => undefined);
+      }
       setPromoteEmail('');
       const response = await apiRequest<{ success: boolean; data: AdminUser[] }>('/api/owner/admins');
       setAdmins(response.data || []);
-      flash('Usuario promovido a administrador.');
-      await loadCore();
+      flash('Usuario promovido a administrador en servidor y Firestore.');
+      await Promise.all([loadCore(), refreshDbMonitoring()]);
     } catch (requestError) {
       handleError(requestError);
     }
@@ -815,15 +1178,36 @@ export const AdminPanelView: React.FC = () => {
   const createAdmin = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
+      const fbProvision = await provisionFirebaseUserAsAdmin({
+        email: newAdmin.email,
+        password: newAdmin.password,
+        name: newAdmin.name,
+      });
       await apiRequest('/api/owner/admins', {
         method: 'POST',
-        body: JSON.stringify({ mode: 'create', ...newAdmin }),
+        body: JSON.stringify({
+          mode: 'create',
+          ...newAdmin,
+          firebaseUid: fbProvision.ok ? fbProvision.uid : undefined,
+        }),
       });
+      if (fbProvision.ok) {
+        await grantAdminInFirestore({
+          uid: fbProvision.uid,
+          email: newAdmin.email.trim().toLowerCase(),
+          name: newAdmin.name.trim(),
+          grantedBy: firebaseDiag.session.uid || currentUser.id,
+        }).catch(() => undefined);
+      }
       setNewAdmin({ name: '', email: '', password: '' });
       const response = await apiRequest<{ success: boolean; data: AdminUser[] }>('/api/owner/admins');
       setAdmins(response.data || []);
-      flash('Cuenta de administrador creada.');
-      await loadCore();
+      flash(
+        fbProvision.ok
+          ? 'Cuenta de administrador creada en servidor, Firebase Auth y Firestore.'
+          : 'Cuenta de administrador creada en servidor.',
+      );
+      await Promise.all([loadCore(), refreshDbMonitoring()]);
     } catch (requestError) {
       handleError(requestError);
     }
@@ -839,10 +1223,12 @@ export const AdminPanelView: React.FC = () => {
         setActionLoading(true);
         try {
           await apiRequest(`/api/owner/admins/${encodeURIComponent(admin.id)}`, { method: 'DELETE' });
+          const targetUid = admin.firebaseUid || admin.id;
+          await revokeAdminInFirestore(targetUid).catch(() => undefined);
           const response = await apiRequest<{ success: boolean; data: AdminUser[] }>('/api/owner/admins');
           setAdmins(response.data || []);
-          flash('Rol de administrador revocado.');
-          await loadCore();
+          flash('Rol de administrador revocado en servidor y Firestore.');
+          await Promise.all([loadCore(), refreshDbMonitoring()]);
           setConfirmDialog(null);
         } catch (requestError) {
           handleError(requestError);
@@ -899,11 +1285,15 @@ export const AdminPanelView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] font-bold text-rose-400">
             <ShieldCheck className="w-3.5 h-3.5" />
-            Control del portal
+            {isOwnerUser ? 'Superusuario · Monitoreo y Soporte' : 'Control del portal'}
           </div>
-          <h1 className="font-display text-3xl font-black tracking-tight mt-2">Panel de administración</h1>
+          <h1 className="font-display text-3xl font-black tracking-tight mt-2">
+            {isOwnerUser ? 'Centro de Superusuario Daemon' : 'Panel de administración'}
+          </h1>
           <p className="text-sm text-slate-400 mt-1.5">
-            Gestiona usuarios, modera la comunidad y supervisa la seguridad de TakeVault Pro.
+            {isOwnerUser
+              ? 'Supervisa la base de datos en Firestore, activa o desactiva casillas y gestiona usuarios y soporte.'
+              : 'Gestiona usuarios, modera la comunidad y supervisa la seguridad de TakeVault Pro.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
@@ -936,10 +1326,11 @@ export const AdminPanelView: React.FC = () => {
             onClick={() => {
               void loadCore();
               void checkFirestore();
+              void refreshDbMonitoring();
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading || firestoreStatus.loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || firestoreStatus.loading || loadingDbSnapshot ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
         </div>
@@ -1229,9 +1620,360 @@ export const AdminPanelView: React.FC = () => {
                   </p>
                 </div>
               </section>
+
+              <section className={`${cardClass} p-5 space-y-4`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-rose-400" />
+                    <h2 className="font-display text-lg font-black tracking-tight">Auditoría e Integridad BD</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refreshDbMonitoring()}
+                    disabled={loadingDbSnapshot}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loadingDbSnapshot ? 'animate-spin' : ''}`} />
+                    Auditar BD
+                  </button>
+                </div>
+
+                {dbSnapshot ? (
+                  <div className="space-y-2.5 text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <span className="text-[10px] text-slate-400 block">Docs users</span>
+                        <span className="text-sm font-bold text-white">{dbSnapshot.totalUsers}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <span className="text-[10px] text-slate-400 block">Docs users_public</span>
+                        <span className="text-sm font-bold text-white">{dbSnapshot.totalPublicProfiles}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <span className="text-[10px] text-slate-400 block">Admins Firestore</span>
+                        <span className="text-sm font-bold text-emerald-400">{dbSnapshot.totalAdmins}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                        <span className="text-[10px] text-slate-400 block">Tickets soporte</span>
+                        <span className="text-sm font-bold text-sky-400">
+                          {Math.max(dbSnapshot.totalSupportTickets, mergedTickets.length)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Listas personales en Daemon</span>
+                      <span className={`font-bold ${dbSnapshot.monitorLeakedCount > 0 ? 'text-amber-300' : 'text-emerald-400'}`}>
+                        {dbSnapshot.monitorLeakedCount === 0
+                          ? '0 (Aislamiento limpio)'
+                          : `${dbSnapshot.monitorLeakedCount} infiltrada(s)`}
+                      </span>
+                    </div>
+
+                    {(dbSnapshot.missingPublicProfiles > 0 || dbSnapshot.missingPrivateInfos > 0) && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] leading-relaxed">
+                        Desincronizaciones detectadas: {dbSnapshot.missingPublicProfiles} sin perfil público ·{' '}
+                        {dbSnapshot.missingPrivateInfos} sin private/info.
+                      </div>
+                    )}
+
+                    {isOwnerUser && (
+                      <button
+                        type="button"
+                        onClick={() => void handleCleanupMonitorLibrary()}
+                        disabled={cleaningMonitor}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-200 font-bold text-xs transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {cleaningMonitor
+                          ? 'Limpiando lista de Daemon...'
+                          : 'Limpiar películas infiltradas en Daemon'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">Pulsa «Auditar BD» para consultar el estado en Firestore.</p>
+                )}
+              </section>
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'modules' && (
+        <div className="space-y-6">
+          <div className={`${cardClass} p-5 space-y-5`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-rose-400" />
+                  <h2 className="font-display text-lg font-black tracking-tight">
+                    Control de Casillas del Sistema (Módulos)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Activa o desactiva casillas visibles para los usuarios. Se sincroniza en vivo con Firestore (`system_config/portal_settings`).
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModulesDraft({ ...DEFAULT_PORTAL_MODULES })}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Activar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setModulesDraft({
+                      explorar: true,
+                      match: false,
+                      miLista: true,
+                      estadisticas: false,
+                      ruleta: false,
+                      asistenteIA: false,
+                      addTitle: false,
+                      comentarios: true,
+                      soporte: true,
+                    })
+                  }
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Solo esenciales
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {MODULE_CHECKBOX_ITEMS.map((item) => (
+                <label
+                  key={item.key}
+                  className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
+                    modulesDraft[item.key]
+                      ? 'bg-emerald-500/[0.06] border-emerald-500/30'
+                      : 'bg-white/[0.02] border-white/10 opacity-75'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(modulesDraft[item.key])}
+                    onChange={(e) =>
+                      setModulesDraft((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                    }
+                    className="mt-0.5 rounded accent-rose-600"
+                  />
+                  <span>
+                    <span className="block text-xs font-bold text-white">{item.label}</span>
+                    <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">{item.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className={`${cardClass} p-5 space-y-5`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-amber-400" />
+                  <h2 className="font-display text-lg font-black tracking-tight">
+                    Casillas de Calificación y Ficha Personal
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Elige exactamente qué casillas aparecen cuando un usuario clasifica una película o serie.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRatingBoxesDraft({ ...DEFAULT_RATING_BOXES })}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Marcar todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRatingBoxesDraft({
+                      stars: true,
+                      evaluation: true,
+                      critique: true,
+                      detailedAxes: false,
+                      wouldRewatch: false,
+                      watchedDate: true,
+                      watchPlatform: true,
+                      favoriteMoment: false,
+                      shortVerdict: false,
+                      favoriteCharacter: false,
+                      quote: false,
+                      recommendation: true,
+                      moodRecommendation: false,
+                      tags: true,
+                    })
+                  }
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Calificación rápida
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {RATING_BOX_ITEMS.map((item) => (
+                <label
+                  key={item.key}
+                  className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
+                    ratingBoxesDraft[item.key]
+                      ? 'bg-rose-500/[0.06] border-rose-500/30'
+                      : 'bg-white/[0.02] border-white/10 opacity-75'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(ratingBoxesDraft[item.key])}
+                    onChange={(e) =>
+                      setRatingBoxesDraft((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                    }
+                    className="mt-0.5 rounded accent-rose-600"
+                  />
+                  <span>
+                    <span className="block text-xs font-bold text-white">{item.label}</span>
+                    <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">{item.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                disabled={savingModules}
+                onClick={() => void handleSaveModulesAndBoxes()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white text-sm font-bold transition-all disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                {savingModules ? 'Guardando en Firestore...' : 'Guardar casillas en Firestore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'support' && (
+        <section className={`${cardClass} p-5 space-y-4`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-sky-400" />
+                <h2 className="font-display text-lg font-black tracking-tight">Bandeja de Soporte y Monitoreo</h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Tickets en tiempo real de Firestore (`support_tickets`) combinados con solicitudes del servidor.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs font-bold">
+              {mergedTickets.filter((t) => t.status === 'abierto' || t.status === 'en_revision').length} pendiente(s)
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {mergedTickets.map((ticket) => {
+              const draft = ticketDrafts[ticket.id] || {
+                status: ticket.status,
+                adminNote: ticket.adminNote || '',
+              };
+              const statusBadgeClass =
+                ticket.status === 'resuelto' || ticket.status === 'cerrado'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : ticket.status === 'en_revision'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+
+              return (
+                <div key={ticket.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-bold text-white">{ticket.subject}</h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusBadgeClass}`}>
+                          {ticket.status}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-white/5 text-slate-300 border border-white/10">
+                          Prioridad: {ticket.priority}
+                        </span>
+                        {ticket.source && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-sky-500/10 text-sky-300 border border-sky-500/20">
+                            {ticket.source === 'both' ? 'Firestore + Servidor' : ticket.source}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {ticket.name} ({ticket.email}) · {formatDate(ticket.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-200 bg-[#0A0A0B] border border-white/5 rounded-xl p-3 whitespace-pre-wrap">
+                    {ticket.message}
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 items-center">
+                    <select
+                      value={draft.status}
+                      onChange={(e) =>
+                        setTicketDrafts((prev) => ({
+                          ...prev,
+                          [ticket.id]: { ...draft, status: e.target.value as SupportTicketStatus },
+                        }))
+                      }
+                      className={inputClass}
+                      aria-label={`Estado de ticket ${ticket.subject}`}
+                    >
+                      <option value="abierto">Abierto</option>
+                      <option value="en_revision">En revisión</option>
+                      <option value="resuelto">Resuelto</option>
+                      <option value="cerrado">Cerrado</option>
+                    </select>
+                    <input
+                      value={draft.adminNote}
+                      onChange={(e) =>
+                        setTicketDrafts((prev) => ({
+                          ...prev,
+                          [ticket.id]: { ...draft, adminNote: e.target.value },
+                        }))
+                      }
+                      placeholder="Nota interna / resolución de Daemon..."
+                      className={`${inputClass} md:col-span-2`}
+                    />
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        disabled={savingTicketId === ticket.id}
+                        onClick={() => void handleSaveTicket(ticket)}
+                        className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                      >
+                        {savingTicketId === ticket.id ? 'Guardando...' : 'Guardar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteTicket(ticket)}
+                        className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300"
+                        title="Eliminar ticket"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {mergedTickets.length === 0 && (
+              <EmptyState message="No hay tickets de soporte registrados por el momento." />
+            )}
+          </div>
+        </section>
       )}
 
       {activeTab === 'catalog' && (
@@ -1456,6 +2198,14 @@ export const AdminPanelView: React.FC = () => {
             </select>
             <button
               type="button"
+              onClick={() => setShowCreateUserForm((v) => !v)}
+              className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-colors md:w-auto"
+            >
+              <UserPlus className="w-4 h-4" />
+              {showCreateUserForm ? 'Cerrar formulario' : 'Nuevo usuario'}
+            </button>
+            <button
+              type="button"
               onClick={() => void handleSyncUsers()}
               disabled={isSyncingUsers}
               className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 transition-colors disabled:opacity-50 md:w-auto"
@@ -1465,6 +2215,75 @@ export const AdminPanelView: React.FC = () => {
               {isSyncingUsers ? 'Sincronizando...' : 'Sincronizar'}
             </button>
           </div>
+
+          {showCreateUserForm && (
+            <form
+              onSubmit={handleCreateUserFromAdmin}
+              className="p-4 rounded-2xl bg-[#0A0A0B] border border-rose-500/30 space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Crear usuario directo en Firebase Auth + Firestore</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Provisiona la cuenta en Firebase Authentication, `users/{'{uid}'}`, `users_public/{'{uid}'}`, `private/info` y el servidor sin cerrar tu sesión de Daemon.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                <input
+                  value={newUserForm.name}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nombre completo *"
+                  className={inputClass}
+                  required
+                />
+                <input
+                  value={newUserForm.username}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, username: e.target.value }))}
+                  placeholder="@usuario (opcional)"
+                  className={inputClass}
+                />
+                <input
+                  type="email"
+                  value={newUserForm.email}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@ejemplo.com *"
+                  className={inputClass}
+                  required
+                />
+                <input
+                  type="password"
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="Contraseña (min. 8 caracteres) *"
+                  className={inputClass}
+                  autoComplete="new-password"
+                  required
+                />
+                <div className="flex gap-2">
+                  {isOwnerUser && (
+                    <select
+                      value={newUserForm.role}
+                      onChange={(e) =>
+                        setNewUserForm((prev) => ({ ...prev, role: e.target.value as 'user' | 'admin' }))
+                      }
+                      className={inputClass}
+                    >
+                      <option value="user">Usuario</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={creatingUser}
+                    className="shrink-0 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold disabled:opacity-50"
+                  >
+                    {creatingUser ? 'Creando...' : 'Crear'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
 
           <p className="text-[10px] text-slate-500 leading-relaxed">
             El panel lee los usuarios directamente de Firestore. «Sincronizar» vuelve a traerlos y
@@ -1479,13 +2298,20 @@ export const AdminPanelView: React.FC = () => {
                   <th className="py-2.5 pr-3 font-bold">Usuario</th>
                   <th className="py-2.5 pr-3 font-bold">Rol</th>
                   <th className="py-2.5 pr-3 font-bold">Estado</th>
+                  <th className="py-2.5 pr-3 font-bold">Firebase BD</th>
                   <th className="py-2.5 pr-3 font-bold">Sesiones</th>
                   <th className="py-2.5 pr-3 font-bold">Último acceso</th>
                   <th className="py-2.5 font-bold text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {filteredUsers.map((user) => {
+                  const dbEntry = dbSnapshot?.users.find(
+                    (d) =>
+                      d.uid === (user.firebaseUid || user.id) ||
+                      (user.email && d.email.toLowerCase() === user.email.toLowerCase()),
+                  );
+                  return (
                   <tr key={user.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                     <td className="py-3 pr-3">
                       <button
@@ -1521,6 +2347,26 @@ export const AdminPanelView: React.FC = () => {
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300">
                           <CheckCircle2 className="w-3 h-3" /> Activo
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3">
+                      {dbEntry ? (
+                        <div className="space-y-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300">
+                            <Database className="w-3 h-3" /> Firestore OK
+                          </span>
+                          <p className="text-[10px] text-slate-500">
+                            {dbEntry.classificationsCount} tit. · {dbEntry.hasPublicDoc ? 'público OK' : 'sin público'}
+                          </p>
+                        </div>
+                      ) : user.firebaseUid || user.syncedWithFirebase ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-300">
+                          <Cloud className="w-3 h-3" /> Vinculado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300">
+                          <AlertTriangle className="w-3 h-3" /> Solo servidor
                         </span>
                       )}
                     </td>
@@ -1568,7 +2414,8 @@ export const AdminPanelView: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {filteredUsers.length === 0 && <EmptyState message="No hay usuarios que coincidan con el filtro." />}

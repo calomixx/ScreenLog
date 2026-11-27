@@ -33,8 +33,9 @@ import {
   Loader2,
   RefreshCw
 } from 'lucide-react';
-import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag } from '../types';
+import { MediaItem, UserReview, WatchStatus, RewatchChoice, EvaluationTag, isSystemMonitorUser } from '../types';
 import { useMedia } from '../context/MediaContext';
+import { useAuth } from '../context/AuthContext';
 import { RatingStars } from './RatingStars';
 import { WatchProvidersTab } from './WatchProvidersTab';
 import { getMediaTypeLabel } from '../lib/mediaLabels';
@@ -166,7 +167,11 @@ export const DetailModal: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const { settings } = useAuth();
   const isCatalogAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner';
+  const isMonitor = isSystemMonitorUser(currentUser);
+  const ratingBoxes = settings.ratingBoxes;
+  const commentsEnabled = settings.modules?.comentarios !== false && settings.communityCommentsEnabled !== false;
 
   // Tab scroll position preservation & body scroll-lock
   const contentContainerRef = useRef<HTMLDivElement>(null);
@@ -595,72 +600,90 @@ export const DetailModal: React.FC = () => {
                 </div>
 
                 {/* Status Action Selector integrated into movie header */}
-                <div 
-                  id="detail-modal-status-selector"
-                  className="mt-2.5 sm:mt-3 flex items-center gap-1.5 flex-wrap group/status"
-                >
-                  <span className="text-xs font-semibold text-slate-300 mr-1 hidden sm:inline select-none drop-shadow">
-                    Tu estado:
-                  </span>
-                  {STATUS_OPTIONS.map((item) => {
-                    const isSelected = currentReview?.status === item.id;
-                    const hasSelected = Boolean(currentReview?.status);
-                    const isShrunk = hasSelected && !isSelected;
-                    const Icon = item.icon;
-                    const displayLabel = isSelected && item.id === 'terminada' ? 'Terminada' : item.label;
+                {isMonitor ? (
+                  <div className="mt-2.5 sm:mt-3 flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      Modo Superusuario Monitor (sin lista personal)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('trailer')}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white flex items-center gap-1.5 shadow-md shadow-rose-950/60 hover:scale-105 active:scale-95 transition-all ml-auto sm:ml-1"
+                      title="Ver Tráiler Oficial"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white flex-shrink-0" />
+                      <span>Ver Tráiler</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    id="detail-modal-status-selector"
+                    className="mt-2.5 sm:mt-3 flex items-center gap-1.5 flex-wrap group/status"
+                  >
+                    <span className="text-xs font-semibold text-slate-300 mr-1 hidden sm:inline select-none drop-shadow">
+                      Tu estado:
+                    </span>
+                    {STATUS_OPTIONS.map((item) => {
+                      const isSelected = currentReview?.status === item.id;
+                      const hasSelected = Boolean(currentReview?.status);
+                      const isShrunk = hasSelected && !isSelected;
+                      const Icon = item.icon;
+                      const displayLabel = isSelected && item.id === 'terminada' ? 'Terminada' : item.label;
 
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleStatusClick(item.id)}
-                        title={
-                          isSelected 
-                            ? `${item.label} (activo • clic para desmarcar)` 
-                            : `Marcar como ${item.label}`
-                        }
-                        className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
-                          isSelected
-                            ? `${item.activeClass} px-3 py-1.5 z-10 border ${item.activeBorder}`
-                            : isShrunk
-                              ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} hover:px-3 hover:bg-black/80`
-                              : `px-3 py-1.5 text-slate-200 bg-black/60 border border-white/15 ${item.hoverColor} hover:bg-black/80`
-                        }`}
-                      >
-                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'scale-110' : ''}`} />
-                        <span
-                          className={`whitespace-nowrap overflow-hidden ${
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleStatusClick(item.id)}
+                          title={
+                            isSelected 
+                              ? `${item.label} (activo • clic para desmarcar)` 
+                              : `Marcar como ${item.label}`
+                          }
+                          className={`relative text-xs font-semibold rounded-lg flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 ${
                             isSelected
-                              ? 'max-w-[140px] opacity-100 ml-1.5'
+                              ? `${item.activeClass} px-3 py-1.5 z-10 border ${item.activeBorder}`
                               : isShrunk
-                                ? 'max-w-0 opacity-0 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
-                                : 'max-w-[120px] opacity-100 ml-1.5'
+                                ? `h-7 sm:h-8 px-2 py-1.5 text-slate-300 bg-black/60 border border-white/10 ${item.hoverColor} hover:px-3 hover:bg-black/80`
+                                : `px-3 py-1.5 text-slate-200 bg-black/60 border border-white/15 ${item.hoverColor} hover:bg-black/80`
                           }`}
                         >
-                          {displayLabel}
-                        </span>
-                        {isSelected && (
-                          <span 
-                            className="ml-1.5 text-[10px] opacity-70 hover:opacity-100 hover:text-black font-bold hidden sm:inline"
-                            title="Desmarcar"
+                          <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'scale-110' : ''}`} />
+                          <span
+                            className={`whitespace-nowrap overflow-hidden ${
+                              isSelected
+                                ? 'max-w-[140px] opacity-100 ml-1.5'
+                                : isShrunk
+                                  ? 'max-w-0 opacity-0 hover:max-w-[120px] hover:opacity-100 hover:ml-1.5'
+                                  : 'max-w-[120px] opacity-100 ml-1.5'
+                            }`}
                           >
-                            ×
+                            {displayLabel}
                           </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                          {isSelected && (
+                            <span 
+                              className="ml-1.5 text-[10px] opacity-70 hover:opacity-100 hover:text-black font-bold hidden sm:inline"
+                              title="Desmarcar"
+                            >
+                              ×
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
 
-                  {/* Quick Trailer Button directly in header banner */}
-                  <button
-                    type="button"
-                    onClick={() => handleTabChange('trailer')}
-                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white flex items-center gap-1.5 shadow-md shadow-rose-950/60 hover:scale-105 active:scale-95 transition-all ml-auto sm:ml-1"
-                    title="Ver Tráiler Oficial"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white flex-shrink-0" />
-                    <span>Ver Tráiler</span>
-                  </button>
-                </div>
+                    {/* Quick Trailer Button directly in header banner */}
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('trailer')}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white flex items-center gap-1.5 shadow-md shadow-rose-950/60 hover:scale-105 active:scale-95 transition-all ml-auto sm:ml-1"
+                      title="Ver Tráiler Oficial"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white flex-shrink-0" />
+                      <span>Ver Tráiler</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -695,20 +718,22 @@ export const DetailModal: React.FC = () => {
               <span>Tráiler</span>
             </button>
 
-            <button
-              onClick={() => handleTabChange('resena')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-                activeTab === 'resena' 
-                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-              }`}
-            >
-              <Edit3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>Mi Reseña</span>
-              {currentReview?.status === 'terminada' && (
-                <span className="text-amber-400 text-xs">⭐</span>
-              )}
-            </button>
+            {!isMonitor && (
+              <button
+                onClick={() => handleTabChange('resena')}
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                  activeTab === 'resena' 
+                    ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                    : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <Edit3 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>Mi Reseña</span>
+                {currentReview?.status === 'terminada' && (
+                  <span className="text-amber-400 text-xs">⭐</span>
+                )}
+              </button>
+            )}
 
             <button
               onClick={() => handleTabChange('votaciones')}
@@ -738,20 +763,22 @@ export const DetailModal: React.FC = () => {
               )}
             </button>
 
-            <button
-              onClick={() => handleTabChange('comentarios')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-                activeTab === 'comentarios' 
-                  ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
-                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 text-purple-400 flex-shrink-0" />
-              <span>Comentarios</span>
-              <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-white/10 text-slate-300 font-bold">
-                {selectedMedia.comments.length}
-              </span>
-            </button>
+            {commentsEnabled && (
+              <button
+                onClick={() => handleTabChange('comentarios')}
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                  activeTab === 'comentarios' 
+                    ? 'bg-rose-600/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm shadow-rose-950/40' 
+                    : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <span>Comentarios</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-white/10 text-slate-300 font-bold">
+                  {selectedMedia.comments.length}
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Tab Body Content Area */}
@@ -979,8 +1006,8 @@ export const DetailModal: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 2: MI RESEÑA PERSONAL (All requested fields) */}
-          {activeTab === 'resena' && (
+          {/* TAB 2: MI RESEÑA PERSONAL (All requested fields controlled by Daemon ratingBoxes) */}
+          {activeTab === 'resena' && !isMonitor && (
             <div className="space-y-6">
               <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-600/10 via-[#161618] to-[#161618] border border-rose-500/20 flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
@@ -1019,60 +1046,67 @@ export const DetailModal: React.FC = () => {
                   </div>
 
                   {/* Rating Stars */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                      Calificación (Estrellas 1 - 5)
-                    </label>
-                    <div className="flex items-center gap-3 bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2">
-                      <RatingStars
-                        rating={reviewForm.stars}
-                        interactive={true}
-                        size="lg"
-                        precision={0.5}
-                        onChange={(stars) => setReviewForm({ ...reviewForm, stars })}
-                      />
+                  {ratingBoxes?.stars !== false && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                        Calificación (Estrellas 1 - 5)
+                      </label>
+                      <div className="flex items-center gap-3 bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2">
+                        <RatingStars
+                          rating={reviewForm.stars}
+                          interactive={true}
+                          size="lg"
+                          precision={0.5}
+                          onChange={(stars) => setReviewForm({ ...reviewForm, stars })}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Evaluación Tag Preset */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                    Evaluación General
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {EVALUATION_PRESETS.map((evalPreset) => (
-                      <button
-                        type="button"
-                        key={evalPreset}
-                        onClick={() => setReviewForm({ ...reviewForm, evaluation: evalPreset })}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${
-                          reviewForm.evaluation === evalPreset
-                            ? 'bg-rose-600/20 text-rose-300 border-rose-500/50 font-bold'
-                            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
-                        }`}
-                      >
-                        {evalPreset}
-                      </button>
-                    ))}
+                {ratingBoxes?.evaluation !== false && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Evaluación General
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {EVALUATION_PRESETS.map((evalPreset) => (
+                        <button
+                          type="button"
+                          key={evalPreset}
+                          onClick={() => setReviewForm({ ...reviewForm, evaluation: evalPreset })}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${
+                            reviewForm.evaluation === evalPreset
+                              ? 'bg-rose-600/20 text-rose-300 border-rose-500/50 font-bold'
+                              : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          {evalPreset}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Crítica / Opinión */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                    Crítica / Opinión Personal
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={reviewForm.critique}
-                    onChange={(e) => setReviewForm({ ...reviewForm, critique: e.target.value })}
-                    placeholder="Escribe tu análisis, qué te pareció el guión, actuaciones, fotografía o sensaciones que te dejó..."
-                    className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 leading-relaxed"
-                  />
-                </div>
+                {ratingBoxes?.critique !== false && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                      Crítica / Opinión Personal
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={reviewForm.critique}
+                      onChange={(e) => setReviewForm({ ...reviewForm, critique: e.target.value })}
+                      placeholder="Escribe tu análisis, qué te pareció el guión, actuaciones, fotografía o sensaciones que te dejó..."
+                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/30 leading-relaxed"
+                    />
+                  </div>
+                )}
 
                 {/* Submit user breakdown vote (Moved from Votaciones to Reseña) */}
+                {ratingBoxes?.detailedAxes !== false && (
                 <div className="p-5 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-300 uppercase">
@@ -1141,6 +1175,7 @@ export const DetailModal: React.FC = () => {
                     {hasVotedDetailed ? 'Voto Detallado Enviado' : 'Enviar Calificación Detallada'}
                   </button>
                 </div>
+                )}
 
                 {/* Metadata Row: Año, Director, Fecha en que la vi */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1168,21 +1203,25 @@ export const DetailModal: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-                      Fecha en que la vi
-                    </label>
-                    <input
-                      type="date"
-                      value={reviewForm.watchedDate}
-                      onChange={(e) => setReviewForm({ ...reviewForm, watchedDate: e.target.value })}
-                      className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
-                    />
-                  </div>
+                  {ratingBoxes?.watchedDate !== false && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                        Fecha en que la vi
+                      </label>
+                      <input
+                        type="date"
+                        value={reviewForm.watchedDate}
+                        onChange={(e) => setReviewForm({ ...reviewForm, watchedDate: e.target.value })}
+                        className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Dónde la vi (Plataforma) & ¿La volvería a ver? */}
+                {(ratingBoxes?.watchPlatform !== false || ratingBoxes?.wouldRewatch !== false) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {ratingBoxes?.watchPlatform !== false && (
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center justify-between">
                       <span>Dónde la vi (Plataforma)</span>
@@ -1241,7 +1280,9 @@ export const DetailModal: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  )}
 
+                  {ratingBoxes?.wouldRewatch !== false && (
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
                       ¿La volvería a ver?
@@ -1264,9 +1305,12 @@ export const DetailModal: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
 
                 {/* ¿La recomiendas a otros cinéfilos? */}
+                {ratingBoxes?.recommendation !== false && (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
                     <ThumbsUp className="w-3.5 h-3.5 text-rose-400" />
@@ -1294,8 +1338,10 @@ export const DetailModal: React.FC = () => {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Momento o Mood Ideal */}
+                {ratingBoxes?.moodRecommendation !== false && (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
@@ -1339,8 +1385,10 @@ export const DetailModal: React.FC = () => {
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
                   />
                 </div>
+                )}
 
                 {/* Veredicto en pocas palabras / Frase resumen */}
+                {ratingBoxes?.shortVerdict !== false && (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-rose-400" />
@@ -1354,9 +1402,12 @@ export const DetailModal: React.FC = () => {
                     className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
                   />
                 </div>
+                )}
 
                 {/* Personaje Favorito & Frase Memorable */}
+                {(ratingBoxes?.favoriteCharacter !== false || ratingBoxes?.quote !== false) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {ratingBoxes?.favoriteCharacter !== false && (
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-sky-400" />
@@ -1370,7 +1421,9 @@ export const DetailModal: React.FC = () => {
                       className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
                     />
                   </div>
+                  )}
 
+                  {ratingBoxes?.quote !== false && (
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
                       <Quote className="w-3.5 h-3.5 text-purple-400" />
@@ -1384,9 +1437,12 @@ export const DetailModal: React.FC = () => {
                       className="w-full bg-[#0A0A0B] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
                     />
                   </div>
+                  )}
                 </div>
+                )}
 
                 {/* Etiquetas de Sensaciones Cinéfilas */}
+                {ratingBoxes?.tags !== false && (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
                     <Tag className="w-3.5 h-3.5 text-rose-400" />
@@ -1418,6 +1474,7 @@ export const DetailModal: React.FC = () => {
                     })}
                   </div>
                 </div>
+                )}
 
                 {/* Save review button */}
                 <div className="pt-2 flex items-center justify-end gap-3">
@@ -1528,9 +1585,10 @@ export const DetailModal: React.FC = () => {
           )}
 
           {/* TAB 4: COMENTARIOS DE LA COMUNIDAD */}
-          {activeTab === 'comentarios' && (
+          {activeTab === 'comentarios' && commentsEnabled && (
             <div className="space-y-6">
               {/* Add comment form */}
+              {!isMonitor && (
               <form onSubmit={handleAddComment} className="p-4 rounded-2xl bg-[#0A0A0B] border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-300 uppercase">
@@ -1567,6 +1625,7 @@ export const DetailModal: React.FC = () => {
                   </button>
                 </div>
               </form>
+              )}
 
               {/* Comment list */}
               <div className="space-y-3">

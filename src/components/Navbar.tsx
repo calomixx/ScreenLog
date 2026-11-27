@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useMedia, AppTab } from '../context/MediaContext';
 import { ROLE_LABELS, useAuth } from '../context/AuthContext';
+import { isSystemMonitorUser } from '../types';
 import { LogoLockup } from './Logo';
 
 interface TabDef {
@@ -64,8 +65,10 @@ export const Navbar: React.FC = () => {
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const { exitToPublic } = useAuth();
+  const { exitToPublic, settings } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+  const isMonitor = isSystemMonitorUser(currentUser);
+  const modules = settings.modules;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -92,22 +95,26 @@ export const Navbar: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isMoreOpen]);
 
-  const tabs: TabDef[] = currentUser
-    ? [
-        { id: 'sistema', label: 'Mi Sala', icon: Home },
-        { id: 'explorar', label: 'Explorar', icon: Compass },
-        { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
-        { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
-        { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
-        ...(isStaffUser ? [{ id: 'admin' as AppTab, label: 'Admin', icon: UserCog, staffOnly: true }] : []),
-      ]
-    : [
-        { id: 'sistema', label: 'Mi Sala', icon: Home },
-        { id: 'explorar', label: 'Explorar', icon: Compass },
-        { id: 'recomendados', label: 'CineMatch', shortLabel: 'Match', icon: Sparkles },
-        { id: 'mi_lista', label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length },
-        { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 },
-      ];
+  const baseUserTabs: TabDef[] = [
+    { id: 'sistema', label: 'Mi Sala', icon: Home },
+    ...(modules?.explorar !== false ? [{ id: 'explorar' as AppTab, label: 'Explorar', icon: Compass }] : []),
+    ...(modules?.match !== false ? [{ id: 'recomendados' as AppTab, label: 'CineMatch', shortLabel: 'Match', icon: Sparkles }] : []),
+    ...(modules?.miLista !== false
+      ? [{ id: 'mi_lista' as AppTab, label: 'Mi Lista', icon: Bookmark, badge: myListEntries.length }]
+      : []),
+    ...(modules?.estadisticas !== false
+      ? [{ id: 'estadisticas' as AppTab, label: 'Estadísticas', shortLabel: 'Stats', icon: BarChart3 }]
+      : []),
+    ...(isStaffUser ? [{ id: 'admin' as AppTab, label: 'Admin', icon: UserCog, staffOnly: true }] : []),
+  ];
+
+  const monitorTabs: TabDef[] = [
+    { id: 'admin', label: 'Monitoreo', icon: ShieldCheck, staffOnly: true },
+    { id: 'explorar', label: 'Catálogo', icon: Compass },
+    { id: 'cuenta', label: 'Monitor', icon: UserIcon, authOnly: true },
+  ];
+
+  const tabs: TabDef[] = isMonitor ? monitorTabs : baseUserTabs;
 
   // En móvil mostramos 5 accesos principales y agrupamos el resto en "Más".
   const mobilePrimaryTabs: TabDef[] = tabs.slice(0, 5);
@@ -137,7 +144,7 @@ export const Navbar: React.FC = () => {
   };
 
   const handleGoHome = () => {
-    setActiveTab('sistema');
+    setActiveTab(isMonitor ? 'admin' : 'sistema');
     setSelectedMediaId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     try { window.history.replaceState(null, '', window.location.pathname); } catch {}
@@ -146,7 +153,7 @@ export const Navbar: React.FC = () => {
   const handleTabClick = (tabId: AppTab) => {
     setSelectedMediaId(null);
     if (tabId === 'landing' || tabId === 'sistema') {
-      setActiveTab('sistema');
+      setActiveTab(isMonitor ? 'admin' : 'sistema');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       try { window.history.replaceState(null, '', window.location.pathname); } catch {}
       return;
@@ -329,28 +336,32 @@ export const Navbar: React.FC = () => {
                 <Search className="w-4 h-4" />
               </button>
 
-              <button
-                type="button"
-                onClick={() => openAssistant()}
-                className="hidden sm:inline-flex p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-rose-300 transition-colors"
-                title="Asistente IA"
-                aria-label="Abrir asistente IA"
-              >
-                <Bot className="w-4 h-4" />
-              </button>
+              {!isMonitor && modules?.asistenteIA !== false && (
+                <button
+                  type="button"
+                  onClick={() => openAssistant()}
+                  className="hidden sm:inline-flex p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-rose-300 transition-colors"
+                  title="Asistente IA"
+                  aria-label="Abrir asistente IA"
+                >
+                  <Bot className="w-4 h-4" />
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => openRoulette()}
-                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-rose-500/25 text-amber-300 hover:text-white border border-amber-500/35 text-xs font-bold transition-all shadow-sm active:scale-95"
-                title="¿Qué Veo Hoy? Ruleta de azar cinéfilo"
-                aria-label="Abrir ruleta ¿Qué Veo Hoy?"
-              >
-                <Dices className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="hidden 2xl:inline">¿Qué veo hoy?</span>
-              </button>
+              {!isMonitor && modules?.ruleta !== false && (
+                <button
+                  type="button"
+                  onClick={() => openRoulette()}
+                  className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-rose-500/25 text-amber-300 hover:text-white border border-amber-500/35 text-xs font-bold transition-all shadow-sm active:scale-95"
+                  title="¿Qué Veo Hoy? Ruleta de azar cinéfilo"
+                  aria-label="Abrir ruleta ¿Qué Veo Hoy?"
+                >
+                  <Dices className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="hidden 2xl:inline">¿Qué veo hoy?</span>
+                </button>
+              )}
 
-              {currentUser ? (
+              {modules?.addTitle !== false && (currentUser ? (
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(true)}
@@ -372,7 +383,7 @@ export const Navbar: React.FC = () => {
                   <span className="hidden 2xl:inline">Añadir Título</span>
                   
                 </button>
-              )}
+              ))}
 
               {currentUser ? (
                 <>
@@ -411,18 +422,24 @@ export const Navbar: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="py-2.5 space-y-1 text-xs text-slate-300 border-b border-white/5">
-                        <div className="flex justify-between py-0.5 px-1">
-                          <span className="text-slate-400">En mi lista</span>
-                          <span className="font-semibold text-white">{myListEntries.length} títulos</span>
+                      {isMonitor ? (
+                        <div className="py-2 px-2.5 my-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-200">
+                          Superusuario · Monitoreo BD & Soporte
                         </div>
-                        <div className="flex justify-between py-0.5 px-1">
-                          <span className="text-slate-400">Terminadas</span>
-                          <span className="font-semibold text-amber-400">
-                            {myListEntries.filter((entry) => entry.review.status === 'terminada').length}
-                          </span>
+                      ) : (
+                        <div className="py-2.5 space-y-1 text-xs text-slate-300 border-b border-white/5">
+                          <div className="flex justify-between py-0.5 px-1">
+                            <span className="text-slate-400">En mi lista</span>
+                            <span className="font-semibold text-white">{myListEntries.length} títulos</span>
+                          </div>
+                          <div className="flex justify-between py-0.5 px-1">
+                            <span className="text-slate-400">Terminadas</span>
+                            <span className="font-semibold text-amber-400">
+                              {myListEntries.filter((entry) => entry.review.status === 'terminada').length}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div className="py-2 space-y-1">
                         <button

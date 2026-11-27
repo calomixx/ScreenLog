@@ -5,3 +5,5 @@ export * from './lists';
 export * from './libraryBridge';
 export * from './migration';
 export * from './diagnostics';
+export * from './systemConfig';
+export * from './support';

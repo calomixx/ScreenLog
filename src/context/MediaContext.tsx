@@ -9,6 +9,7 @@ import {
   UserProfile,
   OfflineSyncAction,
   LocalBackupData,
+  isSystemMonitorUser,
 } from '../types';
 import { INITIAL_MEDIA_LIST } from '../data/initialMedia';
 import { canEditCatalog, useAuth } from './AuthContext';
@@ -16,6 +17,7 @@ import { apiRequest, ApiError } from '../lib/api';
 import { ensureFirebaseCustomSession } from '../lib/firebaseCustomToken';
 import {
   auth,
+  doesFirebaseUserMatchAccount,
   loadCommunityReviewsFromFirestore,
   publishCommunityReviewToFirestore,
   saveCatalogMediaToFirestore,
@@ -258,12 +260,26 @@ function attachCommunityReviews(items: MediaItem[], reviews: ServerReview[]): Me
 }
 
 export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser: authUser, isWorkspaceGuest, isAuthReady, firebaseUid, firebaseLinkError, requestLogin, continueAsGuest, logout: authLogout, updateProfile: authUpdateProfile } = useAuth();
+  const {
+    currentUser: authUser,
+    isWorkspaceGuest,
+    isAuthReady,
+    firebaseUid,
+    firebaseLinkError,
+    settings,
+    requestLogin,
+    continueAsGuest,
+    logout: authLogout,
+    updateProfile: authUpdateProfile,
+  } = useAuth();
   const currentUser = authUser as UserProfile | null;
 
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => INITIAL_MEDIA_LIST);
   const [userReviews, setUserReviews] = useState<Record<string, UserReview>>({});
-  const [activeTab, setActiveTab] = useState<AppTab>(() => (currentUser || isWorkspaceGuest ? 'sistema' : 'landing'));
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    if (!currentUser && !isWorkspaceGuest) return 'landing';
+    return isSystemMonitorUser(currentUser) ? 'admin' : 'sistema';
+  });
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpenState] = useState(false);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
@@ -364,7 +380,10 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
    * nada se queda solo en el navegador cuando vuelve a entrar.
    */
   const syncLocalMediaToCloud = useCallback(async (): Promise<number> => {
-    if (!auth.currentUser?.uid) return 0;
+    if (!authUser || isSystemMonitorUser(authUser)) return 0;
+    if (!auth.currentUser?.uid || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) {
+      return 0;
+    }
     let synced = 0;
     try {
       const savedCustom = localStorage.getItem(STORAGE_CUSTOM_MEDIA_KEY);
@@ -372,6 +391,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const parsedCustom = JSON.parse(savedCustom) as MediaItem[];
         if (Array.isArray(parsedCustom)) {
           for (const item of parsedCustom) {
+            if (
+              item.createdByUserId &&
+              item.createdByUserId !== authUser.id &&
+              item.createdByUserId !== auth.currentUser.uid
+            ) {
+              continue;
+            }
             try {
               await apiRequest('/api/media', {
                 method: 'POST',
@@ -412,12 +438,13 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('No se pudo sincronizar los datos locales con la nube:', err);
     }
     return synced;
-  }, [showToast]);
+  }, [authUser, showToast]);
 
   useEffect(() => {
-    if (!isAuthReady || !auth.currentUser?.uid || !authUser) return;
+    if (!isAuthReady || !authUser || isSystemMonitorUser(authUser)) return;
+    if (!auth.currentUser?.uid || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) return;
     void syncLocalMediaToCloud();
-  }, [isAuthReady, authUser?.id, syncLocalMediaToCloud]);
+  }, [isAuthReady, authUser, firebaseUid, syncLocalMediaToCloud]);
 
   // Real-time synchronization with Firebase Firestore cloud catalog
   useEffect(() => {
@@ -447,7 +474,7 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     unlockedBadgesRef.current = null;
-    if (!authUser) {
+    if (!authUser || isSystemMonitorUser(authUser)) {
       libraryHydratedRef.current = true;
       setUserReviews({});
       return;
@@ -476,8 +503,15 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       const fbUser = auth.currentUser;
-      if (!isAuthReady || !fbUser?.uid) {
+      if (!isAuthReady || !fbUser?.uid || !doesFirebaseUserMatchAccount(fbUser, authUser)) {
         if (!cancelled) libraryHydratedRef.current = true;
+        if (!cancelled && isAuthReady && authUser && fbUser?.uid && !doesFirebaseUserMatchAccount(fbUser, authUser)) {
+          showToast(
+            'Sesión de Firebase aislada por seguridad: inicia sesión de nuevo para vincular tu lista privada.',
+            'warning',
+          );
+          return;
+        }
         // La app está logueada contra el servidor pero sin sesión de Firebase:
         // los cambios se guardan en el servidor, no en Firestore.
         if (!cancelled && isAuthReady && authUser && firebaseLinkError) {
@@ -547,12 +581,29 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   useEffect(() => {
-    if (authUser || isWorkspaceGuest) {
+    if (authUser) {
+      if (isSystemMonitorUser(authUser)) {
+        const restrictedForMonitor: AppTab[] = ['landing', 'sistema', 'mi_lista', 'estadisticas', 'recomendados', 'inicio'];
+        setActiveTab((prev) => (restrictedForMonitor.includes(prev) ? 'admin' : prev));
+      } else {
+        setActiveTab((prev) => {
+          if (prev === 'landing') return 'sistema';
+          const mods = settings?.modules;
+          if (!mods) return prev;
+          if (prev === 'explorar' && mods.explorar === false) return 'sistema';
+          if (prev === 'recomendados' && mods.match === false) return 'sistema';
+          if (prev === 'mi_lista' && mods.miLista === false) return 'sistema';
+          if (prev === 'estadisticas' && mods.estadisticas === false) return 'sistema';
+          if (prev === 'contacto' && mods.soporte === false) return 'sistema';
+          return prev;
+        });
+      }
+    } else if (isWorkspaceGuest) {
       setActiveTab((prev) => (prev === 'landing' ? 'sistema' : prev));
     } else {
       setActiveTab('landing');
     }
-  }, [authUser?.id, isWorkspaceGuest]);
+  }, [authUser, isWorkspaceGuest, settings?.modules]);
 
   const openAuthModal = useCallback(
     (mode: 'login' | 'register' = 'login') => {
@@ -640,6 +691,10 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         requestLogin();
         return;
       }
+      if (isSystemMonitorUser(authUser)) {
+        showToast('Daemon es Superusuario de Monitoreo y Soporte; no administra lista personal.', 'info');
+        return;
+      }
       const normalized: UserReview = { ...review, updatedAt: new Date().toISOString() };
       setUserReviews((prev) => ({ ...prev, [review.mediaId]: normalized }));
 
@@ -658,14 +713,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       void (async () => {
         try {
           const fb = auth.currentUser;
-          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
-            // La sesión de Firebase se abre sola con el token que firma el
-            // servidor; el usuario no tiene que hacer nada.
+          if (!doesFirebaseUserMatchAccount(fb, authUser)) {
             const session = await ensureFirebaseCustomSession();
-            if (!session.ok) {
+            if (!session.ok || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) {
               showToast(
                 `Firebase no vinculado: ${
-                  session.message || firebaseLinkError || 'no se pudo abrir la sesión.'
+                  session.message || firebaseLinkError || 'no se pudo abrir tu sesión personal.'
                 }`,
                 'warning',
               );
@@ -700,6 +753,10 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         requestLogin();
         return;
       }
+      if (isSystemMonitorUser(authUser)) {
+        showToast('Daemon opera como Superusuario de Monitoreo y Soporte (sin lista personal).', 'info');
+        return;
+      }
       const targetMedia = mediaList.find((media) => media.id === mediaId);
       if (!targetMedia) return;
       const existingReview = userReviews[mediaId];
@@ -728,13 +785,17 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         );
       }
     },
-    [authUser, mediaList, userReviews, updateUserReview, requestLogin],
+    [authUser, mediaList, userReviews, updateUserReview, requestLogin, showToast],
   );
 
   const removeFromMyList = useCallback(
     (mediaId: string) => {
       if (!authUser) {
         requestLogin();
+        return;
+      }
+      if (isSystemMonitorUser(authUser)) {
+        showToast('Daemon no posee una lista personal de títulos.', 'info');
         return;
       }
       setUserReviews((prev) => {
@@ -753,9 +814,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       void (async () => {
         try {
           const fb = auth.currentUser;
-          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
+          if (!doesFirebaseUserMatchAccount(fb, authUser)) {
             const session = await ensureFirebaseCustomSession();
-            if (!session.ok) return;
+            if (!session.ok || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) return;
           }
           await removeLibraryEntryFromFirestore(mediaId);
         } catch (err) {
@@ -785,9 +846,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const publishToFirestore = async (id: string) => {
         try {
           const fb = auth.currentUser;
-          if (!fb?.uid || fb.email?.toLowerCase() !== authUser?.email?.toLowerCase()) {
+          if (!doesFirebaseUserMatchAccount(fb, authUser)) {
             const session = await ensureFirebaseCustomSession();
-            if (!session.ok) {
+            if (!session.ok || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) {
               console.warn('Reseña sin sesión de Firebase:', session.message);
               return;
             }
@@ -1172,7 +1233,9 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       setMediaList((prev) => [newMedia, ...prev]);
-      updateMediaStatus(newMedia.id, 'pendiente');
+      if (!isSystemMonitorUser(authUser)) {
+        updateMediaStatus(newMedia.id, 'pendiente');
+      }
 
       // Keep custom titles in local storage so they are immediately available regardless of network or container reboots
       try {
@@ -1185,6 +1248,17 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (err) {
         console.warn('Could not save custom media to localStorage:', err);
       }
+
+      const persistMediaToFirestoreIfAligned = async () => {
+        if (!authUser) return false;
+        if (!doesFirebaseUserMatchAccount(auth.currentUser, authUser)) {
+          const session = await ensureFirebaseCustomSession();
+          if (!session.ok || !doesFirebaseUserMatchAccount(auth.currentUser, authUser)) {
+            return false;
+          }
+        }
+        return saveCatalogMediaToFirestore(newMedia);
+      };
 
       apiRequest('/api/media', {
         method: 'POST',
@@ -1215,12 +1289,12 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       })
         .then(() => {
-          saveCatalogMediaToFirestore(newMedia)
+          persistMediaToFirestoreIfAligned()
             .then((synced) => {
               showToast(
                 synced
-                  ? `"${newMedia.title}" guardado en tu catálogo y sincronizado en Firebase.`
-                  : `Título añadido: ${newMedia.title}.`,
+                  ? `"${newMedia.title}" guardado en el catálogo y sincronizado en Firebase.`
+                  : `Título añadido al catálogo: ${newMedia.title}.`,
                 'success',
               );
             })
@@ -1230,8 +1304,8 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             });
         })
         .catch((error) => {
-          // Even if local server fails, still try saving directly to Firestore
-          saveCatalogMediaToFirestore(newMedia).catch((err) =>
+          // Even if local server fails, still try saving directly to Firestore for matching Firebase user
+          persistMediaToFirestoreIfAligned().catch((err) =>
             console.error('Firestore catalog media fallback error:', err),
           );
           showToast(error instanceof ApiError ? error.message : 'Título guardado en tu colección.', 'info');

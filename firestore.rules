@@ -49,6 +49,12 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Superusuario de monitoreo y configuración (Daemon / owner en /admins)
+    function isSuperOwner() {
+      return isAdmin() &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'owner';
+    }
+
     // 3. Entity Validation Blueprints
     function isValidUserPublicProfile(data, userId) {
       return data.keys().hasAll(['userId', 'name', 'username', 'avatar', 'updatedAt']) &&
@@ -281,12 +287,136 @@ service cloud.firestore {
         data.addedAt is timestamp;
     }
 
+    function isValidUserPrivateInfoByAdmin(data, userId) {
+      return data.keys().hasAll(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'email', 'role', 'blocked', 'mustChangePassword', 'preferences', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId == userId && isValidId(userId) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        (!('role' in data) || (data.role is string && data.role in ['user', 'admin', 'moderator', 'owner'])) &&
+        (!('blocked' in data) || data.blocked is bool) &&
+        (!('mustChangePassword' in data) || data.mustChangePassword is bool) &&
+        data.createdAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidAdminEntry(data, adminId) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'name', 'grantedBy', 'updatedAt']) &&
+        data.uid is string && data.uid == adminId && isValidId(adminId) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.role is string && data.role in ['admin', 'moderator'] &&
+        (!('name' in data) || (data.name is string && data.name.size() <= 80)) &&
+        (!('grantedBy' in data) || (data.grantedBy is string && data.grantedBy.size() <= 128)) &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidBoolFlag(mapObj, key) {
+      return !(key in mapObj) || mapObj[key] is bool;
+    }
+
+    function isValidSystemConfig(data) {
+      return data.keys().hasAll(['portalName', 'tagline', 'allowPublicRegistration', 'communityCommentsEnabled', 'modules', 'ratingBoxes', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'portalName', 'tagline', 'logoUrl', 'allowPublicRegistration',
+          'communityCommentsEnabled', 'catalogPerPage', 'modules', 'ratingBoxes',
+          'monitorModeEnforced', 'updatedAt', 'updatedBy'
+        ]) &&
+        data.portalName is string && data.portalName.size() >= 1 && data.portalName.size() <= 80 &&
+        data.tagline is string && data.tagline.size() <= 160 &&
+        (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 1000)) &&
+        data.allowPublicRegistration is bool &&
+        data.communityCommentsEnabled is bool &&
+        (!('catalogPerPage' in data) || (data.catalogPerPage is int && data.catalogPerPage >= 6 && data.catalogPerPage <= 100)) &&
+        (!('monitorModeEnforced' in data) || data.monitorModeEnforced is bool) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128)) &&
+        data.modules is map &&
+        data.modules.keys().hasOnly(['explorar', 'match', 'miLista', 'estadisticas', 'ruleta', 'asistenteIA', 'addTitle', 'comentarios', 'soporte']) &&
+        isValidBoolFlag(data.modules, 'explorar') &&
+        isValidBoolFlag(data.modules, 'match') &&
+        isValidBoolFlag(data.modules, 'miLista') &&
+        isValidBoolFlag(data.modules, 'estadisticas') &&
+        isValidBoolFlag(data.modules, 'ruleta') &&
+        isValidBoolFlag(data.modules, 'asistenteIA') &&
+        isValidBoolFlag(data.modules, 'addTitle') &&
+        isValidBoolFlag(data.modules, 'comentarios') &&
+        isValidBoolFlag(data.modules, 'soporte') &&
+        data.ratingBoxes is map &&
+        data.ratingBoxes.keys().hasOnly([
+          'stars', 'evaluation', 'critique', 'detailedAxes', 'wouldRewatch',
+          'watchedDate', 'watchPlatform', 'favoriteMoment', 'shortVerdict',
+          'favoriteCharacter', 'quote', 'recommendation', 'moodRecommendation', 'tags'
+        ]) &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidSupportTicketCreate(data, ticketId) {
+      return data.keys().hasAll(['ticketId', 'userId', 'senderName', 'senderEmail', 'category', 'subject', 'message', 'status', 'priority', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ticketId', 'userId', 'senderName', 'senderEmail', 'category', 'subject', 'message', 'status', 'priority', 'adminNote', 'resolvedBy', 'createdAt', 'updatedAt']) &&
+        data.ticketId is string && data.ticketId == ticketId &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        data.senderEmail is string && data.senderEmail.size() >= 3 && data.senderEmail.size() <= 254 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 160 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 4000 &&
+        data.status == 'abierto' &&
+        data.priority in ['baja', 'media', 'alta'] &&
+        (!('adminNote' in data) || (data.adminNote is string && data.adminNote.size() <= 2000)) &&
+        (!('resolvedBy' in data) || (data.resolvedBy is string && data.resolvedBy.size() <= 128)) &&
+        data.createdAt == request.time &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidSupportTicketUpdate(data, prev, ticketId) {
+      return data.keys().hasAll(['ticketId', 'userId', 'senderName', 'senderEmail', 'category', 'subject', 'message', 'status', 'priority', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ticketId', 'userId', 'senderName', 'senderEmail', 'category', 'subject', 'message', 'status', 'priority', 'adminNote', 'resolvedBy', 'createdAt', 'updatedAt']) &&
+        data.ticketId == prev.ticketId &&
+        data.ticketId == ticketId &&
+        data.userId == prev.userId &&
+        data.createdAt == prev.createdAt &&
+        data.status in ['abierto', 'en_revision', 'resuelto', 'cerrado'] &&
+        data.priority in ['baja', 'media', 'alta'] &&
+        (!('adminNote' in data) || (data.adminNote is string && data.adminNote.size() <= 2000)) &&
+        (!('resolvedBy' in data) || (data.resolvedBy is string && data.resolvedBy.size() <= 128)) &&
+        data.updatedAt == request.time;
+    }
+
     // 4. Collection Rules
 
-    // Admins lookup collection (read-only for owner/admin, system-managed)
+    // Configuración global del sistema y casillas activas (controlada por Superusuario/Admin)
+    match /system_config/{configId} {
+      allow get: if configId == 'portal_settings';
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && configId == 'portal_settings' &&
+        isValidSystemConfig(incoming());
+      allow delete: if false;
+    }
+
+    // Tickets de soporte y monitoreo del sistema
+    match /support_tickets/{ticketId} {
+      allow get: if isValidId(ticketId) && isSignedIn() && (isAdmin() || existing().userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || existing().userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(ticketId) &&
+        isValidSupportTicketCreate(incoming(), ticketId);
+      allow update: if isAdmin() && isValidId(ticketId) &&
+        isValidSupportTicketUpdate(incoming(), existing(), ticketId);
+      allow delete: if isAdmin() && isValidId(ticketId);
+    }
+
+    // Admins lookup collection (Daemon/owner puede otorgar o revocar roles admin)
     match /admins/{adminId} {
       allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
-      allow list, create, update, delete: if false;
+      allow list: if isAdmin();
+      allow create: if isSuperOwner() && isValidId(adminId) &&
+        adminId != request.auth.uid &&
+        isValidAdminEntry(incoming(), adminId);
+      allow update: if isSuperOwner() && isValidId(adminId) &&
+        adminId != request.auth.uid &&
+        existing().role != 'owner' &&
+        isValidAdminEntry(incoming(), adminId);
+      allow delete: if isSuperOwner() && isValidId(adminId) &&
+        adminId != request.auth.uid &&
+        existing().role != 'owner';
     }
 
     // Public User Profiles (No PII)
@@ -311,23 +441,31 @@ service cloud.firestore {
 
     // Isolated Private User PII Collection
     match /users/{userId}/private/{docId} {
-      allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin()) &&
-        exists(/databases/$(database)/documents/users_public/$(userId));
-      allow list: if false;
+      allow get: if isValidId(userId) && isValidId(docId) && (
+        isAdmin() ||
+        (isOwner(userId) && exists(/databases/$(database)/documents/users_public/$(userId)))
+      );
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidId(userId) && isValidId(docId) && docId == 'info' &&
         isValidUserPrivateInfo(incoming(), userId) &&
         incoming().createdAt == request.time &&
         existsAfter(/databases/$(database)/documents/users_public/$(userId));
-      allow update: if isOwner(userId) && isValidId(userId) && isValidId(docId) && docId == 'info' &&
-        isValidUserPrivateInfo(incoming(), userId) &&
-        exists(/databases/$(database)/documents/users_public/$(userId)) && (
-          isAdmin() ||
-          (
-            incoming().userId == existing().userId &&
-            incoming().createdAt == existing().createdAt &&
-            !incoming().diff(existing()).affectedKeys().hasAny(['role', 'blocked'])
-          )
-        );
+      allow update: if isValidId(userId) && isValidId(docId) && docId == 'info' && (
+        (
+          isAdmin() &&
+          isValidUserPrivateInfoByAdmin(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt
+        ) ||
+        (
+          isOwner(userId) &&
+          isValidUserPrivateInfo(incoming(), userId) &&
+          exists(/databases/$(database)/documents/users_public/$(userId)) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['role', 'blocked'])
+        )
+      );
       allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
     }
 
@@ -349,8 +487,8 @@ service cloud.firestore {
 
       // Una clasificación por usuario y película: el ID del documento ES el movieId.
       match /movie_classifications/{movieId} {
-        allow get: if isAccountOwner(userId) && isValidId(movieId);
-        allow list: if isAccountOwner(userId);
+        allow get: if (isAccountOwner(userId) || isAdmin()) && isValidId(movieId);
+        allow list: if isAccountOwner(userId) || isAdmin();
         allow create: if isAccountOwner(userId) && isValidId(movieId) &&
           isValidMovieClassification(incoming(), userId, movieId) &&
           incoming().createdAt == request.time;

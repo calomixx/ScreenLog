@@ -25,6 +25,8 @@ import {
 import confetti from 'canvas-confetti';
 import { useMedia } from '../context/MediaContext';
 import { isRealEmail } from '../lib/validation';
+import { auth } from '../lib/firebase';
+import { createSupportTicketInFirestore } from '../lib/firestore/support';
 
 const SITE_SOCIALS = [
   { id: 'email', label: 'Email', href: 'mailto:contacto@takevault.app', icon: Mail, visible: true },
@@ -74,35 +76,60 @@ export const ContactSection: React.FC = () => {
     setIsSending(true);
 
     const subjectName = subjectOptions.find(o => o.value === subject)?.label || 'Consulta General';
-    let ticketNumber = `SL-${Math.floor(10000 + Math.random() * 90000)}`;
+    const generatedId = `tkt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let ticketNumber = `TV-${Math.floor(10000 + Math.random() * 90000)}`;
     let submitError = '';
+    let savedAnywhere = false;
 
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: generatedId,
           userId: currentUser?.id,
           name: name.trim(),
           email: email.trim(),
+          category: subject,
           subject: subjectName,
           message: message.trim(),
+          priority: urgency === 'alta' ? 'alta' : 'media',
           urgency
         })
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Error ${response.status}: No se pudo enviar el mensaje.`);
+      if (response.ok) {
+        savedAnywhere = true;
+        if (payload?.data?.ticketCode) ticketNumber = payload.data.ticketCode;
+      } else {
+        submitError = payload?.error || `Error ${response.status}: No se pudo enviar el mensaje.`;
       }
-      if (payload?.data?.ticketCode) ticketNumber = payload.data.ticketCode;
     } catch (err) {
       submitError = err instanceof Error ? err.message : 'No se pudo enviar el mensaje. Inténtalo de nuevo.';
       console.error('Contact form error:', err);
     }
 
+    if (auth.currentUser?.uid) {
+      try {
+        await createSupportTicketInFirestore({
+          id: generatedId,
+          name: name.trim() || currentUser?.name || 'Cinéfilo',
+          email: email.trim(),
+          category: subject,
+          subject: subjectName,
+          message: message.trim(),
+          priority: urgency === 'alta' ? 'alta' : 'media',
+        });
+        savedAnywhere = true;
+        submitError = '';
+      } catch (fsErr) {
+        console.warn('No se pudo guardar ticket en Firestore:', fsErr);
+      }
+    }
+
     setIsSending(false);
 
-    if (submitError) {
+    if (!savedAnywhere && submitError) {
       setError(submitError);
       return;
     }

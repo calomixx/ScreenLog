@@ -122,6 +122,21 @@ async function testConnection() {
 }
 void testConnection();
 
+export function doesFirebaseUserMatchAccount(
+  fbUser: FirebaseUser | null | undefined,
+  appUser?: { id?: string; email?: string; firebaseUid?: string | null } | null,
+): boolean {
+  if (!fbUser?.uid || !appUser) return false;
+  if (appUser.firebaseUid && appUser.firebaseUid === fbUser.uid) return true;
+  if (appUser.id && appUser.id === fbUser.uid) return true;
+  const fbEmail = String(fbUser.email || '').trim().toLowerCase();
+  const appEmail = String(appUser.email || '').trim().toLowerCase();
+  if (fbEmail && appEmail) {
+    return fbEmail === appEmail;
+  }
+  return false;
+}
+
 /**
  * Atomically syncs the authenticated Firebase user's public profile and isolated private PII.
  */
@@ -157,18 +172,8 @@ export async function syncFirebaseUserProfile(
     : ['Ciencia Ficción', 'Drama'];
 
   try {
-    const privateRef = doc(db, 'users', uid, 'private', 'info');
-    let existingPrivateSnap;
-    try {
-      existingPrivateSnap = await getDoc(privateRef);
-    } catch {
-      existingPrivateSnap = null;
-    }
-
-    const batch = writeBatch(db);
     const publicRef = doc(db, 'users_public', uid);
-
-    batch.set(publicRef, {
+    await setDoc(publicRef, {
       userId: uid,
       name: displayName,
       username,
@@ -178,32 +183,49 @@ export async function syncFirebaseUserProfile(
       favoriteGenres,
       updatedAt: serverTimestamp(),
     });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, publicPath);
+  }
 
-    const email = clampString(fbUser.email || 'user@takevault.app', BLUEPRINT_LIMITS.EMAIL_MAX_LEN, 'user@takevault.app');
+  try {
+    const privateRef = doc(db, 'users', uid, 'private', 'info');
+    let existingPrivateSnap;
+    try {
+      existingPrivateSnap = await getDoc(privateRef);
+    } catch {
+      existingPrivateSnap = null;
+    }
+
+    const email = clampString(
+      overrides?.email || fbUser.email || 'user@takevault.app',
+      BLUEPRINT_LIMITS.EMAIL_MAX_LEN,
+      'user@takevault.app',
+    );
+
     if (existingPrivateSnap && existingPrivateSnap.exists()) {
-      const existingData = existingPrivateSnap.data();
-      batch.set(privateRef, {
-        userId: uid,
-        email,
-        role: existingData.role || 'user',
-        blocked: existingData.blocked || false,
-        createdAt: existingData.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      // No tocar role ni blocked desde el cliente normal (las reglas prohíben
+      // que un usuario no admin modifique role/blocked en affectedKeys).
+      await setDoc(
+        privateRef,
+        {
+          userId: uid,
+          email,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
     } else {
-      batch.set(privateRef, {
+      await setDoc(privateRef, {
         userId: uid,
         email,
         role: 'user',
         blocked: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }, { merge: true });
+      });
     }
-
-    await batch.commit();
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${publicPath} & ${privatePath}`);
+    handleFirestoreError(error, OperationType.WRITE, privatePath);
   }
 }
 

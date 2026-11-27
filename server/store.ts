@@ -1,7 +1,18 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { FieldValue } from 'firebase-admin/firestore';
-import type { MediaItem, UserReview } from '../src/types';
+import type {
+  MediaItem,
+  PortalModulesConfig,
+  RatingBoxesConfig,
+  UserReview,
+} from '../src/types';
+import {
+  DEFAULT_PORTAL_MODULES,
+  DEFAULT_RATING_BOXES,
+  mergePortalModules,
+  mergeRatingBoxes,
+} from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getFirebaseFirestore } from './firebase-admin';
 
@@ -24,6 +35,8 @@ export interface StoredUser {
   customFields: { id: string; label: string; value: string }[];
   blocked: boolean;
   mustChangePassword: boolean;
+  monitorOnly?: boolean;
+  firebaseUid?: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -88,11 +101,16 @@ export interface StoredTicket {
   userId?: string | null;
   name: string;
   email: string;
+  category?: string;
   subject: string;
   message: string;
   urgency: 'normal' | 'alta';
-  status: 'open' | 'closed';
+  priority?: 'baja' | 'media' | 'alta';
+  status: 'open' | 'closed' | 'abierto' | 'en_revision' | 'resuelto' | 'cerrado';
+  adminNote?: string;
+  resolvedBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SystemLogRecord {
@@ -128,6 +146,9 @@ export interface PortalSettings {
   communityCommentsEnabled: boolean;
   allowPublicRegistration: boolean;
   catalogPerPage: number;
+  modules: PortalModulesConfig;
+  ratingBoxes: RatingBoxesConfig;
+  monitorModeEnforced: boolean;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -163,12 +184,15 @@ export const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
 const defaultSettings: PortalSettings = {
-  portalName: 'ScreenLog Pro',
-  tagline: 'Explora, clasifica y comparte tu pasión por el cine',
+  portalName: 'TakeVault Pro',
+  tagline: 'Archive your takes • Cinema Vault',
   logoUrl: '/favicon.svg',
   communityCommentsEnabled: true,
   allowPublicRegistration: true,
   catalogPerPage: 24,
+  modules: { ...DEFAULT_PORTAL_MODULES },
+  ratingBoxes: { ...DEFAULT_RATING_BOXES },
+  monitorModeEnforced: true,
   updatedAt: new Date().toISOString(),
   updatedBy: null,
 };
@@ -242,6 +266,8 @@ function getDefaultUsers(): StoredUser[] {
       customFields: [{ id: '1', label: 'Película favorita', value: 'Interstellar' }],
       blocked: false,
       mustChangePassword: false,
+      monitorOnly: true,
+      firebaseUid: 'bZGMhRTm7aOUoRDlYbabZN2Aotk2',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
       lastLoginAt: null,
@@ -311,6 +337,8 @@ function normalizeStoredUser(raw: Record<string, unknown>, id: string): StoredUs
       : [],
     blocked: Boolean(raw.blocked),
     mustChangePassword: Boolean(raw.mustChangePassword),
+    monitorOnly: Boolean(raw.monitorOnly) || role === 'owner' || email === 'daemon@screenlog.app',
+    firebaseUid: typeof raw.firebaseUid === 'string' ? raw.firebaseUid : null,
     createdAt,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : createdAt,
     lastLoginAt: typeof raw.lastLoginAt === 'string' ? raw.lastLoginAt : null,
@@ -365,7 +393,12 @@ export async function getStore(): Promise<StoreData> {
     cache = {
       ...emptyStore(),
       ...parsed,
-      settings: { ...defaultSettings, ...(parsed.settings || {}) },
+      settings: {
+        ...defaultSettings,
+        ...(parsed.settings || {}),
+        modules: mergePortalModules(parsed.settings?.modules),
+        ratingBoxes: mergeRatingBoxes(parsed.settings?.ratingBoxes),
+      },
       billing: { ...defaultBilling, ...(parsed.billing || {}) },
       users: parsed.users || [],
       sessions: parsed.sessions || [],
@@ -431,6 +464,17 @@ export async function updateStore<T>(mutator: (data: StoreData) => T): Promise<T
   return result;
 }
 
+export function isMonitorStoredUser(user?: Pick<StoredUser, 'role' | 'email' | 'monitorOnly' | 'id'> | null): boolean {
+  if (!user) return false;
+  const normalizedEmail = String(user.email || '').trim().toLowerCase();
+  return (
+    user.role === 'owner' ||
+    Boolean(user.monitorOnly) ||
+    normalizedEmail === 'daemon@screenlog.app' ||
+    user.id === 'usr_daemon_owner'
+  );
+}
+
 export function publicUser(user: StoredUser) {
   const defaultUsername = (user.name || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '') || user.email.split('@')[0];
   return {
@@ -448,6 +492,8 @@ export function publicUser(user: StoredUser) {
     customFields: user.customFields,
     blocked: user.blocked,
     mustChangePassword: user.mustChangePassword,
+    monitorOnly: isMonitorStoredUser(user),
+    firebaseUid: user.firebaseUid || null,
     joinedDate: user.createdAt.slice(0, 10),
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,

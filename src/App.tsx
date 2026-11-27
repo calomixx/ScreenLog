@@ -7,6 +7,7 @@ import { LogoLockup, LogoMark } from './components/Logo';
 import { Toast } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Loader2, ShieldAlert } from 'lucide-react';
+import { isSystemMonitorUser } from './types';
 
 // Lazy-loaded Views (Code Splitting for instant initial page load)
 const SystemDashboardView = lazy(() =>
@@ -122,14 +123,21 @@ const MainAppContent: React.FC = () => {
     isAssistantOpen,
     isRouletteOpen,
   } = useMedia();
-  const { currentUser, isWorkspaceGuest, exitToPublic } = useAuth();
+  const { currentUser, isWorkspaceGuest, exitToPublic, settings, firebaseLinkError } = useAuth();
   const isStaffUser = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+  const isMonitor = isSystemMonitorUser(currentUser);
+  const modules = settings.modules;
 
   const renderTab = () => {
-    if (activeTab === 'explorar') return <CatalogView />;
-    if (activeTab === 'recomendados') return <CineMatchView />;
-    if (activeTab === 'mi_lista') return <MyListView />;
-    if (activeTab === 'estadisticas') return <UserStatsPanel standalone />;
+    if (isMonitor) {
+      if (activeTab === 'explorar') return <CatalogView />;
+      if (activeTab === 'cuenta') return currentUser ? <AccountView /> : <AdminPanelView />;
+      return <AdminPanelView />;
+    }
+    if (activeTab === 'explorar' && modules?.explorar !== false) return <CatalogView />;
+    if (activeTab === 'recomendados' && modules?.match !== false) return <CineMatchView />;
+    if (activeTab === 'mi_lista' && modules?.miLista !== false) return <MyListView />;
+    if (activeTab === 'estadisticas' && modules?.estadisticas !== false) return <UserStatsPanel standalone />;
     if (activeTab === 'admin') {
       return isStaffUser ? (
         <AdminPanelView />
@@ -156,6 +164,15 @@ const MainAppContent: React.FC = () => {
         Saltar al contenido
       </a>
       <Navbar />
+
+      {currentUser && firebaseLinkError && (
+        <div className="bg-amber-500/10 border-b border-amber-500/25 px-4 py-2 text-[11px] sm:text-xs text-amber-200 flex items-center justify-center gap-2 text-center">
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span>
+            <strong>Aviso de sincronización Firebase:</strong> {firebaseLinkError}
+          </span>
+        </div>
+      )}
 
       {/* Subtle indicator when browsing workspace as guest */}
       {!currentUser && isWorkspaceGuest && (
@@ -197,21 +214,45 @@ const MainAppContent: React.FC = () => {
           <LogoLockup size={34} showTagline={false} />
 
           <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:gap-5 text-xs font-semibold" aria-label="Navegación interna">
-            <button type="button" onClick={() => setActiveTab('sistema')} className="hover:text-white transition-colors">
-              Mi Sala
-            </button>
-            <button type="button" onClick={() => setActiveTab('explorar')} className="hover:text-white transition-colors">
-              Explorar
-            </button>
-            <button type="button" onClick={() => setActiveTab('recomendados')} className="hover:text-white transition-colors">
-              CineMatch
-            </button>
-            <button type="button" onClick={() => setActiveTab('mi_lista')} className="hover:text-white transition-colors">
-              Mi Lista
-            </button>
-            <button type="button" onClick={() => setActiveTab('estadisticas')} className="hover:text-white transition-colors">
-              Estadísticas
-            </button>
+            {isMonitor ? (
+              <>
+                <button type="button" onClick={() => setActiveTab('admin')} className="hover:text-white transition-colors">
+                  Monitoreo y Soporte
+                </button>
+                <button type="button" onClick={() => setActiveTab('explorar')} className="hover:text-white transition-colors">
+                  Explorar Catálogo
+                </button>
+                <button type="button" onClick={() => setActiveTab('cuenta')} className="hover:text-white transition-colors">
+                  Cuenta Monitor
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => setActiveTab('sistema')} className="hover:text-white transition-colors">
+                  Mi Sala
+                </button>
+                {modules?.explorar !== false && (
+                  <button type="button" onClick={() => setActiveTab('explorar')} className="hover:text-white transition-colors">
+                    Explorar
+                  </button>
+                )}
+                {modules?.match !== false && (
+                  <button type="button" onClick={() => setActiveTab('recomendados')} className="hover:text-white transition-colors">
+                    CineMatch
+                  </button>
+                )}
+                {modules?.miLista !== false && (
+                  <button type="button" onClick={() => setActiveTab('mi_lista')} className="hover:text-white transition-colors">
+                    Mi Lista
+                  </button>
+                )}
+                {modules?.estadisticas !== false && (
+                  <button type="button" onClick={() => setActiveTab('estadisticas')} className="hover:text-white transition-colors">
+                    Estadísticas
+                  </button>
+                )}
+              </>
+            )}
           </nav>
 
           <div className="text-[11px] text-slate-500 text-center md:text-right">

@@ -965,9 +965,52 @@ import { randomUUID } from "node:crypto";
 import { promises as dns } from "node:dns";
 
 // server/store.ts
-init_initialMedia();
 import { promises as fs } from "node:fs";
 import path2 from "node:path";
+
+// src/types.ts
+var DEFAULT_PORTAL_MODULES = {
+  explorar: true,
+  match: true,
+  miLista: true,
+  estadisticas: true,
+  ruleta: true,
+  asistenteIA: true,
+  addTitle: true,
+  comentarios: true,
+  soporte: true
+};
+var DEFAULT_RATING_BOXES = {
+  stars: true,
+  evaluation: true,
+  critique: true,
+  detailedAxes: true,
+  wouldRewatch: true,
+  watchedDate: true,
+  watchPlatform: true,
+  favoriteMoment: true,
+  shortVerdict: true,
+  favoriteCharacter: true,
+  quote: true,
+  recommendation: true,
+  moodRecommendation: true,
+  tags: true
+};
+function mergePortalModules(input) {
+  return {
+    ...DEFAULT_PORTAL_MODULES,
+    ...input || {}
+  };
+}
+function mergeRatingBoxes(input) {
+  return {
+    ...DEFAULT_RATING_BOXES,
+    ...input || {}
+  };
+}
+
+// server/store.ts
+init_initialMedia();
 
 // server/firebase-admin.ts
 import { existsSync, readFileSync } from "node:fs";
@@ -1133,12 +1176,15 @@ function getFirebaseFirestore() {
 var DATA_DIR = path2.join(process.cwd(), "server", "data");
 var STORE_FILE = path2.join(DATA_DIR, "store.json");
 var defaultSettings = {
-  portalName: "ScreenLog Pro",
-  tagline: "Explora, clasifica y comparte tu pasi\xF3n por el cine",
+  portalName: "TakeVault Pro",
+  tagline: "Archive your takes \u2022 Cinema Vault",
   logoUrl: "/favicon.svg",
   communityCommentsEnabled: true,
   allowPublicRegistration: true,
   catalogPerPage: 24,
+  modules: { ...DEFAULT_PORTAL_MODULES },
+  ratingBoxes: { ...DEFAULT_RATING_BOXES },
+  monitorModeEnforced: true,
   updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
   updatedBy: null
 };
@@ -1197,6 +1243,8 @@ function getDefaultUsers() {
       customFields: [{ id: "1", label: "Pel\xEDcula favorita", value: "Interstellar" }],
       blocked: false,
       mustChangePassword: false,
+      monitorOnly: true,
+      firebaseUid: "bZGMhRTm7aOUoRDlYbabZN2Aotk2",
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
       lastLoginAt: null,
@@ -1250,6 +1298,8 @@ function normalizeStoredUser(raw, id) {
     customFields: Array.isArray(raw.customFields) ? raw.customFields.slice(0, 12) : [],
     blocked: Boolean(raw.blocked),
     mustChangePassword: Boolean(raw.mustChangePassword),
+    monitorOnly: Boolean(raw.monitorOnly) || role === "owner" || email === "daemon@screenlog.app",
+    firebaseUid: typeof raw.firebaseUid === "string" ? raw.firebaseUid : null,
     createdAt,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt,
     lastLoginAt: typeof raw.lastLoginAt === "string" ? raw.lastLoginAt : null,
@@ -1299,7 +1349,12 @@ async function getStore() {
     cache = {
       ...emptyStore(),
       ...parsed,
-      settings: { ...defaultSettings, ...parsed.settings || {} },
+      settings: {
+        ...defaultSettings,
+        ...parsed.settings || {},
+        modules: mergePortalModules(parsed.settings?.modules),
+        ratingBoxes: mergeRatingBoxes(parsed.settings?.ratingBoxes)
+      },
       billing: { ...defaultBilling, ...parsed.billing || {} },
       users: parsed.users || [],
       sessions: parsed.sessions || [],
@@ -1350,6 +1405,11 @@ async function saveStore() {
   writeChain = writeChain.then(() => persistNow(snapshot), () => persistNow(snapshot));
   await writeChain;
 }
+function isMonitorStoredUser(user) {
+  if (!user) return false;
+  const normalizedEmail = String(user.email || "").trim().toLowerCase();
+  return user.role === "owner" || Boolean(user.monitorOnly) || normalizedEmail === "daemon@screenlog.app" || user.id === "usr_daemon_owner";
+}
 function publicUser(user) {
   const defaultUsername = (user.name || "").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") || user.email.split("@")[0];
   return {
@@ -1367,6 +1427,8 @@ function publicUser(user) {
     customFields: user.customFields,
     blocked: user.blocked,
     mustChangePassword: user.mustChangePassword,
+    monitorOnly: isMonitorStoredUser(user),
+    firebaseUid: user.firebaseUid || null,
     joinedDate: user.createdAt.slice(0, 10),
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt
@@ -3105,7 +3167,13 @@ function createApiRouter() {
         settings: {
           portalName: store.settings.portalName,
           tagline: store.settings.tagline,
-          allowPublicRegistration: store.settings.allowPublicRegistration
+          logoUrl: store.settings.logoUrl,
+          communityCommentsEnabled: store.settings.communityCommentsEnabled,
+          allowPublicRegistration: store.settings.allowPublicRegistration,
+          catalogPerPage: store.settings.catalogPerPage,
+          modules: store.settings.modules,
+          ratingBoxes: store.settings.ratingBoxes,
+          monitorModeEnforced: store.settings.monitorModeEnforced
         }
       }
     });
@@ -3828,22 +3896,29 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const store = await getStore();
     const name = sanitizeText(req.body?.name, 100);
     const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const category = sanitizeText(req.body?.category, 60) || "Soporte T\xE9cnico";
     const subject = sanitizeText(req.body?.subject, 160);
     const message = sanitizeMultiline(req.body?.message, 4e3);
     if (!name || !message) return safeError(res, 400, "Nombre y mensaje son obligatorios.", "INVALID_TICKET");
     const emailValidationError = getEmailValidationError(email);
     if (emailValidationError) return safeError(res, 400, emailValidationError, "INVALID_EMAIL");
+    const rawPriority = sanitizeText(req.body?.priority, 20);
+    const priority = rawPriority === "baja" || rawPriority === "alta" ? rawPriority : req.body?.urgency === "alta" ? "alta" : "media";
+    const now = (/* @__PURE__ */ new Date()).toISOString();
     const ticket = {
-      id: randomUUID(),
-      ticketCode: `SL-${Math.floor(1e4 + Math.random() * 9e4)}`,
+      id: sanitizeText(req.body?.id, 100) || `tkt_${randomUUID().slice(0, 12)}`,
+      ticketCode: `TV-${Math.floor(1e4 + Math.random() * 9e4)}`,
       userId: req.authUser?.id || null,
       name,
       email,
+      category,
       subject: subject || "Consulta general",
       message,
-      urgency: req.body?.urgency === "alta" ? "alta" : "normal",
-      status: "open",
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      urgency: priority === "alta" ? "alta" : "normal",
+      priority,
+      status: "abierto",
+      createdAt: now,
+      updatedAt: now
     };
     store.tickets.unshift(ticket);
     if (store.tickets.length > 1e3) store.tickets.length = 1e3;
@@ -4259,7 +4334,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       return;
     }
     try {
-      const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+      const token = await createFirebaseCustomToken(user.firebaseUid || user.id, user.email, user.name);
       res.json({ success: true, data: { token } });
     } catch (error) {
       safeError(
@@ -4267,6 +4342,32 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
         503,
         `No se pudo firmar la sesi\xF3n de Firebase: ${error instanceof Error ? error.message : String(error)}`,
         "FIREBASE_ADMIN_UNAVAILABLE"
+      );
+    }
+  }));
+  router.post("/auth/link-firebase", requireAuth, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const user = req.authUser;
+    if (!user) return;
+    const idToken = typeof req.body?.idToken === "string" ? req.body.idToken.trim() : "";
+    if (!idToken) {
+      return safeError(res, 400, "Falta idToken de Firebase.", "MISSING_ID_TOKEN");
+    }
+    try {
+      const verified = await verifyGoogleIdToken(idToken, FIREBASE_PROJECT_ID);
+      if (verified.email && verified.email.toLowerCase() !== user.email.toLowerCase()) {
+        return safeError(res, 403, "El token de Firebase corresponde a otro correo.", "FIREBASE_EMAIL_MISMATCH");
+      }
+      user.firebaseUid = verified.uid;
+      user.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      await saveStore();
+      res.json({ success: true, data: { user: publicUser(user) } });
+    } catch (error) {
+      safeError(
+        res,
+        401,
+        error instanceof Error ? error.message : "No se pudo verificar el token de Firebase.",
+        "INVALID_FIREBASE_TOKEN"
       );
     }
   }));
@@ -4377,6 +4478,10 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
   router.get("/me/library", requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
     if (!req.authUser) return;
+    if (isMonitorStoredUser(req.authUser)) {
+      res.json({ success: true, data: {} });
+      return;
+    }
     const entries = store.library.filter((e) => e.userId === req.authUser?.id);
     const reviews = {};
     for (const entry of entries) {
@@ -4388,6 +4493,14 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
+    if (isMonitorStoredUser(user)) {
+      return safeError(
+        res,
+        403,
+        "Daemon opera como Superusuario de Monitoreo y Soporte; no administra lista personal.",
+        "MONITOR_ACCOUNT_NO_LIBRARY"
+      );
+    }
     const mediaId = sanitizeText(req.params.mediaId, 120);
     if (!mediaId) return safeError(res, 400, "T\xEDtulo no v\xE1lido.", "INVALID_MEDIA");
     const body = req.body?.review || req.body || {};
@@ -4543,7 +4656,11 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
         tagline: store.settings.tagline,
         logoUrl: store.settings.logoUrl,
         communityCommentsEnabled: store.settings.communityCommentsEnabled,
-        allowPublicRegistration: store.settings.allowPublicRegistration
+        allowPublicRegistration: store.settings.allowPublicRegistration,
+        catalogPerPage: store.settings.catalogPerPage,
+        modules: store.settings.modules,
+        ratingBoxes: store.settings.ratingBoxes,
+        monitorModeEnforced: store.settings.monitorModeEnforced
       }
     });
   }));
@@ -4558,13 +4675,18 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     }));
     try {
       const cloudUsers = await listFirestoreUsers();
-      const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()));
+      const rowByEmail = new Map(rows.map((row) => [row.email.trim().toLowerCase(), row]));
       for (const cloud of cloudUsers) {
         const email = cloud.email.trim().toLowerCase();
-        if (!email || knownEmails.has(email)) continue;
+        if (!email) continue;
+        const existingRow = rowByEmail.get(email);
+        if (existingRow) {
+          if (!existingRow.firebaseUid) existingRow.firebaseUid = cloud.uid;
+          continue;
+        }
         const name = cloud.displayName || email.split("@")[0] || "Cin\xE9filo";
         const createdAt = cloud.createdAt || (/* @__PURE__ */ new Date()).toISOString();
-        rows.push({
+        const newRow = {
           id: cloud.uid,
           name,
           username: name.toLowerCase().replace(/[^a-z0-9._-]/g, "") || email.split("@")[0],
@@ -4579,12 +4701,15 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
           customFields: [],
           blocked: false,
           mustChangePassword: false,
+          monitorOnly: false,
+          firebaseUid: cloud.uid,
           joinedDate: createdAt.slice(0, 10),
           createdAt,
           lastLoginAt: null,
           sessionsCount: 0
-        });
-        knownEmails.add(email);
+        };
+        rows.push(newRow);
+        rowByEmail.set(email, newRow);
       }
     } catch (error) {
       console.warn("El panel seguir\xE1 mostrando solo las cuentas del servidor:", error);
@@ -4597,6 +4722,60 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
       return true;
     }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json({ success: true, data: items });
+  }));
+  router.post("/admin/users", staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+    const name = sanitizeText(req.body?.name, 80);
+    const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const rawUsername = cleanUsername(req.body?.username || "");
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const requestedRole = sanitizeText(req.body?.role, 20);
+    const role = requestedRole === "admin" && actor.role === "owner" ? "admin" : "user";
+    const firebaseUid = sanitizeText(req.body?.firebaseUid, 128) || null;
+    if (!name) return safeError(res, 400, "Indica el nombre del usuario.", "INVALID_NAME");
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, "INVALID_EMAIL");
+    const passwordError = validatePassword(password);
+    if (passwordError) return safeError(res, 400, passwordError, "INVALID_PASSWORD");
+    if (findUserByEmail(store, email)) {
+      return safeError(res, 409, "Ya existe un usuario con este correo.", "EMAIL_IN_USE");
+    }
+    if (rawUsername && findUserByIdentifier(store, rawUsername)) {
+      return safeError(res, 409, "Este nombre de usuario ya est\xE1 en uso.", "USERNAME_IN_USE");
+    }
+    const user = createUserRecord({
+      id: firebaseUid || void 0,
+      name,
+      username: rawUsername || void 0,
+      email,
+      password,
+      role
+    });
+    if (firebaseUid) user.firebaseUid = firebaseUid;
+    store.users.push(user);
+    addLog(store, {
+      level: "info",
+      category: "admin",
+      message: `Usuario creado desde consola admin: ${email} (rol: ${role})`,
+      actorId: actor.id,
+      actorName: actor.name,
+      target: email,
+      ip: getClientIp(req)
+    });
+    addAudit(store, {
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "user.create",
+      targetType: "user",
+      targetId: user.id,
+      targetName: user.name,
+      result: "success"
+    });
+    await saveStore();
+    void syncUserToFirestore(user).catch(() => void 0);
+    res.json({ success: true, data: publicUser(user) });
   }));
   router.post("/admin/sync-users", staffOnly, asyncRoute(async (req, res) => {
     const store = await getStore();
@@ -5049,6 +5228,13 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     if (typeof body.logoUrl === "string") settings.logoUrl = sanitizeText(body.logoUrl, 300);
     if (typeof body.communityCommentsEnabled === "boolean") settings.communityCommentsEnabled = body.communityCommentsEnabled;
     if (typeof body.allowPublicRegistration === "boolean") settings.allowPublicRegistration = body.allowPublicRegistration;
+    if (typeof body.monitorModeEnforced === "boolean") settings.monitorModeEnforced = body.monitorModeEnforced;
+    if (body.modules && typeof body.modules === "object") {
+      settings.modules = mergePortalModules({ ...settings.modules, ...body.modules });
+    }
+    if (body.ratingBoxes && typeof body.ratingBoxes === "object") {
+      settings.ratingBoxes = mergeRatingBoxes({ ...settings.ratingBoxes, ...body.ratingBoxes });
+    }
     if (body.catalogPerPage !== void 0) {
       settings.catalogPerPage = Math.max(8, Math.min(100, Number(body.catalogPerPage) || 24));
     }
@@ -5057,7 +5243,7 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     addLog(store, {
       level: "info",
       category: "admin",
-      message: `Configuraci\xF3n general actualizada por ${actor.email}`,
+      message: `Configuraci\xF3n general y casillas actualizadas por ${actor.email}`,
       actorId: actor.id,
       actorName: actor.name,
       ip: getClientIp(req)
@@ -5072,6 +5258,91 @@ Devuelve tu an\xE1lisis est\xE9tico y 4 a 6 recomendaciones altamente cinematogr
     });
     await saveStore();
     res.json({ success: true, data: settings });
+  }));
+  router.get("/admin/tickets", staffOnly, asyncRoute(async (_req, res) => {
+    const store = await getStore();
+    const tickets = store.tickets.map((t) => ({
+      id: t.id,
+      ticketCode: t.ticketCode,
+      userId: t.userId || "",
+      name: t.name,
+      email: t.email,
+      category: t.category || "Soporte T\xE9cnico",
+      subject: t.subject,
+      message: t.message,
+      status: t.status === "open" ? "abierto" : t.status === "closed" ? "cerrado" : t.status,
+      priority: t.priority || (t.urgency === "alta" ? "alta" : "media"),
+      adminNote: t.adminNote,
+      resolvedBy: t.resolvedBy,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt || t.createdAt,
+      source: "server"
+    }));
+    res.json({ success: true, data: tickets });
+  }));
+  router.patch("/admin/tickets/:id", staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+    const ticket = store.tickets.find((t) => t.id === req.params.id);
+    if (!ticket) return safeError(res, 404, "Ticket no encontrado.", "NOT_FOUND");
+    const validStatuses = ["abierto", "en_revision", "resuelto", "cerrado"];
+    const validPriorities = ["baja", "media", "alta"];
+    if (validStatuses.includes(req.body?.status)) {
+      ticket.status = req.body.status;
+    }
+    if (validPriorities.includes(req.body?.priority)) {
+      ticket.priority = req.body.priority;
+      ticket.urgency = req.body.priority === "alta" ? "alta" : "normal";
+    }
+    if (typeof req.body?.adminNote === "string") {
+      ticket.adminNote = sanitizeMultiline(req.body.adminNote, 2e3);
+    }
+    ticket.resolvedBy = actor.name;
+    ticket.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    addAudit(store, {
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "support.ticket_update",
+      targetType: "ticket",
+      targetId: ticket.id,
+      targetName: ticket.subject,
+      details: `Estado: ${ticket.status}`,
+      result: "success"
+    });
+    await saveStore();
+    res.json({ success: true, data: ticket });
+  }));
+  router.delete("/admin/tickets/:id", staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const before = store.tickets.length;
+    store.tickets = store.tickets.filter((t) => t.id !== req.params.id);
+    if (store.tickets.length === before) {
+      return safeError(res, 404, "Ticket no encontrado.", "NOT_FOUND");
+    }
+    await saveStore();
+    res.json({ success: true });
+  }));
+  router.post("/admin/cleanup-monitor-library", ownerOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+    const monitorIds = new Set(
+      store.users.filter((u) => isMonitorStoredUser(u)).map((u) => u.id)
+    );
+    const before = store.library.length;
+    store.library = store.library.filter((entry) => !monitorIds.has(entry.userId));
+    const removedCount = before - store.library.length;
+    addLog(store, {
+      level: "info",
+      category: "admin",
+      message: `Limpieza de lista del superusuario monitor: ${removedCount} entrada(s) removida(s).`,
+      actorId: actor.id,
+      actorName: actor.name,
+      ip: getClientIp(req)
+    });
+    await saveStore();
+    res.json({ success: true, data: { removedCount } });
   }));
   router.get("/admin/history", staffOnly, asyncRoute(async (_req, res) => {
     const store = await getStore();

@@ -7,6 +7,7 @@ import {
   findUserByEmail,
   findUserByIdentifier,
   findUserById,
+  isMonitorStoredUser,
   ownerExists,
   publicUser,
   type Role,
@@ -38,7 +39,15 @@ import {
   sanitizeText,
   verifyPassword,
 } from './security';
-import type { MediaItem, RewatchChoice, WatchStatus } from '../src/types';
+import {
+  mergePortalModules,
+  mergeRatingBoxes,
+  type MediaItem,
+  type RewatchChoice,
+  type SupportTicketPriority,
+  type SupportTicketStatus,
+  type WatchStatus,
+} from '../src/types';
 import { INITIAL_MEDIA_LIST } from '../src/data/initialMedia';
 import { getCuratedRecommendations, type CineMatchRequest } from './cinematch';
 import { isRealEmail, getEmailValidationError, mediaFormSchema, userReviewSchema, extractYouTubeId } from '../src/lib/validation';
@@ -502,7 +511,13 @@ export function createApiRouter(): Router {
         settings: {
           portalName: store.settings.portalName,
           tagline: store.settings.tagline,
+          logoUrl: store.settings.logoUrl,
+          communityCommentsEnabled: store.settings.communityCommentsEnabled,
           allowPublicRegistration: store.settings.allowPublicRegistration,
+          catalogPerPage: store.settings.catalogPerPage,
+          modules: store.settings.modules,
+          ratingBoxes: store.settings.ratingBoxes,
+          monitorModeEnforced: store.settings.monitorModeEnforced,
         },
       },
     });
@@ -1305,22 +1320,34 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const store = await getStore();
     const name = sanitizeText(req.body?.name, 100);
     const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const category = sanitizeText(req.body?.category, 60) || 'Soporte Técnico';
     const subject = sanitizeText(req.body?.subject, 160);
     const message = sanitizeMultiline(req.body?.message, 4000);
     if (!name || !message) return safeError(res, 400, 'Nombre y mensaje son obligatorios.', 'INVALID_TICKET');
     const emailValidationError = getEmailValidationError(email);
     if (emailValidationError) return safeError(res, 400, emailValidationError, 'INVALID_EMAIL');
+    const rawPriority = sanitizeText(req.body?.priority, 20);
+    const priority: SupportTicketPriority =
+      rawPriority === 'baja' || rawPriority === 'alta'
+        ? rawPriority
+        : req.body?.urgency === 'alta'
+          ? 'alta'
+          : 'media';
+    const now = new Date().toISOString();
     const ticket = {
-      id: randomUUID(),
-      ticketCode: `SL-${Math.floor(10000 + Math.random() * 90000)}`,
+      id: sanitizeText(req.body?.id, 100) || `tkt_${randomUUID().slice(0, 12)}`,
+      ticketCode: `TV-${Math.floor(10000 + Math.random() * 90000)}`,
       userId: req.authUser?.id || null,
       name,
       email,
+      category,
       subject: subject || 'Consulta general',
       message,
-      urgency: req.body?.urgency === 'alta' ? ('alta' as const) : ('normal' as const),
-      status: 'open' as const,
-      createdAt: new Date().toISOString(),
+      urgency: (priority === 'alta' ? 'alta' : 'normal') as 'normal' | 'alta',
+      priority,
+      status: 'abierto' as const,
+      createdAt: now,
+      updatedAt: now,
     };
     store.tickets.unshift(ticket);
     if (store.tickets.length > 1000) store.tickets.length = 1000;
@@ -1775,7 +1802,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     }
 
     try {
-      const token = await createFirebaseCustomToken(user.id, user.email, user.name);
+      const token = await createFirebaseCustomToken(user.firebaseUid || user.id, user.email, user.name);
       res.json({ success: true, data: { token } });
     } catch (error) {
       // Sin credenciales del entorno, Email/Password sigue siendo el respaldo.
@@ -1786,6 +1813,34 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
           error instanceof Error ? error.message : String(error)
         }`,
         'FIREBASE_ADMIN_UNAVAILABLE',
+      );
+    }
+  }));
+
+  // Vincula el UID real de Firebase Auth a la cuenta de Express tras registro/login.
+  router.post('/auth/link-firebase', requireAuth, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const user = req.authUser;
+    if (!user) return;
+    const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken.trim() : '';
+    if (!idToken) {
+      return safeError(res, 400, 'Falta idToken de Firebase.', 'MISSING_ID_TOKEN');
+    }
+    try {
+      const verified = await verifyGoogleIdToken(idToken, FIREBASE_PROJECT_ID);
+      if (verified.email && verified.email.toLowerCase() !== user.email.toLowerCase()) {
+        return safeError(res, 403, 'El token de Firebase corresponde a otro correo.', 'FIREBASE_EMAIL_MISMATCH');
+      }
+      user.firebaseUid = verified.uid;
+      user.updatedAt = new Date().toISOString();
+      await saveStore();
+      res.json({ success: true, data: { user: publicUser(user) } });
+    } catch (error) {
+      safeError(
+        res,
+        401,
+        error instanceof Error ? error.message : 'No se pudo verificar el token de Firebase.',
+        'INVALID_FIREBASE_TOKEN',
       );
     }
   }));
@@ -1912,6 +1967,10 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
   router.get('/me/library', requireAuth, asyncRoute(async (req, res) => {
     const store = await getStore();
     if (!req.authUser) return;
+    if (isMonitorStoredUser(req.authUser)) {
+      res.json({ success: true, data: {} });
+      return;
+    }
     const entries = store.library.filter((e) => e.userId === req.authUser?.id);
     const reviews: Record<string, unknown> = {};
     for (const entry of entries) {
@@ -1924,6 +1983,14 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     const store = await getStore();
     const user = req.authUser;
     if (!user) return;
+    if (isMonitorStoredUser(user)) {
+      return safeError(
+        res,
+        403,
+        'Daemon opera como Superusuario de Monitoreo y Soporte; no administra lista personal.',
+        'MONITOR_ACCOUNT_NO_LIBRARY',
+      );
+    }
     const mediaId = sanitizeText(req.params.mediaId, 120);
     if (!mediaId) return safeError(res, 400, 'Título no válido.', 'INVALID_MEDIA');
     const body = req.body?.review || req.body || {};
@@ -2096,6 +2163,10 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
         logoUrl: store.settings.logoUrl,
         communityCommentsEnabled: store.settings.communityCommentsEnabled,
         allowPublicRegistration: store.settings.allowPublicRegistration,
+        catalogPerPage: store.settings.catalogPerPage,
+        modules: store.settings.modules,
+        ratingBoxes: store.settings.ratingBoxes,
+        monitorModeEnforced: store.settings.monitorModeEnforced,
       },
     });
   }));
@@ -2115,16 +2186,21 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     }));
 
     // 2. Cuentas que solo viven en Firestore (sobreviven a los reinicios de
-    //    Cloud Run). Se deduplican por email contra las del servidor.
+    //    Cloud Run). Se deduplican por email y propagan firebaseUid.
     try {
       const cloudUsers = await listFirestoreUsers();
-      const knownEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()));
+      const rowByEmail = new Map(rows.map((row) => [row.email.trim().toLowerCase(), row]));
       for (const cloud of cloudUsers) {
         const email = cloud.email.trim().toLowerCase();
-        if (!email || knownEmails.has(email)) continue;
+        if (!email) continue;
+        const existingRow = rowByEmail.get(email);
+        if (existingRow) {
+          if (!existingRow.firebaseUid) existingRow.firebaseUid = cloud.uid;
+          continue;
+        }
         const name = cloud.displayName || email.split('@')[0] || 'Cinéfilo';
         const createdAt = cloud.createdAt || new Date().toISOString();
-        rows.push({
+        const newRow: AdminUserRow = {
           id: cloud.uid,
           name,
           username: name.toLowerCase().replace(/[^a-z0-9._-]/g, '') || email.split('@')[0],
@@ -2141,12 +2217,15 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
           customFields: [],
           blocked: false,
           mustChangePassword: false,
+          monitorOnly: false,
+          firebaseUid: cloud.uid,
           joinedDate: createdAt.slice(0, 10),
           createdAt,
           lastLoginAt: null,
           sessionsCount: 0,
-        });
-        knownEmails.add(email);
+        };
+        rows.push(newRow);
+        rowByEmail.set(email, newRow);
       }
     } catch (error) {
       console.warn('El panel seguirá mostrando solo las cuentas del servidor:', error);
@@ -2162,6 +2241,66 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json({ success: true, data: items });
+  }));
+
+  router.post('/admin/users', staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+
+    const name = sanitizeText(req.body?.name, 80);
+    const email = sanitizeText(req.body?.email, 160).toLowerCase();
+    const rawUsername = cleanUsername(req.body?.username || '');
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const requestedRole = sanitizeText(req.body?.role, 20);
+    const role: Role = requestedRole === 'admin' && actor.role === 'owner' ? 'admin' : 'user';
+    const firebaseUid = sanitizeText(req.body?.firebaseUid, 128) || null;
+
+    if (!name) return safeError(res, 400, 'Indica el nombre del usuario.', 'INVALID_NAME');
+    const emailErr = getEmailValidationError(email);
+    if (emailErr) return safeError(res, 400, emailErr, 'INVALID_EMAIL');
+    const passwordError = validatePassword(password);
+    if (passwordError) return safeError(res, 400, passwordError, 'INVALID_PASSWORD');
+
+    if (findUserByEmail(store, email)) {
+      return safeError(res, 409, 'Ya existe un usuario con este correo.', 'EMAIL_IN_USE');
+    }
+    if (rawUsername && findUserByIdentifier(store, rawUsername)) {
+      return safeError(res, 409, 'Este nombre de usuario ya está en uso.', 'USERNAME_IN_USE');
+    }
+
+    const user = createUserRecord({
+      id: firebaseUid || undefined,
+      name,
+      username: rawUsername || undefined,
+      email,
+      password,
+      role,
+    });
+    if (firebaseUid) user.firebaseUid = firebaseUid;
+    store.users.push(user);
+
+    addLog(store, {
+      level: 'info',
+      category: 'admin',
+      message: `Usuario creado desde consola admin: ${email} (rol: ${role})`,
+      actorId: actor.id,
+      actorName: actor.name,
+      target: email,
+      ip: getClientIp(req),
+    });
+    addAudit(store, {
+      actorId: actor.id,
+      actorName: actor.name,
+      action: 'user.create',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.name,
+      result: 'success',
+    });
+    await saveStore();
+    void syncUserToFirestore(user).catch(() => undefined);
+    res.json({ success: true, data: publicUser(user) });
   }));
 
   /**
@@ -2661,6 +2800,13 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     if (typeof body.logoUrl === 'string') settings.logoUrl = sanitizeText(body.logoUrl, 300);
     if (typeof body.communityCommentsEnabled === 'boolean') settings.communityCommentsEnabled = body.communityCommentsEnabled;
     if (typeof body.allowPublicRegistration === 'boolean') settings.allowPublicRegistration = body.allowPublicRegistration;
+    if (typeof body.monitorModeEnforced === 'boolean') settings.monitorModeEnforced = body.monitorModeEnforced;
+    if (body.modules && typeof body.modules === 'object') {
+      settings.modules = mergePortalModules({ ...settings.modules, ...body.modules });
+    }
+    if (body.ratingBoxes && typeof body.ratingBoxes === 'object') {
+      settings.ratingBoxes = mergeRatingBoxes({ ...settings.ratingBoxes, ...body.ratingBoxes });
+    }
     if (body.catalogPerPage !== undefined) {
       settings.catalogPerPage = Math.max(8, Math.min(100, Number(body.catalogPerPage) || 24));
     }
@@ -2669,7 +2815,7 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     addLog(store, {
       level: 'info',
       category: 'admin',
-      message: `Configuración general actualizada por ${actor.email}`,
+      message: `Configuración general y casillas actualizadas por ${actor.email}`,
       actorId: actor.id,
       actorName: actor.name,
       ip: getClientIp(req),
@@ -2684,6 +2830,102 @@ Devuelve tu análisis estético y 4 a 6 recomendaciones altamente cinematográfi
     });
     await saveStore();
     res.json({ success: true, data: settings });
+  }));
+
+  router.get('/admin/tickets', staffOnly, asyncRoute(async (_req, res) => {
+    const store = await getStore();
+    const tickets = store.tickets.map((t) => ({
+      id: t.id,
+      ticketCode: t.ticketCode,
+      userId: t.userId || '',
+      name: t.name,
+      email: t.email,
+      category: t.category || 'Soporte Técnico',
+      subject: t.subject,
+      message: t.message,
+      status:
+        t.status === 'open'
+          ? 'abierto'
+          : t.status === 'closed'
+            ? 'cerrado'
+            : t.status,
+      priority: t.priority || (t.urgency === 'alta' ? 'alta' : 'media'),
+      adminNote: t.adminNote,
+      resolvedBy: t.resolvedBy,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt || t.createdAt,
+      source: 'server' as const,
+    }));
+    res.json({ success: true, data: tickets });
+  }));
+
+  router.patch('/admin/tickets/:id', staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+    const ticket = store.tickets.find((t) => t.id === req.params.id);
+    if (!ticket) return safeError(res, 404, 'Ticket no encontrado.', 'NOT_FOUND');
+
+    const validStatuses: SupportTicketStatus[] = ['abierto', 'en_revision', 'resuelto', 'cerrado'];
+    const validPriorities: SupportTicketPriority[] = ['baja', 'media', 'alta'];
+    if (validStatuses.includes(req.body?.status)) {
+      ticket.status = req.body.status;
+    }
+    if (validPriorities.includes(req.body?.priority)) {
+      ticket.priority = req.body.priority;
+      ticket.urgency = req.body.priority === 'alta' ? 'alta' : 'normal';
+    }
+    if (typeof req.body?.adminNote === 'string') {
+      ticket.adminNote = sanitizeMultiline(req.body.adminNote, 2000);
+    }
+    ticket.resolvedBy = actor.name;
+    ticket.updatedAt = new Date().toISOString();
+
+    addAudit(store, {
+      actorId: actor.id,
+      actorName: actor.name,
+      action: 'support.ticket_update',
+      targetType: 'ticket',
+      targetId: ticket.id,
+      targetName: ticket.subject,
+      details: `Estado: ${ticket.status}`,
+      result: 'success',
+    });
+    await saveStore();
+    res.json({ success: true, data: ticket });
+  }));
+
+  router.delete('/admin/tickets/:id', staffOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const before = store.tickets.length;
+    store.tickets = store.tickets.filter((t) => t.id !== req.params.id);
+    if (store.tickets.length === before) {
+      return safeError(res, 404, 'Ticket no encontrado.', 'NOT_FOUND');
+    }
+    await saveStore();
+    res.json({ success: true });
+  }));
+
+  router.post('/admin/cleanup-monitor-library', ownerOnly, asyncRoute(async (req, res) => {
+    const store = await getStore();
+    const actor = req.authUser;
+    if (!actor) return;
+    const monitorIds = new Set(
+      store.users.filter((u) => isMonitorStoredUser(u)).map((u) => u.id),
+    );
+    const before = store.library.length;
+    store.library = store.library.filter((entry) => !monitorIds.has(entry.userId));
+    const removedCount = before - store.library.length;
+    addLog(store, {
+      level: 'info',
+      category: 'admin',
+      message: `Limpieza de lista del superusuario monitor: ${removedCount} entrada(s) removida(s).`,
+      actorId: actor.id,
+      actorName: actor.name,
+      ip: getClientIp(req),
+    });
+    await saveStore();
+    res.json({ success: true, data: { removedCount } });
   }));
 
   router.get('/admin/history', staffOnly, asyncRoute(async (_req, res) => {

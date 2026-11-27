@@ -1,10 +1,15 @@
+import { deleteApp, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
+  getAuth,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  signOut,
   updateProfile,
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { auth, BLUEPRINT_LIMITS, sanitizeFirestoreId } from './firebase';
 
 export type FirebaseIdentityResult =
   | { ok: true; uid: string; created: boolean }
@@ -60,8 +65,12 @@ export async function ensureFirebasePasswordSession(
 
   try {
     const already = auth.currentUser;
-    if (already?.email && already.email.toLowerCase() === cleanEmail.toLowerCase()) {
-      return { ok: true, uid: already.uid, created: false };
+    if (already) {
+      if (already.email && already.email.toLowerCase() === cleanEmail.toLowerCase()) {
+        return { ok: true, uid: already.uid, created: false };
+      }
+      // Nunca reutilizar la sesión Firebase de otra cuenta (p. ej. Daemon).
+      await signOut(auth);
     }
 
     const derived = await deriveFirebasePassword(cleanEmail, password);
@@ -108,11 +117,170 @@ export async function ensureFirebasePasswordSession(
 
     return { ok: true, uid: user.uid, created };
   } catch (error) {
+    if (auth.currentUser && (auth.currentUser.email || '').trim().toLowerCase() !== cleanEmail.toLowerCase()) {
+      await signOut(auth).catch(() => undefined);
+    }
     const code = (error as { code?: string })?.code || 'unknown';
     return {
       ok: false,
       code,
       message: FIREBASE_ERROR_MESSAGES[code] || 'No se pudo sincronizar la sesión con Firebase.',
     };
+  }
+}
+
+/**
+ * Crea o sincroniza una cuenta real en Firebase Auth y Firestore (`users`,
+ * `users_public`, `users/{uid}/private/info`) usando una app secundaria aislada,
+ * sin cerrar la sesión actual de Daemon/Superusuario.
+ */
+export async function provisionFirebaseUserAsAdmin(params: {
+  email: string;
+  password: string;
+  name: string;
+  username?: string;
+  avatar?: string;
+}): Promise<FirebaseIdentityResult & { idToken?: string }> {
+  const cleanEmail = String(params.email || '').trim().toLowerCase();
+  const cleanName = String(params.name || cleanEmail.split('@')[0] || 'Usuario')
+    .trim()
+    .slice(0, BLUEPRINT_LIMITS.NAME_MAX_LEN);
+
+  if (!cleanEmail || !params.password) {
+    return { ok: false, code: 'invalid-argument', message: 'Faltan email y contraseña.' };
+  }
+
+  const tempAppName = `provisioner_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const secondaryApp = initializeApp(firebaseConfig, tempAppName);
+  const secondaryAuth = getAuth(secondaryApp);
+  const secondaryDb =
+    firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+      ? getFirestore(secondaryApp, firebaseConfig.firestoreDatabaseId)
+      : getFirestore(secondaryApp);
+
+  try {
+    const derived = await deriveFirebasePassword(cleanEmail, params.password);
+    let user = null;
+    let created = false;
+    let lastCode = '';
+
+    for (const candidate of [derived, params.password]) {
+      try {
+        const cred = await signInWithEmailAndPassword(secondaryAuth, cleanEmail, candidate);
+        user = cred.user;
+        break;
+      } catch (err) {
+        lastCode = (err as { code?: string })?.code || '';
+      }
+    }
+
+    if (!user) {
+      if (!canCreateAccount(lastCode)) {
+        return {
+          ok: false,
+          code: lastCode || 'unknown',
+          message: FIREBASE_ERROR_MESSAGES[lastCode] || 'No se pudo provisionar el usuario en Firebase.',
+        };
+      }
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, derived);
+      user = cred.user;
+      created = true;
+    }
+
+    try {
+      await updateProfile(user, { displayName: cleanName });
+    } catch {
+      // Opcional
+    }
+
+    const uid = sanitizeFirestoreId(user.uid);
+    const usernameBase = (params.username || cleanName.toLowerCase().replace(/[^a-z0-9._-]/g, '')) || 'usuario';
+    const username = usernameBase.slice(0, BLUEPRINT_LIMITS.USERNAME_MAX_LEN);
+    const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+    const avatar =
+      params.avatar && !params.avatar.startsWith('data:')
+        ? params.avatar.slice(0, BLUEPRINT_LIMITS.AVATAR_MAX_LEN)
+        : defaultAvatar;
+
+    // 1) users/{uid}
+    const userRef = doc(secondaryDb, 'users', uid);
+    const existingUserSnap = await getDoc(userRef).catch(() => null);
+    if (existingUserSnap?.exists()) {
+      await setDoc(
+        userRef,
+        {
+          uid,
+          displayName: cleanName,
+          email: cleanEmail,
+          photoURL: avatar,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } else {
+      await setDoc(userRef, {
+        uid,
+        displayName: cleanName,
+        email: cleanEmail,
+        photoURL: avatar,
+        preferences: {
+          theme: 'dark',
+          language: 'es',
+          favoriteGenres: [],
+          defaultStatus: 'pending',
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // 2) users_public/{uid}
+    await setDoc(doc(secondaryDb, 'users_public', uid), {
+      userId: uid,
+      name: cleanName,
+      username,
+      avatar,
+      bio: '',
+      city: '',
+      favoriteGenres: ['Ciencia Ficción', 'Drama'],
+      updatedAt: serverTimestamp(),
+    });
+
+    // 3) users/{uid}/private/info
+    const privateRef = doc(secondaryDb, 'users', uid, 'private', 'info');
+    const existingPrivate = await getDoc(privateRef).catch(() => null);
+    if (existingPrivate?.exists()) {
+      await setDoc(
+        privateRef,
+        {
+          userId: uid,
+          email: cleanEmail,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } else {
+      await setDoc(privateRef, {
+        userId: uid,
+        email: cleanEmail,
+        role: 'user',
+        blocked: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const idToken = await user.getIdToken().catch(() => undefined);
+    return { ok: true, uid, created, idToken };
+  } catch (error) {
+    const code = (error as { code?: string })?.code || 'unknown';
+    return {
+      ok: false,
+      code,
+      message: FIREBASE_ERROR_MESSAGES[code] || (error instanceof Error ? error.message : 'Error provisionando usuario en Firebase.'),
+    };
+  } finally {
+    await signOut(secondaryAuth).catch(() => undefined);
+    await deleteApp(secondaryApp).catch(() => undefined);
   }
 }
